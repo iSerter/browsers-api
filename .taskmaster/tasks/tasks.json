@@ -1,0 +1,139 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Database Setup and Core Entity Schema",
+        "description": "Set up PostgreSQL database with TypeORM, create initial schema with core entities (BrowserType, AutomationJob, JobArtifact, BrowserWorker, JobLog), implement migrations, and configure database indexes for optimal query performance.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "details": "1. Install dependencies: @nestjs/typeorm, typeorm, pg\n2. Configure TypeORM module in app.module.ts with PostgreSQL connection settings from environment variables\n3. Create entities:\n   - BrowserType: id, name, executablePath, defaultViewport, capabilities\n   - AutomationJob: id, browserTypeId, targetUrl, actions (jsonb), status (enum: pending/processing/completed/failed/cancelled), priority, timeout, createdAt, updatedAt, startedAt, completedAt, retryCount, error\n   - JobArtifact: id, jobId, type, path, size, mimeType, createdAt\n   - BrowserWorker: id, status, lastHeartbeat, currentJobId, capabilities\n   - JobLog: id, jobId, level, message, timestamp, metadata (jsonb)\n4. Create indexes:\n   - AutomationJob: (status, priority) for job polling\n   - AutomationJob: (browserTypeId) for worker specialization\n   - AutomationJob: (createdAt) for cleanup operations\n   - JobArtifact: (jobId) for artifact retrieval\n5. Generate initial migration: npm run typeorm migration:generate -- -n InitialSchema\n6. Create seed data for BrowserType (Chromium, Firefox, WebKit with desktop/mobile viewports)\n7. Set up configuration management using @nestjs/config with validation schema",
+        "testStrategy": "1. Verify database connection successful\n2. Run migrations and confirm all tables created with correct schema\n3. Test entity CRUD operations through TypeORM repositories\n4. Verify indexes exist using PostgreSQL EXPLAIN ANALYZE\n5. Validate seed data inserted correctly\n6. Test configuration loading from environment variables\n7. Verify foreign key constraints work as expected",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Nest.js Application Structure and Configuration",
+        "description": "Create foundational Nest.js application structure with modules, controllers, services, DTOs, guards, middleware, and configuration management following best practices.",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "1. Initialize Nest.js project structure:\n   - src/modules/jobs (JobsModule, JobsController, JobsService)\n   - src/modules/browsers (BrowsersModule, BrowsersController, BrowsersService)\n   - src/modules/workers (WorkersModule, WorkersService)\n   - src/modules/actions (ActionsModule, ActionsService)\n2. Create DTOs with class-validator:\n   - CreateJobDto: browserTypeId, targetUrl, actions[], timeout\n   - JobResponseDto: id, status, createdAt, etc.\n   - UpdateJobStatusDto: status, error\n3. Implement global exception filter for consistent error responses:\n   - HttpExceptionFilter extending BaseExceptionFilter\n   - Format: { success: false, data: null, error: {...}, metadata: {...} }\n4. Create response interceptor for consistent success responses:\n   - TransformInterceptor implementing NestInterceptor\n   - Format: { success: true, data: {...}, error: null, metadata: {...} }\n5. Set up validation pipe globally with whitelist and transform options\n6. Create configuration service using @nestjs/config:\n   - DatabaseConfig, ServerConfig, BrowserConfig, WorkerConfig\n7. Implement health check module using @nestjs/terminus\n8. Set up logging with Winston or Nest.js built-in logger with structured format",
+        "testStrategy": "1. Test module imports and dependency injection\n2. Verify DTOs validate input correctly with invalid data\n3. Test exception filter returns proper error format\n4. Verify response interceptor transforms successful responses\n5. Test configuration service loads all required values\n6. Verify health check endpoint returns system status\n7. Test logging outputs structured JSON format\n8. Integration test: POST request validates and returns proper format",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Job Submission and Status API Endpoints",
+        "description": "Implement RESTful API endpoints for job submission, status retrieval, job listing, and cancellation with proper validation, error handling, and response formatting.",
+        "status": "pending",
+        "dependencies": [
+          2
+        ],
+        "priority": "high",
+        "details": "1. Implement JobsController endpoints:\n   - POST /api/v1/jobs: Create new job\n   - GET /api/v1/jobs/:id: Get job status and details\n   - GET /api/v1/jobs: List jobs with pagination and filtering\n   - DELETE /api/v1/jobs/:id: Cancel pending/processing job\n   - GET /api/v1/jobs/:id/artifacts: List job artifacts\n2. Implement JobsService methods:\n   - createJob(dto): Validate browser type exists, create job with 'pending' status, return job ID immediately\n   - getJobById(id): Retrieve job with related artifacts\n   - listJobs(filters, pagination): Query with status, browserType filters\n   - cancelJob(id): Update status to 'cancelled' if not completed/failed\n   - getJobArtifacts(jobId): Retrieve all artifacts for job\n3. Add validation:\n   - URL format validation for targetUrl\n   - Timeout range validation (1000-300000ms)\n   - Browser type ID exists in database\n   - Actions array not empty and valid action types\n4. Implement pagination:\n   - Query params: page, limit (default 20, max 100)\n   - Response includes: items[], total, page, totalPages\n5. Add filtering:\n   - status, browserTypeId, createdAfter, createdBefore\n6. Create repository methods with optimized queries:\n   - Use QueryBuilder for complex filters\n   - Eager load relationships where needed",
+        "testStrategy": "1. Unit test JobsService methods with mocked repositories\n2. Test job creation returns job ID immediately\n3. Verify invalid URLs rejected with proper error\n4. Test pagination returns correct page of results\n5. Verify filtering by status works correctly\n6. Test job cancellation only works for pending/processing jobs\n7. Integration test: Create job, retrieve status, verify response format\n8. Test concurrent job creation doesn't cause race conditions\n9. Verify 404 returned for non-existent job IDs",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Playwright Integration and Browser Management",
+        "description": "Integrate Playwright for browser automation, implement browser instance lifecycle management, and create browser pool with configurable min/max sizes and idle timeout handling.",
+        "status": "pending",
+        "dependencies": [
+          2
+        ],
+        "priority": "high",
+        "details": "1. Install Playwright: npm install playwright\n2. Create BrowserPoolService:\n   - Maintain Map<browserType, BrowserPool>\n   - Pool config: minSize (2), maxSize (10), idleTimeout (300000ms)\n   - Methods: acquireBrowser(type), releaseBrowser(instance), cleanup()\n3. Implement BrowserPool class:\n   - availableInstances: Browser[]\n   - activeInstances: Set<Browser>\n   - createBrowser(): Launch browser with args [--no-sandbox, --disable-setuid-sandbox, --disable-dev-shm-usage]\n   - acquire(): Return available or create new (if < maxSize), wait if at max\n   - release(browser): Add to available, start idle timer\n   - closeIdleBrowsers(): Close browsers idle > timeout\n4. Create BrowserContextManager:\n   - createContext(browser, options): New context with viewport, userAgent\n   - closeContext(context): Cleanup pages and context\n   - setResourceLimits(context): Memory/CPU limits per context\n5. Implement browser type configurations:\n   - Chromium: chromium.launch({ headless: true, args: [...] })\n   - Firefox: firefox.launch({ headless: true })\n   - WebKit: webkit.launch({ headless: true })\n6. Add viewport presets:\n   - Desktop: 1920x1080\n   - Mobile: 375x667 (iPhone), 412x915 (Android)\n7. Implement graceful shutdown:\n   - Close all contexts and browsers on SIGTERM/SIGINT\n8. Add browser health checks:\n   - Periodic validation of browser instances\n   - Replace unhealthy instances",
+        "testStrategy": "1. Test browser pool initializes with minSize instances\n2. Verify acquire() returns working browser instance\n3. Test pool doesn't exceed maxSize under load\n4. Verify idle browsers closed after timeout\n5. Test browser context creation with different viewports\n6. Verify resource limits applied to contexts\n7. Test graceful shutdown closes all browsers\n8. Load test: Acquire/release 100 browsers concurrently\n9. Verify browser health check replaces failed instances",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Screenshot Action Handler Implementation",
+        "description": "Implement the screenshot action handler with Playwright, supporting full-page and viewport screenshots, various formats (PNG, JPEG), quality settings, and proper error handling.",
+        "status": "pending",
+        "dependencies": [
+          4
+        ],
+        "priority": "high",
+        "details": "1. Create ActionHandler interface:\n   - execute(context: BrowserContext, action: ActionConfig): Promise<ActionResult>\n2. Implement ScreenshotActionHandler:\n   - Navigate to targetUrl with waitUntil: 'networkidle'\n   - Handle options: fullPage (boolean), type (png/jpeg), quality (0-100)\n   - Take screenshot: page.screenshot({ fullPage, type, quality })\n   - Save to artifacts directory: /artifacts/{jobId}/{timestamp}-screenshot.{ext}\n   - Create JobArtifact record with path, size, mimeType\n   - Return ActionResult with artifact info\n3. Add navigation options:\n   - timeout: configurable (default 30000ms)\n   - waitUntil: 'load' | 'domcontentloaded' | 'networkidle'\n4. Implement wait strategies:\n   - waitForSelector: Wait for specific element before screenshot\n   - waitForTimeout: Fixed delay before screenshot\n5. Error handling:\n   - TimeoutError: Navigation timeout\n   - NetworkError: Failed to load page\n   - InvalidURLError: Malformed URL\n   - Retry logic: 3 attempts with exponential backoff (1s, 2s, 4s)\n6. Create ArtifactStorageService:\n   - saveArtifact(buffer, jobId, filename): Save to filesystem/S3\n   - getArtifact(path): Retrieve artifact\n   - deleteArtifact(path): Cleanup\n7. Add screenshot optimizations:\n   - Disable images/CSS for faster loading (optional)\n   - Set viewport before navigation\n   - Block unnecessary resources (ads, analytics)",
+        "testStrategy": "1. Test screenshot of simple HTML page succeeds\n2. Verify full-page screenshot captures entire page\n3. Test viewport screenshot captures visible area only\n4. Verify JPEG quality setting affects file size\n5. Test navigation timeout throws proper error\n6. Verify retry logic attempts 3 times on failure\n7. Test artifact saved to correct path with metadata\n8. Verify waitForSelector waits for element\n9. Test error handling for invalid URLs\n10. Integration test: Submit job, verify screenshot artifact created",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Job Processor Worker Implementation",
+        "description": "Create the job processor worker that polls the queue, acquires browser instances, executes actions, handles retries, updates job status, and manages worker lifecycle with heartbeat monitoring.",
+        "status": "pending",
+        "dependencies": [
+          5
+        ],
+        "priority": "high",
+        "details": "1. Create JobProcessorService:\n   - pollInterval: 1000ms\n   - maxConcurrentJobs: 5 per worker\n   - Methods: start(), stop(), processJob(job)\n2. Implement job polling:\n   - Query: SELECT * FROM automation_job WHERE status = 'pending' ORDER BY priority DESC, created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED\n   - Update status to 'processing' immediately\n   - Record startedAt timestamp\n3. Implement processJob(job):\n   - Acquire browser from pool based on browserTypeId\n   - Create browser context with job configuration\n   - Execute each action in sequence using ActionHandlers\n   - Collect artifacts and results\n   - Update job status to 'completed' with completedAt\n   - Release browser back to pool\n4. Add error handling:\n   - Catch all errors during execution\n   - Categorize: TimeoutError, NetworkError, BrowserError, UnknownError\n   - Implement retry logic:\n     - Retryable errors: TimeoutError, NetworkError (max 3 retries)\n     - Non-retryable: InvalidURLError, AuthenticationError\n     - Exponential backoff: retryCount^2 seconds\n   - Update job status to 'failed' after max retries\n   - Store error details in job.error field\n5. Create JobLogService:\n   - logJobEvent(jobId, level, message, metadata)\n   - Levels: debug, info, warn, error\n6. Implement WorkerHeartbeatService:\n   - Register worker on startup\n   - Update lastHeartbeat every 10 seconds\n   - Mark worker as inactive if heartbeat > 30 seconds old\n7. Add graceful shutdown:\n   - Stop polling on SIGTERM\n   - Wait for active jobs to complete (max 60s)\n   - Release all browser instances\n   - Update worker status to 'stopped'\n8. Create WorkerManagerService:\n   - Monitor worker health\n   - Reassign jobs from dead workers\n   - Scale workers based on queue depth",
+        "testStrategy": "1. Test worker polls and picks up pending jobs\n2. Verify job status updated to 'processing' immediately\n3. Test successful job execution updates status to 'completed'\n4. Verify retry logic attempts 3 times for retryable errors\n5. Test non-retryable errors fail immediately\n6. Verify exponential backoff delays between retries\n7. Test worker heartbeat updates every 10 seconds\n8. Verify graceful shutdown waits for active jobs\n9. Test concurrent job processing (5 jobs simultaneously)\n10. Integration test: Submit job, verify worker processes and completes\n11. Test dead worker detection and job reassignment",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Additional Action Handlers (Form Fill, PDF, Data Extraction)",
+        "description": "Implement form-fill, PDF generation, and data extraction action handlers with comprehensive options, validation, and error handling to expand automation capabilities.",
+        "status": "pending",
+        "dependencies": [
+          6
+        ],
+        "priority": "medium",
+        "details": "1. Implement FormFillActionHandler:\n   - Options: fields[] { selector, value, type (text/select/checkbox/radio) }\n   - Navigate to targetUrl\n   - For each field:\n     - Wait for selector: page.waitForSelector(selector, { timeout: 5000 })\n     - Fill based on type:\n       - text: page.fill(selector, value)\n       - select: page.selectOption(selector, value)\n       - checkbox: page.check(selector) or page.uncheck(selector)\n       - radio: page.click(selector)\n   - Optional submit: page.click(submitSelector) if provided\n   - Wait for navigation if submit clicked\n   - Return success with filled fields count\n2. Implement PDFGenerationActionHandler:\n   - Options: format (A4/Letter), landscape (boolean), printBackground (boolean), margin\n   - Navigate to targetUrl with waitUntil: 'networkidle'\n   - Generate PDF: page.pdf({ format, landscape, printBackground, margin })\n   - Save to artifacts with .pdf extension\n   - Return artifact info\n3. Implement DataExtractionActionHandler:\n   - Options: selectors[] { name, selector, attribute, multiple }\n   - Navigate to targetUrl\n   - For each selector:\n     - Extract data: page.locator(selector).getAttribute(attribute) or .textContent()\n     - Handle multiple: page.locator(selector).all() if multiple=true\n   - Return extracted data as JSON object\n   - Optionally save as artifact\n4. Implement ClickActionHandler:\n   - Options: selector, waitForNavigation (boolean), waitForSelector (string)\n   - Click element: page.click(selector)\n   - Wait for navigation if specified\n   - Wait for specific selector if provided\n   - Return success\n5. Add action validation:\n   - Validate required options present\n   - Validate selector syntax\n   - Validate value types match field types\n6. Create ActionHandlerFactory:\n   - Register all handlers: screenshot, formFill, pdf, dataExtraction, click\n   - getHandler(actionType): Return appropriate handler\n7. Update JobProcessorService to use ActionHandlerFactory",
+        "testStrategy": "1. Test form fill with text inputs on sample form\n2. Verify select dropdown selection works\n3. Test checkbox and radio button interactions\n4. Verify form submission and navigation\n5. Test PDF generation with different formats\n6. Verify PDF includes background graphics\n7. Test data extraction from simple HTML\n8. Verify multiple element extraction returns array\n9. Test click action triggers navigation\n10. Verify action validation rejects invalid options\n11. Integration test: Submit job with multiple actions in sequence",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "API Authentication and Rate Limiting",
+        "description": "Implement API key authentication system with database-backed keys, role-based access control, and rate limiting per client to secure the API and prevent abuse.",
+        "status": "pending",
+        "dependencies": [
+          3
+        ],
+        "priority": "high",
+        "details": "1. Create ApiKey entity:\n   - id, key (unique, indexed), clientId, name, isActive, rateLimit (requests/minute), createdAt, lastUsedAt\n2. Create ApiKeysModule with CRUD operations:\n   - generateApiKey(): Create cryptographically secure key using crypto.randomBytes(32).toString('hex')\n   - validateApiKey(key): Check if key exists and isActive\n   - revokeApiKey(key): Set isActive to false\n3. Implement AuthGuard:\n   - Extract API key from header: X-API-Key or Authorization: Bearer {key}\n   - Validate key using ApiKeysService\n   - Attach client info to request object\n   - Return 401 Unauthorized if invalid/missing\n4. Implement RateLimitGuard using @nestjs/throttler:\n   - Install: npm install @nestjs/throttler\n   - Configure per-client limits from ApiKey.rateLimit\n   - Use Redis for distributed rate limiting (optional, fallback to memory)\n   - Return 429 Too Many Requests with headers:\n     - X-RateLimit-Limit: limit\n     - X-RateLimit-Remaining: remaining\n     - X-RateLimit-Reset: reset timestamp\n5. Apply guards globally or per controller:\n   - @UseGuards(AuthGuard, RateLimitGuard)\n6. Create admin endpoints for API key management:\n   - POST /api/v1/admin/api-keys: Generate new key\n   - GET /api/v1/admin/api-keys: List all keys\n   - DELETE /api/v1/admin/api-keys/:id: Revoke key\n7. Add request logging middleware:\n   - Log: timestamp, clientId, endpoint, method, statusCode, duration\n   - Store in database or send to logging service\n8. Implement URL whitelist/blacklist:\n   - Create UrlPolicy entity: pattern, type (whitelist/blacklist)\n   - Validate targetUrl against policies before job creation\n   - Return 403 Forbidden for blocked URLs",
+        "testStrategy": "1. Test API key generation creates unique keys\n2. Verify valid API key allows request\n3. Test invalid API key returns 401\n4. Verify rate limiting blocks requests after limit\n5. Test rate limit headers returned correctly\n6. Verify rate limit resets after time window\n7. Test API key revocation blocks future requests\n8. Verify request logging captures all required fields\n9. Test URL whitelist allows only permitted domains\n10. Verify blacklist blocks specified URLs\n11. Load test: Verify rate limiting under concurrent requests",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "WebSocket Gateway for Real-time Job Updates",
+        "description": "Implement Socket.io WebSocket gateway for real-time job status updates, progress notifications, and connection management with authentication and room-based broadcasting.",
+        "status": "pending",
+        "dependencies": [
+          8
+        ],
+        "priority": "medium",
+        "details": "1. Install Socket.io: npm install @nestjs/websockets @nestjs/platform-socket.io socket.io\n2. Create JobEventsGateway:\n   - @WebSocketGateway({ cors: true, namespace: '/jobs' })\n   - Implement OnGatewayConnection, OnGatewayDisconnect\n3. Implement authentication:\n   - Extract API key from handshake query or auth header\n   - Validate using ApiKeysService\n   - Disconnect if invalid\n4. Implement connection management:\n   - handleConnection(client): Validate auth, store client mapping\n   - handleDisconnect(client): Cleanup client data\n   - Track active connections per client\n5. Create room-based subscriptions:\n   - Client subscribes to specific job: client.join(`job:${jobId}`)\n   - Client subscribes to all their jobs: client.join(`client:${clientId}`)\n   - Handle @SubscribeMessage('subscribe') event\n6. Implement event broadcasting:\n   - job.created: { jobId, status, createdAt }\n   - job.started: { jobId, status, startedAt }\n   - job.progress: { jobId, progress, message } (for multi-step actions)\n   - job.completed: { jobId, status, completedAt, artifacts[] }\n   - job.failed: { jobId, status, error }\n7. Update JobProcessorService to emit events:\n   - Inject JobEventsGateway\n   - Emit events at each status change\n   - Emit progress events during long-running actions\n8. Add heartbeat/ping-pong:\n   - Server sends ping every 30 seconds\n   - Client responds with pong\n   - Disconnect if no pong after 60 seconds\n9. Implement reconnection handling:\n   - Send missed events on reconnection\n   - Store recent events in Redis (last 100 per job)\n10. Add connection limits:\n    - Max connections per API key\n    - Reject new connections if limit exceeded",
+        "testStrategy": "1. Test WebSocket connection with valid API key succeeds\n2. Verify invalid API key disconnects immediately\n3. Test client can subscribe to specific job\n4. Verify job.created event received on job submission\n5. Test job.completed event includes artifacts\n6. Verify events only sent to subscribed clients\n7. Test reconnection receives missed events\n8. Verify heartbeat disconnects inactive clients\n9. Test connection limit enforced per API key\n10. Load test: 100 concurrent WebSocket connections\n11. Integration test: Submit job, connect WebSocket, verify all lifecycle events received",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Monitoring, Logging, and Health Checks",
+        "description": "Implement comprehensive monitoring with Prometheus metrics, structured logging with correlation IDs, health check endpoints, and performance dashboards for production observability.",
+        "status": "pending",
+        "dependencies": [
+          9
+        ],
+        "priority": "medium",
+        "details": "1. Install Prometheus client: npm install @willsoto/nestjs-prometheus prom-client\n2. Create MetricsModule:\n   - Register PrometheusModule.register()\n   - Expose metrics endpoint: GET /metrics\n3. Implement custom metrics:\n   - Counter: jobs_created_total (labels: browserType, status)\n   - Counter: jobs_completed_total (labels: browserType, status)\n   - Counter: jobs_failed_total (labels: browserType, errorType)\n   - Histogram: job_duration_seconds (labels: browserType, actionType)\n   - Gauge: active_jobs (current processing jobs)\n   - Gauge: browser_pool_size (labels: browserType, state: available/active)\n   - Gauge: worker_count (labels: status: active/inactive)\n   - Counter: api_requests_total (labels: endpoint, method, statusCode)\n   - Histogram: api_request_duration_seconds (labels: endpoint, method)\n4. Create MetricsService:\n   - Methods to increment/observe metrics\n   - Inject into services and controllers\n5. Implement structured logging:\n   - Use Winston with JSON format\n   - Include: timestamp, level, message, context, correlationId, metadata\n   - Create LoggerService wrapper\n   - Add correlation ID middleware:\n     - Generate UUID for each request\n     - Store in AsyncLocalStorage\n     - Include in all logs\n6. Enhance health checks using @nestjs/terminus:\n   - Database health: TypeOrmHealthIndicator\n   - Memory health: MemoryHealthIndicator (heap < 300MB)\n   - Disk health: DiskHealthIndicator (storage > 10% free)\n   - Custom browser pool health: Check pool availability\n   - Custom worker health: Check active workers > 0\n   - Endpoints:\n     - GET /health: Overall health (returns 503 if any check fails)\n     - GET /health/ready: Readiness probe (database + workers)\n     - GET /health/live: Liveness probe (basic app health)\n7. Create performance monitoring:\n   - Track slow queries (> 1s)\n   - Monitor browser pool wait times\n   - Alert on high error rates\n8. Implement log aggregation:\n   - Configure Winston transports for ELK/CloudWatch\n   - Add request/response logging middleware\n   - Log all job lifecycle events with full context\n9. Create admin dashboard endpoints:\n   - GET /api/v1/admin/stats: System statistics\n   - GET /api/v1/admin/workers: Worker status\n   - GET /api/v1/admin/queue: Queue depth and metrics",
+        "testStrategy": "1. Test /metrics endpoint returns Prometheus format\n2. Verify job metrics increment on job creation/completion\n3. Test histogram records job duration correctly\n4. Verify gauge reflects current active jobs\n5. Test health check returns 200 when healthy\n6. Verify health check returns 503 when database down\n7. Test correlation ID present in all logs for request\n8. Verify structured logs parseable as JSON\n9. Test slow query logging triggers for queries > 1s\n10. Verify browser pool metrics reflect actual pool state\n11. Load test: Verify metrics accurate under high load\n12. Test admin endpoints return correct statistics",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-10-18T01:38:21.204Z",
+      "updated": "2025-10-18T01:38:21.204Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
