@@ -26,6 +26,32 @@ Create a new automation job.
 }
 ```
 
+**Response:**
+```json
+{
+  "jobId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "pending",
+  "createdAt": "2025-10-18T10:00:00Z"
+}
+```
+
+#### `GET /api/v1/jobs/:jobId`
+Get job status and results.
+
+**Response:**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "actionType": "screenshot",
+  "result": {
+    "screenshotUrl": "/api/v1/jobs/550e8400.../artifacts/screenshot.png",
+    "duration": 2500
+  },
+  "createdAt": "2025-10-18T10:00:00Z",
+  "completedAt": "2025-10-18T10:00:03Z"
+}
+```
 
 ## Tech Stack
 

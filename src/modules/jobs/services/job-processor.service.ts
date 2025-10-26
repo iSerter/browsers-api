@@ -15,6 +15,7 @@ import { WorkerManagerService } from './worker-manager.service';
 import { LogLevel } from '../entities/job-log.entity';
 import { WorkerStatus } from '../../workers/entities/browser-worker.entity';
 import { Browser, Page } from 'playwright';
+import { JobEventsGateway } from '../gateways/job-events.gateway';
 
 @Injectable()
 export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
@@ -32,6 +33,7 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
     private readonly actionHandlerFactory: ActionHandlerFactory,
     private readonly jobLogService: JobLogService,
     private readonly workerManagerService: WorkerManagerService,
+    private readonly jobEventsGateway: JobEventsGateway,
   ) {}
 
   async onModuleInit() {
@@ -129,6 +131,18 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       await queryRunner.release();
 
       this.logger.log(`Picked up job ${job.id} for processing`);
+      
+      // Emit job started event
+      this.jobEventsGateway.emitJobEvent({
+        type: 'job.started',
+        jobId: job.id,
+        status: JobStatus.PROCESSING,
+        timestamp: job.startedAt,
+        data: {
+          startedAt: job.startedAt,
+        },
+      });
+      
       this.jobLogService.logJobEvent(
         job.id,
         LogLevel.INFO,
@@ -170,6 +184,19 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
         // Mark job as completed
         job.status = JobStatus.COMPLETED;
         job.completedAt = new Date();
+
+      // Emit job completed event
+      this.jobEventsGateway.emitJobEvent({
+        type: 'job.completed',
+        jobId: job.id,
+        status: JobStatus.COMPLETED,
+        timestamp: job.completedAt,
+        data: {
+          completedAt: job.completedAt,
+          artifacts: job.artifacts || [],
+          result: job.result,
+        },
+      });
 
       await this.jobLogService.logJobEvent(
         job.id,
@@ -223,12 +250,26 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       const results: any[] = [];
 
       // Execute each action in sequence on the same page
-      for (const actionConfig of job.actions) {
+      for (let i = 0; i < job.actions.length; i++) {
+        const actionConfig = job.actions[i];
         await this.jobLogService.logJobEvent(
           job.id,
           LogLevel.DEBUG,
           `Executing action: ${actionConfig.action}`,
         );
+
+        // Emit progress event
+        this.jobEventsGateway.emitJobEvent({
+          type: 'job.progress',
+          jobId: job.id,
+          status: JobStatus.PROCESSING,
+          timestamp: new Date(),
+          data: {
+            progress: Math.round(((i + 1) / job.actions.length) * 100),
+            message: `Executing action ${i + 1} of ${job.actions.length}: ${actionConfig.action}`,
+            step: actionConfig.action,
+          },
+        });
 
         const handler = this.actionHandlerFactory.getHandler(
           actionConfig.action,
@@ -310,17 +351,18 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
     job: AutomationJob,
     error: Error,
   ): Promise<void> {
-    await this.jobLogService.logJobEvent(job.id, LogLevel.ERROR, error.message, {
-      errorName: error.name,
-      stack: error.stack,
-    });
+      await this.jobLogService.logJobEvent(job.id, LogLevel.ERROR, error.message, {
+        errorName: error.name,
+        stack: error.stack,
+      });
 
-    // Categorize error
-    const errorCategory = this.categorizeError(error);
-    const isRetryable = this.isRetryableError(error);
+      // Categorize error
+      const errorCategory = this.categorizeError(error);
+      const isRetryable = this.isRetryableError(error);
 
-    // Determine retry strategy
-    if (isRetryable && job.retryCount < job.maxRetries) {
+      // Determine retry strategy
+      if (isRetryable && job.retryCount < job.maxRetries) {
+        // Don't emit job.failed yet, it will be retried
       job.retryCount++;
       job.status = JobStatus.PENDING;
       job.startedAt = undefined as any;
@@ -347,6 +389,19 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       job.status = JobStatus.FAILED;
       job.completedAt = new Date();
       job.errorMessage = error.message;
+
+      // Emit job failed event
+      this.jobEventsGateway.emitJobEvent({
+        type: 'job.failed',
+        jobId: job.id,
+        status: JobStatus.FAILED,
+        timestamp: job.completedAt,
+        data: {
+          error: errorCategory,
+          errorMessage: error.message,
+          completedAt: job.completedAt,
+        },
+      });
 
       this.logger.error(`Job ${job.id} failed permanently: ${error.message}`);
 

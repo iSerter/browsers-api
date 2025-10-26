@@ -18,6 +18,7 @@ import { ActionHandlerFactory } from './factories/action-handler.factory';
 import { ScreenshotActionHandler } from './handlers/screenshot-action.handler';
 import { FillActionHandler } from './handlers/fill-action.handler';
 import { ClickActionHandler } from './handlers/click-action.handler';
+import { JobEventsGateway } from './gateways/job-events.gateway';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ClickActionHandler } from './handlers/click-action.handler';
     FillActionHandler,
     ClickActionHandler,
     ActionHandlerFactory,
+    JobEventsGateway,
   ],
   exports: [
     JobsService,

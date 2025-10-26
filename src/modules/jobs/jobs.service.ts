@@ -10,6 +10,7 @@ import { JobArtifact } from './entities/job-artifact.entity';
 import { CreateJobDto } from './dto/create-job.dto';
 import { ListJobsQueryDto } from './dto/list-jobs-query.dto';
 import { BrowsersService } from '../browsers/browsers.service';
+import { JobEventsGateway } from './gateways/job-events.gateway';
 
 @Injectable()
 export class JobsService {
@@ -19,6 +20,7 @@ export class JobsService {
     @InjectRepository(JobArtifact)
     private readonly artifactRepository: Repository<JobArtifact>,
     private readonly browsersService: BrowsersService,
+    private readonly jobEventsGateway: JobEventsGateway,
   ) {}
 
   async createJob(createJobDto: CreateJobDto) {
@@ -43,6 +45,17 @@ export class JobsService {
     });
 
     const savedJob = await this.jobRepository.save(job);
+
+    // Emit job created event
+    this.jobEventsGateway.emitJobEvent({
+      type: 'job.created',
+      jobId: savedJob.id,
+      status: JobStatus.PENDING,
+      timestamp: savedJob.createdAt,
+      data: {
+        createdAt: savedJob.createdAt,
+      },
+    });
 
     return {
       jobId: savedJob.id,
