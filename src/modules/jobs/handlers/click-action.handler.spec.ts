@@ -136,7 +136,9 @@ describe('ClickActionHandler', () => {
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
       expect(result.success).toBe(false);
-      expect(result.error?.message).toContain('requires target and getTargetBy');
+      expect(result.error?.message).toContain(
+        'requires target and getTargetBy',
+      );
     });
 
     it('should return error when getTargetBy is missing', async () => {
@@ -148,7 +150,9 @@ describe('ClickActionHandler', () => {
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
       expect(result.success).toBe(false);
-      expect(result.error?.message).toContain('requires target and getTargetBy');
+      expect(result.error?.message).toContain(
+        'requires target and getTargetBy',
+      );
     });
 
     it('should return error when element not found', async () => {
@@ -200,4 +204,3 @@ describe('ClickActionHandler', () => {
     });
   });
 });
-

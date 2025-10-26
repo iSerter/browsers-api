@@ -44,4 +44,3 @@ export class UrlPolicy {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
-

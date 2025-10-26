@@ -8,7 +8,12 @@ import {
 
 interface ClickActionConfig extends ActionConfig {
   target: string;
-  getTargetBy: 'getByLabel' | 'getByText' | 'getByRole' | 'getBySelector' | 'getByPlaceholder';
+  getTargetBy:
+    | 'getByLabel'
+    | 'getByText'
+    | 'getByRole'
+    | 'getBySelector'
+    | 'getByPlaceholder';
   button?: 'left' | 'right' | 'middle';
   clickCount?: number;
   waitForNavigation?: boolean;
@@ -23,7 +28,13 @@ export class ClickActionHandler implements IActionHandler {
     config: ClickActionConfig,
     jobId: string,
   ): Promise<ActionResult> {
-    const { target, getTargetBy, button = 'left', clickCount = 1, waitForNavigation = false } = config;
+    const {
+      target,
+      getTargetBy,
+      button = 'left',
+      clickCount = 1,
+      waitForNavigation = false,
+    } = config;
 
     try {
       this.logger.log(
@@ -45,7 +56,9 @@ export class ClickActionHandler implements IActionHandler {
         await locator.click({ button, clickCount });
       }
 
-      this.logger.debug(`Clicked element: ${target} (button: ${button}, count: ${clickCount})`);
+      this.logger.debug(
+        `Clicked element: ${target} (button: ${button}, count: ${clickCount})`,
+      );
 
       // Wait for navigation after click if requested
       if (waitForNavigation) {
@@ -66,7 +79,9 @@ export class ClickActionHandler implements IActionHandler {
         },
       };
     } catch (error) {
-      this.logger.error(`Click action failed for job ${jobId}: ${error.message}`);
+      this.logger.error(
+        `Click action failed for job ${jobId}: ${error.message}`,
+      );
 
       return {
         success: false,

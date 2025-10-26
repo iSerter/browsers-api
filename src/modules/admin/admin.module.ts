@@ -9,4 +9,3 @@ import { BrowsersModule } from '../browsers/browsers.module';
   controllers: [AdminController],
 })
 export class AdminModule {}
-

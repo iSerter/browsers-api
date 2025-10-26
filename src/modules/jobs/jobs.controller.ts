@@ -37,7 +37,7 @@ export class JobsController {
     const isAllowed = await this.apiKeysService.checkUrlAllowed(
       createJobDto.targetUrl,
     );
-    
+
     if (!isAllowed) {
       throw new ForbiddenException(
         'The requested URL is not allowed by policy configuration',

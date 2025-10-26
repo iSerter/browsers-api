@@ -46,9 +46,10 @@ export class AdminController {
           firefoxStats.availableCount +
           webkitStats.availableCount,
         totalActive:
-          chromiumStats.activeCount + firefoxStats.activeCount + webkitStats.activeCount,
+          chromiumStats.activeCount +
+          firefoxStats.activeCount +
+          webkitStats.activeCount,
       },
     };
   }
 }
-

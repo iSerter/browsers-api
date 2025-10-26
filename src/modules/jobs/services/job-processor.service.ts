@@ -131,7 +131,7 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       await queryRunner.release();
 
       this.logger.log(`Picked up job ${job.id} for processing`);
-      
+
       // Emit job started event
       this.jobEventsGateway.emitJobEvent({
         type: 'job.started',
@@ -142,7 +142,7 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
           startedAt: job.startedAt,
         },
       });
-      
+
       this.jobLogService.logJobEvent(
         job.id,
         LogLevel.INFO,
@@ -185,24 +185,24 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
         job.status = JobStatus.COMPLETED;
         job.completedAt = new Date();
 
-      // Emit job completed event
-      this.jobEventsGateway.emitJobEvent({
-        type: 'job.completed',
-        jobId: job.id,
-        status: JobStatus.COMPLETED,
-        timestamp: job.completedAt,
-        data: {
-          completedAt: job.completedAt,
-          artifacts: job.artifacts || [],
-          result: job.result,
-        },
-      });
+        // Emit job completed event
+        this.jobEventsGateway.emitJobEvent({
+          type: 'job.completed',
+          jobId: job.id,
+          status: JobStatus.COMPLETED,
+          timestamp: job.completedAt,
+          data: {
+            completedAt: job.completedAt,
+            artifacts: job.artifacts || [],
+            result: job.result,
+          },
+        });
 
-      await this.jobLogService.logJobEvent(
-        job.id,
-        LogLevel.INFO,
-        'Job processing completed successfully',
-      );
+        await this.jobLogService.logJobEvent(
+          job.id,
+          LogLevel.INFO,
+          'Job processing completed successfully',
+        );
       } finally {
         // Release browser back to pool
         await this.releaseBrowser(browser, job.browserTypeId);
@@ -351,18 +351,23 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
     job: AutomationJob,
     error: Error,
   ): Promise<void> {
-      await this.jobLogService.logJobEvent(job.id, LogLevel.ERROR, error.message, {
+    await this.jobLogService.logJobEvent(
+      job.id,
+      LogLevel.ERROR,
+      error.message,
+      {
         errorName: error.name,
         stack: error.stack,
-      });
+      },
+    );
 
-      // Categorize error
-      const errorCategory = this.categorizeError(error);
-      const isRetryable = this.isRetryableError(error);
+    // Categorize error
+    const errorCategory = this.categorizeError(error);
+    const isRetryable = this.isRetryableError(error);
 
-      // Determine retry strategy
-      if (isRetryable && job.retryCount < job.maxRetries) {
-        // Don't emit job.failed yet, it will be retried
+    // Determine retry strategy
+    if (isRetryable && job.retryCount < job.maxRetries) {
+      // Don't emit job.failed yet, it will be retried
       job.retryCount++;
       job.status = JobStatus.PENDING;
       job.startedAt = undefined as any;

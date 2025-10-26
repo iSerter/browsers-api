@@ -33,7 +33,7 @@ describe('JobEventsGateway', () => {
       disconnectSockets: jest.fn(),
     };
 
-    gateway.server = mockServer as any;
+    gateway.server = mockServer;
 
     // Mock socket
     mockSocket = {
@@ -70,7 +70,9 @@ describe('JobEventsGateway', () => {
       await gateway.handleConnection(mockSocket);
 
       expect(mockSocket.disconnect).toHaveBeenCalled();
-      expect(mockApiKeysService.validateApiKey).toHaveBeenCalledWith('invalid-key');
+      expect(mockApiKeysService.validateApiKey).toHaveBeenCalledWith(
+        'invalid-key',
+      );
     });
 
     it('should disconnect client if connection limit is exceeded', async () => {
@@ -124,7 +126,9 @@ describe('JobEventsGateway', () => {
 
       await gateway.handleConnection(mockSocket);
 
-      expect(mockApiKeysService.validateApiKey).toHaveBeenCalledWith('token-123');
+      expect(mockApiKeysService.validateApiKey).toHaveBeenCalledWith(
+        'token-123',
+      );
     });
 
     it('should extract API key from x-api-key header', async () => {
@@ -140,7 +144,9 @@ describe('JobEventsGateway', () => {
 
       await gateway.handleConnection(mockSocket);
 
-      expect(mockApiKeysService.validateApiKey).toHaveBeenCalledWith('api-key-123');
+      expect(mockApiKeysService.validateApiKey).toHaveBeenCalledWith(
+        'api-key-123',
+      );
     });
   });
 
@@ -183,14 +189,18 @@ describe('JobEventsGateway', () => {
       gateway.handleSubscribe(mockSocket, { jobId: 'job-123' });
 
       expect(mockSocket.join).toHaveBeenCalledWith('job:job-123');
-      expect(mockSocket.emit).toHaveBeenCalledWith('subscribed', { jobId: 'job-123' });
+      expect(mockSocket.emit).toHaveBeenCalledWith('subscribed', {
+        jobId: 'job-123',
+      });
     });
 
     it('should subscribe to all jobs for client', () => {
       gateway.handleSubscribe(mockSocket, {});
 
       expect(mockSocket.join).toHaveBeenCalledWith('client:client-id');
-      expect(mockSocket.emit).toHaveBeenCalledWith('subscribed', { clientId: 'client-id' });
+      expect(mockSocket.emit).toHaveBeenCalledWith('subscribed', {
+        clientId: 'client-id',
+      });
     });
 
     it('should emit error if not authenticated', () => {
@@ -199,7 +209,9 @@ describe('JobEventsGateway', () => {
         emit: jest.fn(),
       };
 
-      gateway.handleSubscribe(unauthenticatedSocket as any, { jobId: 'job-123' });
+      gateway.handleSubscribe(unauthenticatedSocket as any, {
+        jobId: 'job-123',
+      });
 
       expect(unauthenticatedSocket.emit).toHaveBeenCalledWith('error', {
         message: 'Not authenticated',
@@ -223,14 +235,18 @@ describe('JobEventsGateway', () => {
       gateway.handleUnsubscribe(mockSocket, { jobId: 'job-123' });
 
       expect(mockSocket.leave).toHaveBeenCalledWith('job:job-123');
-      expect(mockSocket.emit).toHaveBeenCalledWith('unsubscribed', { jobId: 'job-123' });
+      expect(mockSocket.emit).toHaveBeenCalledWith('unsubscribed', {
+        jobId: 'job-123',
+      });
     });
 
     it('should unsubscribe from all jobs', () => {
       gateway.handleUnsubscribe(mockSocket, {});
 
       expect(mockSocket.leave).toHaveBeenCalledWith('client:client-id');
-      expect(mockSocket.emit).toHaveBeenCalledWith('unsubscribed', { clientId: 'client-id' });
+      expect(mockSocket.emit).toHaveBeenCalledWith('unsubscribed', {
+        clientId: 'client-id',
+      });
     });
   });
 
@@ -246,13 +262,16 @@ describe('JobEventsGateway', () => {
     });
 
     it('should update last pong timestamp', () => {
-      const originalLastPong = gateway['clients'].get('socket-id-123')!.lastPong;
+      const originalLastPong =
+        gateway['clients'].get('socket-id-123')!.lastPong;
 
       // Wait a bit
       setTimeout(() => {
         gateway.handlePong(mockSocket);
         const newLastPong = gateway['clients'].get('socket-id-123')!.lastPong;
-        expect(newLastPong.getTime()).toBeGreaterThan(originalLastPong.getTime());
+        expect(newLastPong.getTime()).toBeGreaterThan(
+          originalLastPong.getTime(),
+        );
       }, 10);
     });
   });
@@ -303,4 +322,3 @@ describe('JobEventsGateway', () => {
     });
   });
 });
-

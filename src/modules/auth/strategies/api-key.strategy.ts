@@ -25,4 +25,3 @@ export class ApiKeyStrategy extends PassportStrategy(Strategy, 'api-key') {
     };
   }
 }
-

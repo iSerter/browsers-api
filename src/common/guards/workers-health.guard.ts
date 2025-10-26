@@ -12,7 +12,7 @@ export class WorkersHealthIndicator extends HealthIndicator {
     try {
       const stats = await this.workersService.getStats();
       const isHealthy = stats.totalWorkers > 0 && stats.idleWorkers > 0;
-      
+
       return this.getStatus(key, isHealthy, {
         total: stats.totalWorkers,
         idle: stats.idleWorkers,
@@ -20,10 +20,10 @@ export class WorkersHealthIndicator extends HealthIndicator {
         offline: stats.offlineWorkers,
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return this.getStatus(key, false, {
-        error: error.message,
+        error: errorMessage,
       });
     }
   }
 }
-

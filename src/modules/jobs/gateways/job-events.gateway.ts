@@ -71,7 +71,8 @@ export class JobEventsGateway
       }
 
       // Check connection limits
-      const connectionsForKey = this.apiKeyClients.get(apiKeyData.id)?.size || 0;
+      const connectionsForKey =
+        this.apiKeyClients.get(apiKeyData.id)?.size || 0;
       if (connectionsForKey >= this.MAX_CONNECTIONS_PER_KEY) {
         this.logger.warn(
           `Connection limit exceeded for API key: ${apiKeyData.id}`,
@@ -96,7 +97,9 @@ export class JobEventsGateway
       }
       this.apiKeyClients.get(apiKeyData.id)!.add(client.id);
 
-      this.logger.log(`Client connected: ${client.id} (API key: ${apiKeyData.id})`);
+      this.logger.log(
+        `Client connected: ${client.id} (API key: ${apiKeyData.id})`,
+      );
       client.emit('connected', {
         message: 'Connected to job events',
         clientId: apiKeyData.clientId,
@@ -244,10 +247,11 @@ export class JobEventsGateway
           this.server.to(socketId).disconnectSockets();
         } else {
           // Send ping
-          this.server.to(socketId).emit('ping', { timestamp: now.toISOString() });
+          this.server
+            .to(socketId)
+            .emit('ping', { timestamp: now.toISOString() });
         }
       });
     }, this.PING_INTERVAL);
   }
 }
-

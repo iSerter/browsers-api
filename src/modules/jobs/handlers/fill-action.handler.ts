@@ -8,7 +8,12 @@ import {
 
 interface FillActionConfig extends ActionConfig {
   target: string;
-  getTargetBy: 'getByLabel' | 'getByText' | 'getByRole' | 'getBySelector' | 'getByPlaceholder';
+  getTargetBy:
+    | 'getByLabel'
+    | 'getByText'
+    | 'getByRole'
+    | 'getBySelector'
+    | 'getByPlaceholder';
   value: string;
 }
 
@@ -52,7 +57,9 @@ export class FillActionHandler implements IActionHandler {
         },
       };
     } catch (error) {
-      this.logger.error(`Fill action failed for job ${jobId}: ${error.message}`);
+      this.logger.error(
+        `Fill action failed for job ${jobId}: ${error.message}`,
+      );
 
       return {
         success: false,
@@ -97,4 +104,3 @@ export class FillActionHandler implements IActionHandler {
     return ['TIMEOUT_ERROR'].includes(errorCode);
   }
 }
-

@@ -133,9 +133,7 @@ describe('ScreenshotActionHandler', () => {
         action: 'screenshot',
       };
 
-      artifactService.saveArtifact.mockResolvedValue(
-        'artifacts/123/file.png',
-      );
+      artifactService.saveArtifact.mockResolvedValue('artifacts/123/file.png');
 
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
@@ -187,4 +185,3 @@ describe('ScreenshotActionHandler', () => {
     });
   });
 });
-

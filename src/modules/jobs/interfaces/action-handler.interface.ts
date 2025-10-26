@@ -14,7 +14,12 @@ export interface ActionResult {
 export interface ActionConfig {
   action: string;
   target?: string; // The target to find (text, label, role, selector)
-  getTargetBy?: 'getByLabel' | 'getByText' | 'getByRole' | 'getBySelector' | 'getByPlaceholder'; // How to find the target
+  getTargetBy?:
+    | 'getByLabel'
+    | 'getByText'
+    | 'getByRole'
+    | 'getBySelector'
+    | 'getByPlaceholder'; // How to find the target
   value?: string; // Value for fill actions
   attribute?: string; // Attribute to extract for extract actions
   multiple?: boolean; // Extract multiple elements

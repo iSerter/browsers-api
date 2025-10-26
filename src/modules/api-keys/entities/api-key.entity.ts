@@ -59,4 +59,3 @@ export class ApiKey {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
-

@@ -13,10 +13,10 @@ export class ApiKeyGuard extends AuthGuard('api-key') {
 
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<Request>();
-    
+
     // Try to extract API key from headers
     const apiKey = this.extractApiKeyFromHeader(request);
-    
+
     if (!apiKey) {
       this.logger.warn('No API key provided in request');
       throw new UnauthorizedException('API key is required');
@@ -30,7 +30,9 @@ export class ApiKeyGuard extends AuthGuard('api-key') {
 
   handleRequest(err: any, user: any, info: any) {
     if (err || !user) {
-      this.logger.warn(`API key validation failed: ${info?.message || err?.message}`);
+      this.logger.warn(
+        `API key validation failed: ${info?.message || err?.message}`,
+      );
       throw err || new UnauthorizedException('Invalid or expired API key');
     }
 
@@ -56,4 +58,3 @@ export class ApiKeyGuard extends AuthGuard('api-key') {
     return null;
   }
 }
-

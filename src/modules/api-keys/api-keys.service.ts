@@ -33,9 +33,11 @@ export class ApiKeysService {
     });
 
     const saved = await this.apiKeyRepository.save(apiKey);
-    
-    this.logger.log(`Generated API key for client: ${dto.clientId} (${dto.name})`);
-    
+
+    this.logger.log(
+      `Generated API key for client: ${dto.clientId} (${dto.name})`,
+    );
+
     return saved;
   }
 
@@ -101,7 +103,7 @@ export class ApiKeysService {
 
     const saved = await this.urlPolicyRepository.save(policy);
     this.logger.log(`Created URL policy: ${dto.pattern} (${dto.type})`);
-    
+
     return saved;
   }
 
@@ -171,7 +173,9 @@ export class ApiKeysService {
       }
 
       // Check if URL contains the pattern
-      return urlLower.includes(patternLower) || urlLower.startsWith(patternLower);
+      return (
+        urlLower.includes(patternLower) || urlLower.startsWith(patternLower)
+      );
     } catch (error) {
       this.logger.error(`Error matching pattern ${pattern}: ${error.message}`);
       return false;
@@ -200,4 +204,3 @@ export class ApiKeysService {
     this.logger.log(`Deleted API key: ${id}`);
   }
 }
-

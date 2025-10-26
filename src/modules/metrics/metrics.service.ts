@@ -82,7 +82,10 @@ export class MetricsService {
     actionType: string,
     durationSeconds: number,
   ): void {
-    this.jobDurationSeconds.observe({ browserType, actionType }, durationSeconds);
+    this.jobDurationSeconds.observe(
+      { browserType, actionType },
+      durationSeconds,
+    );
   }
 
   setActiveJobs(count: number): void {
@@ -100,8 +103,16 @@ export class MetricsService {
   }
 
   // API metrics methods
-  incrementApiRequest(endpoint: string, method: string, statusCode: number): void {
-    this.apiRequestsTotal.inc({ endpoint, method, statusCode: String(statusCode) });
+  incrementApiRequest(
+    endpoint: string,
+    method: string,
+    statusCode: number,
+  ): void {
+    this.apiRequestsTotal.inc({
+      endpoint,
+      method,
+      statusCode: String(statusCode),
+    });
   }
 
   recordApiRequestDuration(
@@ -125,4 +136,3 @@ export class MetricsService {
     this.registry.resetMetrics();
   }
 }
-

@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 import { PolicyType } from '../entities/url-policy.entity';
 
 export class CreateUrlPolicyDto {
@@ -18,4 +24,3 @@ export class CreateUrlPolicyDto {
   @IsOptional()
   isActive?: boolean = true;
 }
-

@@ -54,4 +54,3 @@ export type JobEventType =
   | JobProgressEvent
   | JobCompletedEvent
   | JobFailedEvent;
-

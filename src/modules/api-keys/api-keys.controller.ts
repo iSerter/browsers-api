@@ -18,7 +18,7 @@ export class ApiKeysController {
   @Post()
   async createApiKey(@Body() dto: CreateApiKeyDto) {
     const apiKey = await this.apiKeysService.generateApiKey(dto);
-    
+
     // Return API key (only shown once)
     return {
       id: apiKey.id,
@@ -34,7 +34,7 @@ export class ApiKeysController {
   @Get()
   async listApiKeys() {
     const keys = await this.apiKeysService.findAllApiKeys();
-    
+
     return keys.map((key) => ({
       id: key.id,
       clientId: key.clientId,
@@ -80,4 +80,3 @@ export class ApiKeysController {
     return { message: 'URL policy deleted successfully' };
   }
 }
-

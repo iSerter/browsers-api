@@ -8,13 +8,9 @@ import { ApiKeyStrategy } from '../auth/strategies/api-key.strategy';
 import { PassportModule } from '@nestjs/passport';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([ApiKey, UrlPolicy]),
-    PassportModule,
-  ],
+  imports: [TypeOrmModule.forFeature([ApiKey, UrlPolicy]), PassportModule],
   controllers: [ApiKeysController],
   providers: [ApiKeysService, ApiKeyStrategy],
   exports: [ApiKeysService],
 })
 export class ApiKeysModule {}
-
