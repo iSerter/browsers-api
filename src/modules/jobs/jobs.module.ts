@@ -16,6 +16,8 @@ import { WorkerManagerService } from './services/worker-manager.service';
 import { WorkerHeartbeatService } from './services/worker-heartbeat.service';
 import { ActionHandlerFactory } from './factories/action-handler.factory';
 import { ScreenshotActionHandler } from './handlers/screenshot-action.handler';
+import { FillActionHandler } from './handlers/fill-action.handler';
+import { ClickActionHandler } from './handlers/click-action.handler';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { ScreenshotActionHandler } from './handlers/screenshot-action.handler';
     WorkerManagerService,
     WorkerHeartbeatService,
     ScreenshotActionHandler,
+    FillActionHandler,
+    ClickActionHandler,
     ActionHandlerFactory,
   ],
   exports: [

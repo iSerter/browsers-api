@@ -4,18 +4,22 @@ import {
   ActionConfig,
 } from '../interfaces/action-handler.interface';
 import { ScreenshotActionHandler } from '../handlers/screenshot-action.handler';
+import { FillActionHandler } from '../handlers/fill-action.handler';
+import { ClickActionHandler } from '../handlers/click-action.handler';
 
 @Injectable()
 export class ActionHandlerFactory {
   private readonly handlers: Map<string, IActionHandler> = new Map();
 
-  constructor(private readonly screenshotHandler: ScreenshotActionHandler) {
+  constructor(
+    private readonly screenshotHandler: ScreenshotActionHandler,
+    private readonly fillHandler: FillActionHandler,
+    private readonly clickHandler: ClickActionHandler,
+  ) {
     // Register all action handlers
     this.handlers.set('screenshot', this.screenshotHandler);
-    // Future handlers will be registered here:
-    // this.handlers.set('formFill', this.formFillHandler);
-    // this.handlers.set('pdf', this.pdfHandler);
-    // this.handlers.set('extract', this.extractHandler);
+    this.handlers.set('fill', this.fillHandler);
+    this.handlers.set('click', this.clickHandler);
   }
 
   getHandler(actionType: string): IActionHandler {

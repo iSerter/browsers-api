@@ -14,7 +14,7 @@ import { JobLogService } from './job-log.service';
 import { WorkerManagerService } from './worker-manager.service';
 import { LogLevel } from '../entities/job-log.entity';
 import { WorkerStatus } from '../../workers/entities/browser-worker.entity';
-import { Browser } from 'playwright';
+import { Browser, Page } from 'playwright';
 
 @Injectable()
 export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
@@ -204,10 +204,25 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
+    // Create a single page for all actions to share
+    const page = await context.newPage();
+
     try {
+      // Navigate to target URL once at the start
+      await page.goto(job.targetUrl, {
+        waitUntil: job.waitUntil as any,
+        timeout: job.timeoutMs,
+      });
+
+      await this.jobLogService.logJobEvent(
+        job.id,
+        LogLevel.INFO,
+        `Navigated to target URL: ${job.targetUrl}`,
+      );
+
       const results: any[] = [];
 
-      // Execute each action in sequence
+      // Execute each action in sequence on the same page
       for (const actionConfig of job.actions) {
         await this.jobLogService.logJobEvent(
           job.id,
@@ -219,16 +234,7 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
           actionConfig.action,
         );
 
-        const result = await handler.execute(
-          context,
-          {
-            ...actionConfig,
-            targetUrl: job.targetUrl,
-            waitUntil: job.waitUntil,
-            timeout: job.timeoutMs,
-          },
-          job.id,
-        );
+        const result = await handler.execute(page, actionConfig, job.id);
 
         results.push(result as any);
 
@@ -255,7 +261,12 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
         `All actions completed successfully`,
         { actionCount: job.actions.length },
       );
+    } catch (error) {
+      this.logger.error(`Error executing job ${job.id}: ${error.message}`);
+      await page.close();
+      throw error;
     } finally {
+      await page.close();
       await this.contextManager.closeContext(context);
     }
   }
