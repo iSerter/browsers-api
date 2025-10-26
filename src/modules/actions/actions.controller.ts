@@ -30,4 +30,3 @@ export class ActionsController {
     return this.actionsService.createPdfJob(payload);
   }
 }
-

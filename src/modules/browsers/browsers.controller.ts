@@ -15,4 +15,3 @@ export class BrowsersController {
     return this.browsersService.findOne(id);
   }
 }
-

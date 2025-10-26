@@ -44,4 +44,3 @@ export class JobsController {
     return this.jobsService.getJobArtifacts(id);
   }
 }
-

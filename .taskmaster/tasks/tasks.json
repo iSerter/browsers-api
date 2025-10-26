@@ -57,7 +57,7 @@
         "id": 5,
         "title": "Screenshot Action Handler Implementation",
         "description": "Implement the screenshot action handler with Playwright, supporting full-page and viewport screenshots, various formats (PNG, JPEG), quality settings, and proper error handling.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "4"
         ],
@@ -70,7 +70,7 @@
         "id": 6,
         "title": "Job Processor Worker Implementation",
         "description": "Create the job processor worker that polls the queue, acquires browser instances, executes actions, handles retries, updates job status, and manages worker lifecycle with heartbeat monitoring.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "5"
         ],
@@ -142,7 +142,7 @@
       ],
       "created": "2025-10-26T20:33:50.386Z",
       "description": "Tasks for master context",
-      "updated": "2025-10-26T20:36:54.120Z"
+      "updated": "2025-10-26T20:53:11.382Z"
     }
   }
 }

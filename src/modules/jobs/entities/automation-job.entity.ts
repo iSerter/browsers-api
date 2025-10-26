@@ -89,7 +89,10 @@ export class AutomationJob {
   @Column({ nullable: true, type: 'jsonb' })
   result: any;
 
-  @OneToMany(() => require('./job-artifact.entity').JobArtifact, (artifact: any) => artifact.job)
+  @OneToMany(
+    () => require('./job-artifact.entity').JobArtifact,
+    (artifact: any) => artifact.job,
+  )
   artifacts: any[];
 
   @OneToMany(() => require('./job-log.entity').JobLog, (log: any) => log.job)
@@ -98,4 +101,3 @@ export class AutomationJob {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
-

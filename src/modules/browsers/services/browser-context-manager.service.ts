@@ -105,9 +105,12 @@ export class BrowserContextManagerService {
       // Most resource limits are handled by OS-level restrictions
 
       // Block unnecessary resources to reduce memory usage
-      await context.route('**/*.{jpg,jpeg,png,gif,ico,svg,woff,woff2,ttf,eot,mp4,webm}', (route) => {
-        route.abort();
-      });
+      await context.route(
+        '**/*.{jpg,jpeg,png,gif,ico,svg,woff,woff2,ttf,eot,mp4,webm}',
+        (route) => {
+          route.abort();
+        },
+      );
 
       this.logger.debug('Resource limits configured for context');
     } catch (error) {
@@ -116,4 +119,3 @@ export class BrowserContextManagerService {
     }
   }
 }
-

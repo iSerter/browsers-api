@@ -41,4 +41,3 @@ export class ListJobsQueryDto {
   @IsDateString()
   createdBefore?: string;
 }
-

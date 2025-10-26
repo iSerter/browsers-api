@@ -29,4 +29,3 @@ export class BrowsersService {
     return browserType;
   }
 }
-

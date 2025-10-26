@@ -141,4 +141,3 @@ export class InitialSchema1729000000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS browser_types CASCADE;`);
   }
 }
-

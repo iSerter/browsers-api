@@ -51,4 +51,3 @@ export class CreateJobDto {
   @Max(10)
   maxRetries?: number;
 }
-

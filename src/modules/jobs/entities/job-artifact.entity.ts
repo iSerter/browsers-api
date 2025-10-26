@@ -54,4 +54,3 @@ export class JobArtifact {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
-

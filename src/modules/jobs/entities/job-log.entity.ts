@@ -42,4 +42,3 @@ export class JobLog {
   @Index()
   createdAt: Date;
 }
-

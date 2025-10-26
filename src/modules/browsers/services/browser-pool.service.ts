@@ -9,7 +9,7 @@ import {
   firefox,
   webkit,
   Browser,
-          LaunchOptions as LaunchOptionsType,
+  LaunchOptions as LaunchOptionsType,
 } from 'playwright';
 import {
   BrowserPoolConfig,
@@ -20,7 +20,9 @@ import {
 } from '../interfaces/browser-pool.interface';
 
 @Injectable()
-export class BrowserPoolService implements IBrowserPool, OnModuleInit, OnModuleDestroy {
+export class BrowserPoolService
+  implements IBrowserPool, OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(BrowserPoolService.name);
   private readonly pools: Map<string, BrowserPool> = new Map();
   private readonly config: BrowserPoolConfig = {
@@ -156,12 +158,7 @@ export class BrowserPoolService implements IBrowserPool, OnModuleInit, OnModuleD
       if (!config) {
         throw new Error(`Unsupported browser type: ${browserType}`);
       }
-      pool = new BrowserPool(
-        browserType,
-        config,
-        this.config,
-        this.logger,
-      );
+      pool = new BrowserPool(browserType, config, this.config, this.logger);
       this.pools.set(browserType, pool);
       this.logger.log(
         `Created browser pool for ${browserType} (minSize: ${this.config.minSize}, maxSize: ${this.config.maxSize})`,
@@ -207,7 +204,8 @@ class BrowserPool {
     }
 
     // Create new browser if under max size
-    const totalInstances = this.availableInstances.length + this.activeInstances.size;
+    const totalInstances =
+      this.availableInstances.length + this.activeInstances.size;
     if (totalInstances < this.config.maxSize) {
       const browser = await this.createBrowser();
       this.activeInstances.add(browser);
@@ -268,7 +266,10 @@ class BrowserPool {
     this.idleTimers.clear();
 
     // Close all browsers
-    const allBrowsers = [...this.availableInstances, ...Array.from(this.activeInstances)];
+    const allBrowsers = [
+      ...this.availableInstances,
+      ...Array.from(this.activeInstances),
+    ];
     await Promise.all(
       allBrowsers.map(async (browser) => {
         try {
@@ -313,7 +314,9 @@ class BrowserPool {
     }
 
     if (closedCount > 0) {
-      this.logger.log(`Closed ${closedCount} idle ${this.browserType} browsers`);
+      this.logger.log(
+        `Closed ${closedCount} idle ${this.browserType} browsers`,
+      );
     }
   }
 
@@ -399,4 +402,3 @@ class BrowserPool {
     }
   }
 }
-

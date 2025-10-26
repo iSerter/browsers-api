@@ -1,0 +1,269 @@
+---
+description: Nest.js best practices and testing requirements for this project.
+globs: src/**/*.ts
+alwaysApply: true
+---
+
+## Testing Requirements
+
+- **Always Implement Tests**
+  - Create unit tests for all services, controllers, and handlers
+  - Write tests alongside implementation, not after
+  - Aim for 80%+ code coverage for business logic
+  - Include tests for happy paths, error cases, and edge cases
+
+- **Test Structure**
+  - Use Jest as the testing framework
+  - Group tests by feature/module
+  - Follow AAA pattern (Arrange, Act, Assert)
+  - Use descriptive test names that explain what is being tested
+
+```typescript
+// ✅ DO: Clear test structure
+describe('ArtifactStorageService', () => {
+  describe('saveArtifact', () => {
+    it('should save artifact to filesystem and database', async () => {
+      // Arrange
+      const buffer = Buffer.from('test');
+      const jobId = 'test-job-id';
+      
+      // Act
+      const result = await service.saveArtifact(buffer, jobId, 'test.png', ArtifactType.SCREENSHOT, 'image/png');
+      
+      // Assert
+      expect(result).toBeDefined();
+      expect(fs.writeFile).toHaveBeenCalled();
+    });
+  });
+});
+```
+
+- **Mocking Strategy**
+  - Mock external dependencies (databases, APIs, filesystem)
+  - Use NestJS testing utilities (`TestingModule`, `MockRepository`)
+  - Mock at the boundary (mock repositories, not internal logic)
+  - Verify mock interactions
+
+```typescript
+// ✅ DO: Mock external dependencies
+@Injectable()
+class MockRepository<T> {
+  private items: T[] = [];
+  
+  async save(item: T): Promise<T> {
+    this.items.push(item);
+    return item;
+  }
+  
+  async findOne(): Promise<T> {
+    return this.items[0];
+  }
+}
+```
+
+- **Test Files Location**
+  - Place unit tests next to source files: `*.spec.ts`
+  - Place e2e tests in `test/` directory
+  - Mirror source structure in tests
+
+## Nest.js Best Practices
+
+- **Dependency Injection**
+  - Use constructor injection for all dependencies
+  - Avoid property injection unless necessary
+  - Use `@Injectable()` decorator on all services
+
+```typescript
+// ✅ DO: Constructor injection
+@Injectable()
+export class ExampleService {
+  constructor(
+    private readonly repository: Repository<Example>,
+    private readonly configService: ConfigService,
+  ) {}
+}
+
+// ❌ DON'T: Property injection
+@Injectable()
+export class BadService {
+  @Inject() private readonly repository: Repository<Example>;
+}
+```
+
+- **Module Organization**
+  - Use feature modules for domain logic
+  - Export services that other modules need
+  - Import only what you need from other modules
+  - Keep module responsibilities clear and focused
+
+```typescript
+// ✅ DO: Clean module structure
+@Module({
+  imports: [TypeOrmModule.forFeature([Entity]), OtherModule],
+  providers: [Service, Handler, Factory],
+  controllers: [Controller],
+  exports: [Service], // Export what others need
+})
+export class FeatureModule {}
+```
+
+- **Error Handling**
+  - Use specific exception types (NotFoundException, BadRequestException, etc.)
+  - Create custom exceptions for domain-specific errors
+  - Use global exception filters for consistent error responses
+  - Log errors with appropriate context
+
+```typescript
+// ✅ DO: Specific error types
+if (!job) {
+  throw new NotFoundException(`Job with ID ${id} not found`);
+}
+
+// ❌ DON'T: Generic errors
+throw new Error('Something went wrong');
+```
+
+- **Logging**
+  - Use NestJS Logger with context
+  - Log at appropriate levels (debug, info, warn, error)
+  - Include relevant context (jobId, requestId, etc.)
+  - Avoid logging sensitive information
+
+```typescript
+// ✅ DO: Contextual logging
+private readonly logger = new Logger(ExampleService.name);
+
+this.logger.log(`Processing job ${jobId}`);
+this.logger.error(`Failed to process job ${jobId}: ${error.message}`);
+this.logger.debug(`Job ${jobId} details: ${JSON.stringify(details)}`);
+```
+
+- **DTOs and Validation**
+  - Use class-validator decorators on DTOs
+  - Create specific DTOs for different operations (Create, Update, etc.)
+  - Use validation pipes globally
+  - Validate at the controller boundary
+
+```typescript
+// ✅ DO: Well-defined DTOs with validation
+export class CreateJobDto {
+  @IsString()
+  @IsNotEmpty()
+  targetUrl: string;
+
+  @IsInt()
+  @IsPositive()
+  browserTypeId: number;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  actions: ActionConfig[];
+}
+```
+
+- **Async Operations**
+  - Always handle async errors with try/catch
+  - Use async/await over Promises when possible
+  - Don't forget `await` in async functions
+  - Handle cleanup in finally blocks
+
+```typescript
+// ✅ DO: Proper async handling
+async processJob(jobId: string): Promise<void> {
+  const browser = await this.pool.acquire();
+  try {
+    await this.executeActions(browser, jobId);
+  } catch (error) {
+    this.logger.error(`Job ${jobId} failed: ${error.message}`);
+    throw error;
+  } finally {
+    await this.pool.release(browser);
+  }
+}
+```
+
+- **Configuration**
+  - Use ConfigModule for environment variables
+  - Create validation schemas for configuration
+  - Use type-safe config objects
+  - Document required environment variables
+
+```typescript
+// ✅ DO: Validated configuration
+export const validationSchema = Joi.object({
+  DATABASE_HOST: Joi.string().required(),
+  DATABASE_PORT: Joi.number().default(5432),
+  DATABASE_NAME: Joi.string().required(),
+});
+```
+
+- **Entities and TypeORM**
+  - Use class-based entities
+  - Define indexes for frequently queried fields
+  - Use relations properly with @ManyToOne, @OneToMany
+  - Add created_at and updated_at timestamps
+
+```typescript
+// ✅ DO: Proper entity definition
+@Entity('jobs')
+@Index(['status', 'priority'], { where: "status = 'pending'" })
+export class Job {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  @Index()
+  status: string;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+}
+```
+
+- **Guards and Interceptors**
+  - Use guards for authentication/authorization
+  - Use interceptors for cross-cutting concerns (logging, transformation)
+  - Apply at module or controller level
+  - Keep guards and interceptors focused
+
+- **Testing Module Setup**
+  - Use TestingModule for integration tests
+  - Override providers for testing
+  - Use in-memory database for tests
+  - Clean up after tests
+
+```typescript
+// ✅ DO: Proper test module setup
+describe('JobsService', () => {
+  let service: JobsService;
+  
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        JobsService,
+        { provide: getRepositoryToken(AutomationJob), useClass: MockRepository },
+      ],
+    }).compile();
+
+    service = module.get<JobsService>(JobsService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});
+```
+
+- **Code Style**
+  - Follow NestJS conventions
+  - Use meaningful names
+  - Keep methods focused and small
+  - Use TypeScript strictly
+  - Document complex logic
+
+- **Performance**
+  - Use database indexes for frequently queried fields
+  - Implement pagination for list endpoints
+  - Use connection pooling
+  - Cache frequently accessed data
+  - Monitor and optimize slow queries

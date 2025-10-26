@@ -8,7 +8,6 @@ import { BrowserWorker } from './entities/browser-worker.entity';
   imports: [TypeOrmModule.forFeature([BrowserWorker])],
   controllers: [WorkersController],
   providers: [WorkersService],
-  exports: [WorkersService],
+  exports: [WorkersService, TypeOrmModule],
 })
 export class WorkersModule {}
-

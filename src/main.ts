@@ -42,8 +42,14 @@ async function bootstrap() {
   const port = configService.get('PORT', 3000);
   await app.listen(port);
 
-  logger.log(`Application is running on: http://localhost:${port}/${apiPrefix}`, 'Bootstrap');
-  logger.log(`Health check available at: http://localhost:${port}/health`, 'Bootstrap');
+  logger.log(
+    `Application is running on: http://localhost:${port}/${apiPrefix}`,
+    'Bootstrap',
+  );
+  logger.log(
+    `Health check available at: http://localhost:${port}/health`,
+    'Bootstrap',
+  );
 }
 
 bootstrap();

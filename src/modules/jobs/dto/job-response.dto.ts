@@ -30,4 +30,3 @@ export class PaginatedJobsResponseDto {
   limit: number;
   totalPages: number;
 }
-

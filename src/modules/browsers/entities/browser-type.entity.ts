@@ -56,4 +56,3 @@ export class BrowserType {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
-

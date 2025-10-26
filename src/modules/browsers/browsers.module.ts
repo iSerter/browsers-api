@@ -17,4 +17,3 @@ import { BrowserContextManagerService } from './services/browser-context-manager
   exports: [BrowsersService, BrowserPoolService, BrowserContextManagerService],
 })
 export class BrowsersModule {}
-

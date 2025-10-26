@@ -15,4 +15,3 @@ export class WorkersController {
     return this.workersService.getStats();
   }
 }
-

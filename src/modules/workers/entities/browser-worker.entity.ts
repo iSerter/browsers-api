@@ -53,4 +53,3 @@ export class BrowserWorker {
   @Column({ nullable: true, type: 'jsonb' })
   metadata: any;
 }
-

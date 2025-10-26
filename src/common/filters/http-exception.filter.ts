@@ -83,4 +83,3 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return statusMap[status] || 'UNKNOWN_ERROR';
   }
 }
-

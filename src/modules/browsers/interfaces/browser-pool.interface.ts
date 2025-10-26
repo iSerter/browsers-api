@@ -45,4 +45,3 @@ export interface BrowserTypeConfig {
     args: string[];
   };
 }
-

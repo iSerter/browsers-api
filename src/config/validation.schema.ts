@@ -51,4 +51,3 @@ export const validationSchema = Joi.object({
     .valid('error', 'warn', 'info', 'debug')
     .default('info'),
 });
-
