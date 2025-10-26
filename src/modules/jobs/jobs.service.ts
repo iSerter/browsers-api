@@ -9,6 +9,7 @@ import { AutomationJob, JobStatus } from './entities/automation-job.entity';
 import { JobArtifact } from './entities/job-artifact.entity';
 import { CreateJobDto } from './dto/create-job.dto';
 import { ListJobsQueryDto } from './dto/list-jobs-query.dto';
+import { BrowsersService } from '../browsers/browsers.service';
 
 @Injectable()
 export class JobsService {
@@ -17,11 +18,19 @@ export class JobsService {
     private readonly jobRepository: Repository<AutomationJob>,
     @InjectRepository(JobArtifact)
     private readonly artifactRepository: Repository<JobArtifact>,
+    private readonly browsersService: BrowsersService,
   ) {}
 
   async createJob(createJobDto: CreateJobDto) {
-    // Validate browser type exists (will be implemented with BrowsersService)
-    // For now, just create the job
+    // Validate browser type exists
+    try {
+      await this.browsersService.findOne(createJobDto.browserTypeId);
+    } catch (error) {
+      throw new BadRequestException(
+        `Browser type with ID ${createJobDto.browserTypeId} not found`,
+      );
+    }
+
     const job = this.jobRepository.create({
       browserTypeId: createJobDto.browserTypeId,
       targetUrl: createJobDto.targetUrl,

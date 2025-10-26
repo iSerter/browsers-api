@@ -9,6 +9,7 @@ import {
   Min,
   Max,
   ValidateNested,
+  ArrayNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { WaitUntilOption } from '../entities/automation-job.entity';
@@ -23,6 +24,7 @@ export class CreateJobDto {
   targetUrl: string;
 
   @IsArray()
+  @ArrayNotEmpty()
   @ValidateNested({ each: true })
   @Type(() => Object)
   actions: any[];

@@ -5,9 +5,13 @@ import { JobsService } from './jobs.service';
 import { AutomationJob } from './entities/automation-job.entity';
 import { JobArtifact } from './entities/job-artifact.entity';
 import { JobLog } from './entities/job-log.entity';
+import { BrowsersModule } from '../browsers/browsers.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AutomationJob, JobArtifact, JobLog])],
+  imports: [
+    TypeOrmModule.forFeature([AutomationJob, JobArtifact, JobLog]),
+    BrowsersModule,
+  ],
   controllers: [JobsController],
   providers: [JobsService],
   exports: [JobsService],
