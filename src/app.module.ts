@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -11,9 +12,11 @@ import { BrowsersModule } from './modules/browsers/browsers.module';
 import { WorkersModule } from './modules/workers/workers.module';
 import { ActionsModule } from './modules/actions/actions.module';
 import { HealthModule } from './modules/health/health.module';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AppLoggerService } from './common/services/logger.service';
+import { throttleConfig } from './modules/auth/config/throttle.config';
 
 @Module({
   imports: [
@@ -34,11 +37,13 @@ import { AppLoggerService } from './common/services/logger.service';
         return dbConfig;
       },
     }),
+    ThrottlerModule.forRoot(throttleConfig),
     JobsModule,
     BrowsersModule,
     WorkersModule,
     ActionsModule,
     HealthModule,
+    ApiKeysModule,
   ],
   controllers: [AppController],
   providers: [

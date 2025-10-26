@@ -8,6 +8,7 @@ import { JobArtifact } from './entities/job-artifact.entity';
 import { JobLog } from './entities/job-log.entity';
 import { BrowsersModule } from '../browsers/browsers.module';
 import { WorkersModule } from '../workers/workers.module';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { ArtifactStorageService } from './services/artifact-storage.service';
 import { JobLogService } from './services/job-log.service';
 import { JobProcessorService } from './services/job-processor.service';
@@ -21,6 +22,7 @@ import { ScreenshotActionHandler } from './handlers/screenshot-action.handler';
     TypeOrmModule.forFeature([AutomationJob, JobArtifact, JobLog]),
     BrowsersModule,
     WorkersModule,
+    ApiKeysModule,
     ConfigModule,
   ],
   controllers: [JobsController],
