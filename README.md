@@ -43,8 +43,8 @@ Get job status and results.
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "status": "completed",
-  "actionType": "screenshot",
   "result": {
+    "content": "(rendered HTML source code)",
     "screenshotUrl": "/api/v1/jobs/550e8400.../artifacts/screenshot.png",
     "duration": 2500
   },
