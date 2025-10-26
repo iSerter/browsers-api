@@ -13,9 +13,13 @@ import { WorkersModule } from './modules/workers/workers.module';
 import { ActionsModule } from './modules/actions/actions.module';
 import { HealthModule } from './modules/health/health.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AppLoggerService } from './common/services/logger.service';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { throttleConfig } from './modules/auth/config/throttle.config';
 
 @Module({
@@ -44,11 +48,15 @@ import { throttleConfig } from './modules/auth/config/throttle.config';
     ActionsModule,
     HealthModule,
     ApiKeysModule,
+    MetricsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     AppLoggerService,
+    CorrelationIdMiddleware,
+    LoggingMiddleware,
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,

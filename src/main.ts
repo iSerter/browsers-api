@@ -3,6 +3,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { AppLoggerService } from './common/services/logger.service';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import { LoggingMiddleware } from './common/middleware/logging.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -15,6 +17,17 @@ async function bootstrap() {
   // Set up custom logger
   const logger = app.get(AppLoggerService);
   app.useLogger(logger);
+
+  // Apply middleware for correlation ID and request logging
+  app.use((req, res, next) => {
+    const correlationIdMiddleware = app.get(CorrelationIdMiddleware);
+    correlationIdMiddleware.use(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    const loggingMiddleware = app.get(LoggingMiddleware);
+    loggingMiddleware.use(req, res, next);
+  });
 
   // Set global prefix
   const apiPrefix = configService.get('API_PREFIX', 'api/v1');
@@ -48,6 +61,10 @@ async function bootstrap() {
   );
   logger.log(
     `Health check available at: http://localhost:${port}/health`,
+    'Bootstrap',
+  );
+  logger.log(
+    `Metrics available at: http://localhost:${port}/metrics`,
     'Bootstrap',
   );
 }

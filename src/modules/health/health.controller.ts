@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import {
   HealthCheck,
   HealthCheckService,
@@ -6,6 +6,8 @@ import {
   MemoryHealthIndicator,
   DiskHealthIndicator,
 } from '@nestjs/terminus';
+import { BrowserPoolHealthIndicator } from '../../common/guards/browser-pool-health.guard';
+import { WorkersHealthIndicator } from '../../common/guards/workers-health.guard';
 
 @Controller('health')
 export class HealthController {
@@ -14,6 +16,10 @@ export class HealthController {
     private db: TypeOrmHealthIndicator,
     private memory: MemoryHealthIndicator,
     private disk: DiskHealthIndicator,
+    @Inject(BrowserPoolHealthIndicator)
+    private readonly browserPoolHealth: BrowserPoolHealthIndicator,
+    @Inject(WorkersHealthIndicator)
+    private readonly workersHealth: WorkersHealthIndicator,
   ) {}
 
   @Get()
@@ -28,6 +34,8 @@ export class HealthController {
           path: '/',
           thresholdPercent: 0.9, // 90% threshold
         }),
+      () => this.browserPoolHealth.isHealthy('browser_pool'),
+      () => this.workersHealth.isHealthy('workers'),
     ]);
   }
 
@@ -37,6 +45,7 @@ export class HealthController {
     return this.health.check([
       () => this.db.pingCheck('database'),
       () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
+      () => this.workersHealth.isHealthy('workers'),
     ]);
   }
 
