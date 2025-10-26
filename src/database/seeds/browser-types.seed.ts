@@ -15,7 +15,6 @@ export async function seedBrowserTypes() {
       deviceType: DeviceTypeEnum.DESKTOP,
       viewportWidth: 1920,
       viewportHeight: 1080,
-      userAgent: null,
       isActive: true,
     },
     {
@@ -24,7 +23,6 @@ export async function seedBrowserTypes() {
       deviceType: DeviceTypeEnum.DESKTOP,
       viewportWidth: 1920,
       viewportHeight: 1080,
-      userAgent: null,
       isActive: true,
     },
     {
@@ -33,7 +31,6 @@ export async function seedBrowserTypes() {
       deviceType: DeviceTypeEnum.DESKTOP,
       viewportWidth: 1920,
       viewportHeight: 1080,
-      userAgent: null,
       isActive: true,
     },
     {

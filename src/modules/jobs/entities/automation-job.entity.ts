@@ -10,8 +10,6 @@ import {
   OneToMany,
 } from 'typeorm';
 import { BrowserType } from '../../browsers/entities/browser-type.entity';
-import { JobArtifact } from './job-artifact.entity';
-import { JobLog } from './job-log.entity';
 
 export enum JobStatus {
   PENDING = 'pending',
@@ -91,11 +89,11 @@ export class AutomationJob {
   @Column({ nullable: true, type: 'jsonb' })
   result: any;
 
-  @OneToMany(() => JobArtifact, (artifact) => artifact.job)
-  artifacts: JobArtifact[];
+  @OneToMany(() => require('./job-artifact.entity').JobArtifact, (artifact: any) => artifact.job)
+  artifacts: any[];
 
-  @OneToMany(() => JobLog, (log) => log.job)
-  logs: JobLog[];
+  @OneToMany(() => require('./job-log.entity').JobLog, (log: any) => log.job)
+  logs: any[];
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
