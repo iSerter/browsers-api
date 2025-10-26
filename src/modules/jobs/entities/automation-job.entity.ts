@@ -1,0 +1,103 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+  OneToMany,
+} from 'typeorm';
+import { BrowserType } from '../../browsers/entities/browser-type.entity';
+import { JobArtifact } from './job-artifact.entity';
+import { JobLog } from './job-log.entity';
+
+export enum JobStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
+}
+
+export enum WaitUntilOption {
+  LOAD = 'load',
+  DOMCONTENTLOADED = 'domcontentloaded',
+  NETWORKIDLE = 'networkidle',
+}
+
+@Entity('automation_jobs')
+@Index(['status', 'priority'], { where: "status = 'pending'" })
+export class AutomationJob {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ name: 'browser_type_id' })
+  @Index()
+  browserTypeId: number;
+
+  @ManyToOne(() => BrowserType)
+  @JoinColumn({ name: 'browser_type_id' })
+  browserType: BrowserType;
+
+  @Column({ type: 'text', name: 'target_url' })
+  targetUrl: string;
+
+  @Column({ type: 'jsonb' })
+  actions: any[];
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: WaitUntilOption.NETWORKIDLE,
+    name: 'wait_until',
+  })
+  waitUntil: WaitUntilOption;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: JobStatus.PENDING,
+  })
+  @Index()
+  status: JobStatus;
+
+  @Column({ default: 0 })
+  priority: number;
+
+  @Column({ default: 0, name: 'retry_count' })
+  retryCount: number;
+
+  @Column({ default: 3, name: 'max_retries' })
+  maxRetries: number;
+
+  @Column({ default: 30000, name: 'timeout_ms' })
+  timeoutMs: number;
+
+  @CreateDateColumn({ name: 'created_at' })
+  @Index()
+  createdAt: Date;
+
+  @Column({ nullable: true, name: 'started_at' })
+  startedAt: Date;
+
+  @Column({ nullable: true, name: 'completed_at' })
+  completedAt: Date;
+
+  @Column({ nullable: true, type: 'text', name: 'error_message' })
+  errorMessage: string;
+
+  @Column({ nullable: true, type: 'jsonb' })
+  result: any;
+
+  @OneToMany(() => JobArtifact, (artifact) => artifact.job)
+  artifacts: JobArtifact[];
+
+  @OneToMany(() => JobLog, (log) => log.job)
+  logs: JobLog[];
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
+
