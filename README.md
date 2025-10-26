@@ -19,11 +19,38 @@ Create a new automation job.
   "actions": [
     {"action": "fill", "target": "Your e-mail address", "getTargetBy": "getByLabel", "value": "user@example.com"},
     {"action": "fill", "target": "#password", "getTargetBy": "getBySelector", "value": "secret123"},
+    {"action": "scroll", "target": "Submit", "getTargetBy": "getByText", "speed": 2000},
+    {"action": "moveCursor", "target": "Submit", "getTargetBy": "getByText"},
     {"action": "click", "target": "Submit", "getTargetBy": "getByText", "waitForNavigation": true},
     {"action": "screenshot", "fullPage": true, "type": "png"}
   ],
   "timeout": 30000
 }
+```
+
+#### Available Actions
+
+- **fill**: Fill form fields with values
+- **click**: Click on elements with various targeting options
+- **moveCursor**: Move cursor to element using human-like movement (includes customizable speed, jitter, overshoot, and timing options)
+- **scroll**: Scroll the page with human-like behavior (can scroll to specific position, element, or to bottom)
+- **screenshot**: Capture screenshots of the page or specific elements
+
+#### Action Configuration Examples
+
+**Scroll to specific Y position:**
+```json
+{"action": "scroll", "targetY": 2000}
+```
+
+**Scroll to element:**
+```json
+{"action": "scroll", "target": "Footer", "getTargetBy": "getByText"}
+```
+
+**Scroll with custom parameters:**
+```json
+{"action": "scroll", "target": "#footer", "getTargetBy": "getBySelector", "speed": 2000, "variance": 0.4}
 ```
 
 **Response:**

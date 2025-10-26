@@ -6,6 +6,8 @@ import {
 import { ScreenshotActionHandler } from '../handlers/screenshot-action.handler';
 import { FillActionHandler } from '../handlers/fill-action.handler';
 import { ClickActionHandler } from '../handlers/click-action.handler';
+import { MoveCursorActionHandler } from '../handlers/move-cursor-action.handler';
+import { ScrollActionHandler } from '../handlers/scroll-action.handler';
 
 @Injectable()
 export class ActionHandlerFactory {
@@ -15,11 +17,15 @@ export class ActionHandlerFactory {
     private readonly screenshotHandler: ScreenshotActionHandler,
     private readonly fillHandler: FillActionHandler,
     private readonly clickHandler: ClickActionHandler,
+    private readonly moveCursorHandler: MoveCursorActionHandler,
+    private readonly scrollHandler: ScrollActionHandler,
   ) {
     // Register all action handlers
     this.handlers.set('screenshot', this.screenshotHandler);
     this.handlers.set('fill', this.fillHandler);
     this.handlers.set('click', this.clickHandler);
+    this.handlers.set('moveCursor', this.moveCursorHandler);
+    this.handlers.set('scroll', this.scrollHandler);
   }
 
   getHandler(actionType: string): IActionHandler {

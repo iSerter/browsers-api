@@ -18,6 +18,8 @@ import { ActionHandlerFactory } from './factories/action-handler.factory';
 import { ScreenshotActionHandler } from './handlers/screenshot-action.handler';
 import { FillActionHandler } from './handlers/fill-action.handler';
 import { ClickActionHandler } from './handlers/click-action.handler';
+import { MoveCursorActionHandler } from './handlers/move-cursor-action.handler';
+import { ScrollActionHandler } from './handlers/scroll-action.handler';
 import { JobEventsGateway } from './gateways/job-events.gateway';
 
 @Module({
@@ -39,6 +41,8 @@ import { JobEventsGateway } from './gateways/job-events.gateway';
     ScreenshotActionHandler,
     FillActionHandler,
     ClickActionHandler,
+    MoveCursorActionHandler,
+    ScrollActionHandler,
     ActionHandlerFactory,
     JobEventsGateway,
   ],
