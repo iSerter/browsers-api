@@ -8,6 +8,21 @@ I'm experimenting with task-master and Github Speckit.
 
 Browser Automation API that provides HTTP endpoints for browser tasks using Playwright. The system follows a producer-consumer pattern where API requests are queued in PostgreSQL and processed asynchronously by browser workers.
 
+## Quick Start with Docker
+
+```bash
+# Start the full stack (PostgreSQL + API)
+./scripts/docker-dev.sh start
+
+# Run migrations and seeds
+./scripts/docker-dev.sh migrate
+./scripts/docker-dev.sh seed
+
+# API will be available at http://localhost:3000
+```
+
+For detailed Docker setup and deployment instructions, see [docs/DOCKER.md](docs/DOCKER.md).
+
 #### `POST /api/v1/jobs`
 Create a new automation job.
 

@@ -1,0 +1,89 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: browsers-api-postgres
+    environment:
+      POSTGRES_DB: browser_automation
+      POSTGRES_USER: automation_user
+      POSTGRES_PASSWORD: secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U automation_user -d browser_automation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - browsers-api-network
+
+  # Browsers API Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: browsers-api
+    ports:
+      - "3000:3000"
+      - "9090:9090"  # Metrics port
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_PREFIX: api/v1
+      
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: automation_user
+      DB_PASSWORD: secure_password
+      DB_DATABASE: browser_automation
+      
+      # Worker Configuration
+      WORKER_POLL_INTERVAL_MS: 1000
+      WORKER_MAX_CONCURRENT_JOBS: 10
+      BROWSER_POOL_MIN_SIZE: 1
+      BROWSER_POOL_MAX_SIZE: 5
+      BROWSER_IDLE_TIMEOUT_MS: 300000
+      
+      # Job Configuration
+      DEFAULT_JOB_TIMEOUT_MS: 30000
+      MAX_JOB_RETRIES: 3
+      JOB_CLEANUP_AFTER_DAYS: 7
+      
+      # Storage
+      ARTIFACT_STORAGE_TYPE: filesystem
+      ARTIFACT_STORAGE_PATH: /app/artifacts
+      MAX_ARTIFACT_SIZE_MB: 50
+      
+      # Playwright
+      PLAYWRIGHT_HEADLESS: "true"
+      PLAYWRIGHT_TIMEOUT_MS: 30000
+      PLAYWRIGHT_SCREENSHOTS_DIR: /app/screenshots
+      
+      # Security
+      API_KEY_HEADER: X-API-Key
+      RATE_LIMIT_MAX: 100
+      RATE_LIMIT_WINDOW_MS: 60000
+      
+      # Monitoring
+      ENABLE_METRICS: "true"
+      METRICS_PORT: 9090
+      LOG_LEVEL: info
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./screenshots:/app/screenshots
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - browsers-api-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  browsers-api-network:
+    driver: bridge
