@@ -1,0 +1,726 @@
+{
+	"info": {
+		"_postman_id": "browsers-api-collection",
+		"name": "Browsers API",
+		"description": "Complete API collection for the Browser Automation API. Provides HTTP endpoints for browser tasks using Playwright with a producer-consumer pattern.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "browsers-api"
+	},
+	"item": [
+		{
+			"name": "Jobs",
+			"item": [
+				{
+					"name": "Create Job",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"jobId\", jsonData.id || jsonData.jobId);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"browserTypeId\": 1,\n  \"targetUrl\": \"https://iserter.com\",\n  \"actions\": [\n    {\n      \"action\": \"fill\",\n      \"target\": \"Your e-mail address\",\n      \"getTargetBy\": \"getByLabel\",\n      \"value\": \"user@example.com\"\n    },\n    {\n      \"action\": \"fill\",\n      \"target\": \"#password\",\n      \"getTargetBy\": \"getBySelector\",\n      \"value\": \"secret123\"\n    },\n    {\n      \"action\": \"scroll\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\",\n      \"speed\": 2000\n    },\n    {\n      \"action\": \"moveCursor\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\"\n    },\n    {\n      \"action\": \"click\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\",\n      \"waitForNavigation\": true\n    },\n    {\n      \"action\": \"screenshot\",\n      \"fullPage\": true,\n      \"type\": \"png\"\n    }\n  ],\n  \"timeoutMs\": 30000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"jobs"
+							]
+						},
+						"description": "Create a new automation job. Requires API key authentication.\n\n**Actions Available:**\n- `fill`: Fill form fields\n- `click`: Click on elements\n- `moveCursor`: Move cursor with human-like movement\n- `scroll`: Scroll page with human-like behavior\n- `screenshot`: Capture screenshots\n\n**Optional Parameters:**\n- `waitUntil`: Navigation wait option\n- `priority`: Job priority (0-100)\n- `timeoutMs`: Job timeout in milliseconds (1000-300000)\n- `maxRetries`: Maximum retry attempts (0-10)"
+					},
+					"response": []
+				},
+				{
+					"name": "List Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs?status=pending&page=1&limit=20",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"jobs"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending",
+									"description": "Filter by job status (pending, in-progress, completed, failed, cancelled)"
+								},
+								{
+									"key": "browserTypeId",
+									"value": "1",
+									"description": "Filter by browser type ID"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page (1-100, default: 20)"
+								},
+								{
+									"key": "createdAfter",
+									"value": "",
+									"description": "Filter jobs created after this date (ISO 8601)"
+								},
+								{
+									"key": "createdBefore",
+									"value": "",
+									"description": "Filter jobs created before this date (ISO 8601)"
+								}
+							]
+						},
+						"description": "List all jobs with optional filtering and pagination."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"jobs",
+								"{{jobId}}"
+							]
+						},
+						"description": "Get detailed information about a specific job including status and results."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Job",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"jobs",
+								"{{jobId}}"
+							]
+						},
+						"description": "Cancel a pending or in-progress job. Returns 204 No Content on success."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Artifacts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}/artifacts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"jobs",
+								"{{jobId}}",
+								"artifacts"
+							]
+						},
+						"description": "Get all artifacts (screenshots, files, etc.) associated with a job."
+					},
+					"response": []
+				}
+			],
+			"description": "Job management endpoints for creating, listing, and managing automation jobs."
+		},
+		{
+			"name": "Browsers",
+			"item": [
+				{
+					"name": "List Browsers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/browsers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"browsers"
+							]
+						},
+						"description": "List all available browser types (Chromium, Firefox, WebKit)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Browser by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/browsers/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"browsers",
+								"1"
+							]
+						},
+						"description": "Get details about a specific browser type by ID."
+					},
+					"response": []
+				}
+			],
+			"description": "Browser type information endpoints."
+		},
+		{
+			"name": "Workers",
+			"item": [
+				{
+					"name": "List Workers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/workers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"workers"
+							]
+						},
+						"description": "List all browser workers and their current status."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Worker Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/workers/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"workers",
+								"stats"
+							]
+						},
+						"description": "Get statistics about worker performance and status."
+					},
+					"response": []
+				}
+			],
+			"description": "Worker management and monitoring endpoints."
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Get Admin Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"stats"
+							]
+						},
+						"description": "Get comprehensive admin statistics including workers and browser pool stats."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Workers (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/workers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"workers"
+							]
+						},
+						"description": "Get detailed worker information from admin perspective."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Queue Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/queue",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"queue"
+							]
+						},
+						"description": "Get queue status including browser pool availability and active jobs."
+					},
+					"response": []
+				}
+			],
+			"description": "Administrative endpoints for monitoring and management."
+		},
+		{
+			"name": "API Keys",
+			"item": [
+				{
+					"name": "Create API Key",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201 || pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.key) {",
+									"        pm.collectionVariables.set(\"apiKey\", jsonData.key);",
+									"        pm.collectionVariables.set(\"apiKeyId\", jsonData.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clientId\": \"my-client-id\",\n  \"name\": \"My API Key\",\n  \"rateLimit\": 100,\n  \"expiresAt\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys"
+							]
+						},
+						"description": "Create a new API key. The key is returned only once - store it securely!\n\n**Parameters:**\n- `clientId`: Unique client identifier\n- `name`: Descriptive name for the key\n- `rateLimit`: Requests per minute (1-10000, default: 100)\n- `expiresAt`: Optional expiration date"
+					},
+					"response": []
+				},
+				{
+					"name": "List API Keys",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys"
+							]
+						},
+						"description": "List all API keys (without sensitive key values)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get API Key by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys/{{apiKeyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys",
+								"{{apiKeyId}}"
+							]
+						},
+						"description": "Get details about a specific API key."
+					},
+					"response": []
+				},
+				{
+					"name": "Revoke API Key",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys/{{apiKeyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys",
+								"{{apiKeyId}}"
+							]
+						},
+						"description": "Revoke (delete) an API key. This action cannot be undone."
+					},
+					"response": []
+				},
+				{
+					"name": "List URL Policies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys/url-policies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys",
+								"url-policies"
+							]
+						},
+						"description": "List all URL policies that control which URLs can be accessed."
+					},
+					"response": []
+				},
+				{
+					"name": "Create URL Policy",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201 || pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.id) {",
+									"        pm.collectionVariables.set(\"urlPolicyId\", jsonData.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"pattern\": \"https://example.com/**\",\n  \"type\": \"WHITELIST\",\n  \"description\": \"Allow access to example.com and subdomains\",\n  \"isActive\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys/url-policies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys",
+								"url-policies"
+							]
+						},
+						"description": "Create a URL policy to control which URLs can be accessed.\n\n**Policy Types:**\n- `WHITELIST`: Only allow URLs matching this pattern\n- `BLACKLIST`: Block URLs matching this pattern\n\n**Parameters:**\n- `pattern`: URL pattern (supports wildcards)\n- `type`: Policy type (WHITELIST or BLACKLIST)\n- `description`: Optional description\n- `isActive`: Whether the policy is active (default: true)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get URL Policy by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys/url-policies/{{urlPolicyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys",
+								"url-policies",
+								"{{urlPolicyId}}"
+							]
+						},
+						"description": "Get details about a specific URL policy."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete URL Policy",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/api-keys/url-policies/{{urlPolicyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"api-keys",
+								"url-policies",
+								"{{urlPolicyId}}"
+							]
+						},
+						"description": "Delete a URL policy."
+					},
+					"response": []
+				}
+			],
+			"description": "API key and URL policy management endpoints."
+		},
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Comprehensive health check including database, memory, disk, browser pool, and workers."
+					},
+					"response": []
+				},
+				{
+					"name": "Readiness Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health/ready",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health",
+								"ready"
+							]
+						},
+						"description": "Readiness probe - checks if the service is ready to accept traffic (database, memory, workers)."
+					},
+					"response": []
+				},
+				{
+					"name": "Liveness Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health/live",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health",
+								"live"
+							]
+						},
+						"description": "Liveness probe - checks if the service is alive (basic memory check)."
+					},
+					"response": []
+				}
+			],
+			"description": "Health check endpoints for monitoring and orchestration."
+		},
+		{
+			"name": "Metrics",
+			"item": [
+				{
+					"name": "Get Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/metrics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"metrics"
+							]
+						},
+						"description": "Get application metrics and statistics."
+					},
+					"response": []
+				}
+			],
+			"description": "Metrics endpoint for monitoring."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3333",
+			"type": "string"
+		},
+		{
+			"key": "apiKey",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "jobId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "apiKeyId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "urlPolicyId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
