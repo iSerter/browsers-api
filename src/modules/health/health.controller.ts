@@ -24,11 +24,11 @@ export class HealthController {
 
   @Get()
   @HealthCheck({
-    timeout: 5000, // 5 second timeout
+    timeout: 10000, // 10 second timeout for all checks
   })
   check() {
     return this.health.check([
-      () => this.db.pingCheck('database', { timeout: 3000 }),
+      () => this.db.pingCheck('database', { timeout: 5000 }), // 5 second DB timeout
       () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024), // 300MB
       () => this.memory.checkRSS('memory_rss', 300 * 1024 * 1024), // 300MB
       () =>
@@ -43,11 +43,11 @@ export class HealthController {
 
   @Get('ready')
   @HealthCheck({
-    timeout: 5000, // 5 second timeout
+    timeout: 10000, // 10 second timeout
   })
   ready() {
     return this.health.check([
-      () => this.db.pingCheck('database', { timeout: 3000 }),
+      () => this.db.pingCheck('database', { timeout: 5000 }), // 5 second DB timeout
       () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
       () => this.workersHealth.isHealthy('workers'),
     ]);

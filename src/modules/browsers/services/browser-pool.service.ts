@@ -321,14 +321,42 @@ class BrowserPool {
   }
 
   private async initializePool(): Promise<void> {
-    for (let i = 0; i < this.config.minSize; i++) {
-      const browser = await this.createBrowser();
-      this.availableInstances.push(browser);
-      this.startIdleTimer(browser);
+    // Initialize pool asynchronously to avoid blocking module initialization
+    // This allows the app to start quickly while browsers are being launched
+    this.initializePoolAsync().catch((error) => {
+      this.logger.error(
+        `Failed to initialize ${this.browserType} pool: ${error.message}`,
+      );
+    });
+  }
+
+  private async initializePoolAsync(): Promise<void> {
+    try {
+      const minSize = this.config.minSize || 1;
+      this.logger.log(
+        `Initializing ${this.browserType} pool with ${minSize} browsers (async)`,
+      );
+      
+      // Launch browsers in parallel for faster initialization
+      const browserPromises = Array.from({ length: minSize }, () =>
+        this.createBrowser(),
+      );
+      const browsers = await Promise.all(browserPromises);
+      
+      browsers.forEach((browser) => {
+        this.availableInstances.push(browser);
+        this.startIdleTimer(browser);
+      });
+      
+      this.logger.log(
+        `Initialized ${this.browserType} pool with ${browsers.length} browsers`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error initializing ${this.browserType} pool: ${error.message}`,
+      );
+      // Don't throw - allow pool to be created lazily when needed
     }
-    this.logger.log(
-      `Initialized ${this.browserType} pool with ${this.config.minSize} browsers`,
-    );
   }
 
   private async createBrowser(): Promise<Browser> {
