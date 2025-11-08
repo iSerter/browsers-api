@@ -20,11 +20,14 @@
 # Build image
 docker build -t browsers-api:latest .
 
-# Run with env file
-docker run --rm -p 3000:3000 --env-file ./.env browsers-api:latest
+# Run with env file (default port 3333)
+docker run --rm -p 3333:3333 --env-file ./.env browsers-api:latest
 
 # Run detached
-docker run -d --name browsers-api -p 3000:3000 --env-file ./.env browsers-api:latest
+docker run -d --name browsers-api -p 3333:3333 --env-file ./.env browsers-api:latest
+
+# Run with custom port
+docker run --rm -p 8080:8080 -e PORT=8080 --env-file ./.env browsers-api:latest
 ```
 
 ### Docker Compose
@@ -115,7 +118,7 @@ Key environment variables (see `.env.example`):
 
 ## Ports
 
-- `3000` - API server
+- `3333` - API server (default, configurable via `PORT` env variable)
 - `9090` - Metrics endpoint
 - `5432` - PostgreSQL (when using docker-compose)
 
@@ -132,19 +135,22 @@ When using docker-compose:
 # Check container health
 docker inspect --format='{{.State.Health.Status}}' browsers-api
 
-# Manual health check
-curl http://localhost:3000/api/v1/health
+# Manual health check (default port 3333)
+curl http://localhost:3333/api/v1/health
+
+# With custom port
+curl http://localhost:8080/api/v1/health
 ```
 
 ## Common Issues
 
 ### Port already in use
 ```bash
-# Find what's using port 3000
-lsof -i :3000
+# Find what's using port 3333
+lsof -i :3333
 
-# Use different port
-docker run -p 3001:3000 ...
+# Use different port by setting PORT environment variable
+docker run -p 8080:8080 -e PORT=8080 ...
 ```
 
 ### Database connection failed

@@ -32,8 +32,11 @@ This guide covers Docker containerization for the Browsers API project, includin
 
 2. **Using Docker Commands Directly**
    ```bash
-   # Start with docker-compose
+   # Start with docker-compose (default port 3333)
    docker-compose up -d
+   
+   # Start with custom port (set PORT in .env or export before running)
+   PORT=8080 docker-compose up -d
    
    # Stop services
    docker-compose down
@@ -50,7 +53,7 @@ The application requires the following environment variables. These are configur
 
 #### Application
 - `NODE_ENV`: Environment mode (development/production)
-- `PORT`: Application port (default: 3000)
+- `PORT`: Application port (default: 3333, configurable)
 - `API_PREFIX`: API route prefix (default: api/v1)
 
 #### Database
@@ -116,7 +119,7 @@ docker build \
 ### Run with Environment File
 ```bash
 docker run --rm \
-  -p 3000:3000 \
+  -p 3333:3333 \
   --env-file ./.env \
   browsers-api:latest
 ```
@@ -124,8 +127,9 @@ docker run --rm \
 ### Run with Inline Environment Variables
 ```bash
 docker run --rm \
-  -p 3000:3000 \
+  -p 3333:3333 \
   -e NODE_ENV=production \
+  -e PORT=3333 \
   -e DB_HOST=your-db-host \
   -e DB_PORT=5432 \
   -e DB_USERNAME=user \
@@ -134,11 +138,21 @@ docker run --rm \
   browsers-api:latest
 ```
 
+### Run with Custom Port
+```bash
+# Use a different port by setting PORT environment variable
+docker run --rm \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  --env-file ./.env \
+  browsers-api:latest
+```
+
 ### Run as Detached Container
 ```bash
 docker run -d \
   --name browsers-api \
-  -p 3000:3000 \
+  -p 3333:3333 \
   --env-file ./.env \
   browsers-api:latest
 ```
@@ -146,7 +160,7 @@ docker run -d \
 ### Run with Volume Mounts
 ```bash
 docker run --rm \
-  -p 3000:3000 \
+  -p 3333:3333 \
   -v $(pwd)/artifacts:/app/artifacts \
   -v $(pwd)/screenshots:/app/screenshots \
   --env-file ./.env \
@@ -276,11 +290,11 @@ docker-compose exec postgres pg_isready -U automation_user
 
 ### Port Already in Use
 ```bash
-# Find process using port 3000
-lsof -i :3000
+# Find process using port 3333
+lsof -i :3333
 
-# Use different port
-docker run -p 3001:3000 ...
+# Use different port by setting PORT environment variable
+docker run -p 8080:8080 -e PORT=8080 ...
 ```
 
 ### Browser Automation Fails

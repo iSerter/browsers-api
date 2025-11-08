@@ -10,7 +10,7 @@
 - **Runner stage**: Production-optimized image with browsers and runtime dependencies
 - Includes health check endpoint monitoring
 - Creates necessary directories for artifacts and screenshots
-- Exposes port 3000 for API and includes Prometheus metrics support
+- Exposes port 3333 for API (configurable via PORT env variable) and includes Prometheus metrics support
 
 #### docker-compose.yml
 - Complete orchestration for local development
@@ -145,8 +145,11 @@ GitHub Actions workflow for automated builds:
 # Build image
 docker build -t browsers-api:latest .
 
-# Run with environment
-docker run -p 3000:3000 --env-file .env browsers-api:latest
+# Run with environment (default port 3333)
+docker run -p 3333:3333 --env-file .env browsers-api:latest
+
+# Run with custom port
+docker run -p 8080:8080 -e PORT=8080 --env-file .env browsers-api:latest
 ```
 
 ### Docker Hub Publishing

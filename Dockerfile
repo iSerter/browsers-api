@@ -31,6 +31,7 @@ WORKDIR /app
 
 # Set production environment
 ENV NODE_ENV=production
+ENV PORT=3333
 
 # Copy package files for reference
 COPY package.json package-lock.json ./
@@ -47,12 +48,12 @@ COPY --from=builder /app/dist ./dist
 # Create necessary directories
 RUN mkdir -p ./artifacts ./screenshots
 
-# Expose application port (default 3000)
-EXPOSE 3000
+# Expose application port (configurable via PORT env variable, default: 3333)
+EXPOSE 3333
 
-# Health check
+# Health check (uses PORT env variable)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "const port = process.env.PORT || 3333; require('http').get(`http://localhost:${port}/api/v1/health`, (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Run the application
 CMD ["node", "dist/main.js"]

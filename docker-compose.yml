@@ -26,11 +26,11 @@ services:
       dockerfile: Dockerfile
     container_name: browsers-api
     ports:
-      - "3000:3000"
+      - "${PORT:-3333}:${PORT:-3333}"
       - "9090:9090"  # Metrics port
     environment:
       NODE_ENV: production
-      PORT: 3000
+      PORT: ${PORT:-3333}
       API_PREFIX: api/v1
       
       # Database
