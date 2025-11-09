@@ -56,7 +56,7 @@ run_stack() {
     print_info "Starting full stack with $DOCKER_COMPOSE..."
     $DOCKER_COMPOSE up -d
     print_info "Stack is running!"
-    print_info "API available at http://localhost:3000"
+    print_info "API available at http://localhost:3333"
     print_info "Metrics available at http://localhost:9090/metrics"
 }
 

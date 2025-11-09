@@ -18,7 +18,7 @@ Browser Automation API that provides HTTP endpoints for browser tasks using Play
 ./scripts/docker-dev.sh migrate
 ./scripts/docker-dev.sh seed
 
-# API will be available at http://localhost:3000
+# API will be available at http://localhost:3333
 ```
 
 For detailed Docker setup and deployment instructions, see [docs/DOCKER.md](docs/DOCKER.md).

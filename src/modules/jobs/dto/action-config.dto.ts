@@ -62,6 +62,14 @@ export class ActionConfigDto {
   @IsBoolean()
   multiple?: boolean;
 
+  // Element selection index (for handling multiple matches)
+  // When multiple elements match, use this 0-based index to select which one
+  // If not specified, defaults to 0 (first match)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  index?: number;
+
   // Click action fields
   @IsOptional()
   @IsEnum(MouseButton)
@@ -163,6 +171,22 @@ export class ActionConfigDto {
   @IsNumber()
   @Min(0)
   padding?: number;
+
+  // Fill action fields (human-like typing)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  typingDelay?: number; // Fixed delay between keystrokes in ms
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  typingDelayMin?: number; // Minimum delay between keystrokes in ms
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  typingDelayMax?: number; // Maximum delay between keystrokes in ms
 
   // Visit action fields (no additional fields needed)
 

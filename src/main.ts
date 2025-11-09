@@ -52,7 +52,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = configService.get('PORT', 3000);
+  const port = configService.get('PORT', 3333);
   await app.listen(port);
 
   logger.log(

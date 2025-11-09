@@ -35,11 +35,15 @@ export class ScreenshotActionHandler implements IActionHandler {
       );
 
       // Take screenshot
-      const screenshotBuffer = await page.screenshot({
+      // Quality is only supported for JPEG, not PNG
+      const screenshotOptions: any = {
         fullPage,
         type,
-        quality,
-      });
+      };
+      if (type === 'jpeg') {
+        screenshotOptions.quality = quality;
+      }
+      const screenshotBuffer = await page.screenshot(screenshotOptions);
 
       // Generate filename
       const timestamp = Date.now();

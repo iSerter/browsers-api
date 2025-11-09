@@ -6,6 +6,11 @@ import {
   IActionHandler,
 } from '../interfaces/action-handler.interface';
 import { moveMouseHuman } from '../utils/human-mouse';
+import {
+  getLocator,
+  isStrictModeViolation,
+  getStrictModeViolationSuggestions,
+} from '../utils/locator-helper';
 
 interface MoveCursorActionConfig extends ActionConfig {
   target: string;
@@ -23,6 +28,7 @@ interface MoveCursorActionConfig extends ActionConfig {
   stepsMin?: number;
   stepsMax?: number;
   padding?: number;
+  index?: number;
 }
 
 @Injectable()
@@ -45,11 +51,12 @@ export class MoveCursorActionHandler implements IActionHandler {
       stepsMin,
       stepsMax,
       padding,
+      index = 0,
     } = config;
 
     try {
       this.logger.log(
-        `Starting move cursor action for job ${jobId} on target: ${target} (${getTargetBy})`,
+        `Starting move cursor action for job ${jobId} on target: ${target} (${getTargetBy}${index > 0 ? `, index: ${index}` : ''})`,
       );
 
       // Validate required fields
@@ -57,11 +64,11 @@ export class MoveCursorActionHandler implements IActionHandler {
         throw new Error('Move cursor action requires target and getTargetBy');
       }
 
-      // Get the locator based on getTargetBy method
-      const locator = this.getLocator(page, target, getTargetBy);
+      // Get the locator based on getTargetBy method with index support
+      const locator = getLocator(page, target, getTargetBy, index);
 
-      // Wait for element to be visible
-      await locator.waitFor({ state: 'visible' });
+      // Wait for element to be visible with 2 second timeout
+      await locator.waitFor({ state: 'visible', timeout: 2000 });
 
       // Get the element handle
       const element = await locator.elementHandle();
@@ -89,6 +96,7 @@ export class MoveCursorActionHandler implements IActionHandler {
         data: {
           target,
           getTargetBy,
+          index,
           options: {
             speed,
             jitter,
@@ -106,10 +114,17 @@ export class MoveCursorActionHandler implements IActionHandler {
         `Move cursor action failed for job ${jobId}: ${error.message}`,
       );
 
+      // Enhance error message for strict mode violations
+      let errorMessage = error.message;
+      if (isStrictModeViolation(error)) {
+        const suggestions = getStrictModeViolationSuggestions(error);
+        errorMessage = `${error.message}. ${suggestions}`;
+      }
+
       return {
         success: false,
         error: {
-          message: error.message,
+          message: errorMessage,
           code: this.getErrorCode(error),
           retryable: this.isRetryableError(error),
         },
@@ -117,26 +132,13 @@ export class MoveCursorActionHandler implements IActionHandler {
     }
   }
 
-  private getLocator(page: Page, target: string, getTargetBy: string) {
-    switch (getTargetBy) {
-      case 'getByLabel':
-        return page.getByLabel(target);
-      case 'getByText':
-        return page.getByText(target);
-      case 'getByRole':
-        return page.getByRole(target as any);
-      case 'getByPlaceholder':
-        return page.getByPlaceholder(target);
-      case 'getBySelector':
-        return page.locator(target);
-      default:
-        throw new Error(`Unknown getTargetBy method: ${getTargetBy}`);
-    }
-  }
-
   private getErrorCode(error: any): string {
+    // Timeout errors from element selection should be treated as element not found
     if (error.name === 'TimeoutError') {
-      return 'TIMEOUT_ERROR';
+      return 'ELEMENT_NOT_FOUND_ERROR';
+    }
+    if (isStrictModeViolation(error)) {
+      return 'STRICT_MODE_VIOLATION';
     }
     if (error.message.includes('not found')) {
       return 'ELEMENT_NOT_FOUND_ERROR';
@@ -146,7 +148,8 @@ export class MoveCursorActionHandler implements IActionHandler {
 
   private isRetryableError(error: any): boolean {
     const errorCode = this.getErrorCode(error);
-    return ['TIMEOUT_ERROR'].includes(errorCode);
+    // Element not found and strict mode violations are not retryable - they require user action
+    return false;
   }
 }
 
