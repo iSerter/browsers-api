@@ -23,9 +23,7 @@ export class HealthController {
   ) {}
 
   @Get()
-  @HealthCheck({
-    timeout: 10000, // 10 second timeout for all checks
-  })
+  @HealthCheck()
   check() {
     return this.health.check([
       () => this.db.pingCheck('database', { timeout: 5000 }), // 5 second DB timeout
@@ -42,9 +40,7 @@ export class HealthController {
   }
 
   @Get('ready')
-  @HealthCheck({
-    timeout: 10000, // 10 second timeout
-  })
+  @HealthCheck()
   ready() {
     return this.health.check([
       () => this.db.pingCheck('database', { timeout: 5000 }), // 5 second DB timeout

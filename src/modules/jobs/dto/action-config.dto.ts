@@ -22,6 +22,9 @@ export enum ActionType {
   SCROLL = 'scroll',
   MOVE_CURSOR = 'moveCursor',
   SCREENSHOT = 'screenshot',
+  VISIT = 'visit',
+  EXTRACT = 'extract',
+  PDF = 'pdf',
 }
 
 export enum ScreenshotType {
@@ -81,6 +84,10 @@ export class ActionConfigDto {
   @IsOptional()
   @IsEnum(ScreenshotType)
   type?: ScreenshotType;
+
+  @IsOptional()
+  @IsString()
+  format?: string; // Alias for type, used by actions service
 
   @IsOptional()
   @IsNumber()
@@ -156,5 +163,23 @@ export class ActionConfigDto {
   @IsNumber()
   @Min(0)
   padding?: number;
+
+  // Visit action fields (no additional fields needed)
+
+  // Extract action fields
+  @IsOptional()
+  extractors?: any; // Can be complex object, validate as needed
+
+  // PDF action fields
+  @IsOptional()
+  @IsString()
+  pdfFormat?: string; // PDF format option
+
+  @IsOptional()
+  @IsBoolean()
+  printBackground?: boolean;
+
+  @IsOptional()
+  margin?: any; // Can be object or string, validate as needed
 }
 

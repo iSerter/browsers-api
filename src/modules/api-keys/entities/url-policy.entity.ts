@@ -31,7 +31,7 @@ export class UrlPolicy {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'is_active', type: 'boolean', default: true })
   @Index()
   isActive: boolean;
 

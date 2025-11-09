@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JobsService } from '../jobs/jobs.service';
+import { ActionType } from '../jobs/dto/action-config.dto';
 
 @Injectable()
 export class ActionsService {
@@ -12,7 +13,7 @@ export class ActionsService {
       targetUrl: payload.url,
       actions: [
         {
-          action: 'screenshot',
+          action: ActionType.SCREENSHOT,
           fullPage: payload.fullPage,
           format: payload.format,
           quality: payload.quality,
@@ -29,7 +30,7 @@ export class ActionsService {
       targetUrl: payload.url,
       actions: [
         {
-          action: 'visit',
+          action: ActionType.VISIT,
         },
       ],
       waitUntil: payload.waitUntil,
@@ -53,7 +54,7 @@ export class ActionsService {
       targetUrl: payload.url,
       actions: [
         {
-          action: 'extract',
+          action: ActionType.EXTRACT,
           extractors: payload.extractors,
         },
       ],
@@ -68,8 +69,8 @@ export class ActionsService {
       targetUrl: payload.url,
       actions: [
         {
-          action: 'pdf',
-          format: payload.format,
+          action: ActionType.PDF,
+          pdfFormat: payload.format,
           printBackground: payload.printBackground,
           margin: payload.margin,
         },

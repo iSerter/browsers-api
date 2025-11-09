@@ -26,8 +26,8 @@ export class CreateJobDto {
 
   @IsArray()
   @ArrayNotEmpty()
-  @ValidateNested({ each: true })
   @Type(() => ActionConfigDto)
+  @ValidateNested({ each: true })
   actions: ActionConfigDto[];
 
   @IsOptional()
