@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { WaitUntilOption } from '../entities/automation-job.entity';
+import { ActionConfigDto } from './action-config.dto';
 
 export class CreateJobDto {
   @IsInt()
@@ -26,8 +27,8 @@ export class CreateJobDto {
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
-  @Type(() => Object)
-  actions: any[];
+  @Type(() => ActionConfigDto)
+  actions: ActionConfigDto[];
 
   @IsOptional()
   @IsEnum(WaitUntilOption)
