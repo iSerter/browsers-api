@@ -118,6 +118,8 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
         .getOne();
 
       if (!job) {
+        // No job found - rollback transaction before releasing
+        await queryRunner.rollbackTransaction();
         await queryRunner.release();
         return;
       }
