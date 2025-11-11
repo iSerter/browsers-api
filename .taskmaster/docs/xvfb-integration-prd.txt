@@ -1,0 +1,98 @@
+# Xvfb Integration PRD
+
+## Overview
+Integrate Xvfb (X Virtual Framebuffer) into the Browsers API to enable running browsers with `headless: false` on virtual displays. This allows better compatibility with web applications that require a display server while maintaining the ability to run in containerized environments without physical displays.
+
+## Requirements
+
+### 1. Docker Infrastructure
+- Install Xvfb package in the Dockerfile
+- Create entrypoint script that starts Xvfb before the NestJS application
+- Configure Xvfb with environment variables for display number, resolution, and screen settings
+- Ensure proper process lifecycle management (start, stop, health check)
+- Set DISPLAY environment variable to point browsers to the virtual display
+
+### 2. Configuration Management
+- Add Xvfb-related environment variables to validation schema:
+  - XVFB_ENABLED (boolean, default: false)
+  - XVFB_DISPLAY (string, default: ":99")
+  - XVFB_SCREEN (number, default: 0)
+  - XVFB_RESOLUTION (string, default: "1920x1080x24")
+  - XVFB_ARGS (string, optional additional arguments)
+- Update docker-compose.yml with Xvfb configuration options
+- Ensure backward compatibility (default remains headless mode)
+
+### 3. Browser Pool Service Updates
+- Inject ConfigService into BrowserPoolService
+- Read PLAYWRIGHT_HEADLESS from ConfigService instead of hardcoded values
+- When Xvfb is enabled, set headless: false for all browser types
+- Verify DISPLAY environment variable is set before launching browsers
+- Add error handling for missing DISPLAY when Xvfb is enabled
+
+### 4. Xvfb Management Service (Optional Enhancement)
+- Create XvfbService to manage Xvfb process lifecycle
+- Start Xvfb on module initialization when enabled
+- Stop Xvfb on module destruction
+- Implement health check to verify Xvfb is running
+- Log Xvfb status and errors appropriately
+- Handle Xvfb failures gracefully (fallback to headless or fail fast)
+
+### 5. Testing
+- Unit tests for Xvfb configuration reading
+- Unit tests for browser launch with Xvfb enabled/disabled
+- Integration tests for Docker container with Xvfb
+- Test browser automation actions work correctly with headless: false
+- Test error handling when Xvfb fails to start
+
+### 6. Documentation
+- Update README.md with Xvfb configuration options and examples
+- Update Docker documentation (docs/DOCKER.md) with Xvfb setup instructions
+- Add troubleshooting section for Xvfb-related issues
+- Document when to use Xvfb vs headless mode
+
+## Technical Specifications
+
+### Xvfb Command Format
+```bash
+Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset
+```
+
+### Environment Variables
+- DISPLAY=:99.0 (set by entrypoint script)
+- XVFB_ENABLED=true (enable Xvfb)
+- XVFB_DISPLAY=:99 (display number)
+- XVFB_RESOLUTION=1920x1080x24 (width x height x depth)
+- XVFB_ARGS="" (optional additional arguments)
+
+### Browser Configuration
+When Xvfb is enabled:
+- headless: false (read from PLAYWRIGHT_HEADLESS or set based on XVFB_ENABLED)
+- DISPLAY environment variable must be set
+- All existing browser launch arguments remain the same
+
+## Implementation Phases
+
+### Phase 1: Docker Infrastructure (Tasks 1-3)
+- Update Dockerfile
+- Create entrypoint script
+- Update docker-compose.yml
+
+### Phase 2: Configuration (Tasks 4-5)
+- Update validation schema
+- Update BrowserPoolService
+
+### Phase 3: Optional Enhancement (Task 6)
+- Create XvfbService
+
+### Phase 4: Testing & Documentation (Tasks 7-8)
+- Write tests
+- Update documentation
+
+## Success Criteria
+- Xvfb starts automatically when enabled via environment variable
+- Browsers launch successfully with headless: false when Xvfb is enabled
+- All existing browser automation actions work correctly
+- Configuration is flexible and well-documented
+- Tests verify Xvfb integration works as expected
+- Documentation is clear and comprehensive
+

@@ -95,6 +95,39 @@ Get job status and results.
 }
 ```
 
+#### `GET /api/v1/jobs/:jobId/artifacts`
+Get list of all artifacts (screenshots, files, etc.) associated with a job.
+
+**Response:**
+```json
+[
+  {
+    "id": "artifact-uuid",
+    "jobId": "550e8400-e29b-41d4-a716-446655440000",
+    "artifactType": "screenshot",
+    "filePath": "/artifacts/job-id/1762825733438-screenshot.png",
+    "mimeType": "image/png",
+    "sizeBytes": 123456,
+    "createdAt": "2025-10-18T10:00:05Z"
+  }
+]
+```
+
+#### `GET /api/v1/jobs/:jobId/artifacts/:artifactId`
+Download a specific artifact file (screenshot, PDF, etc.).
+
+**Response:**
+- Returns the file content with appropriate headers:
+  - `Content-Type`: Based on artifact's mimeType (e.g., `image/png`, `image/jpeg`)
+  - `Content-Disposition`: Attachment with filename
+  - `Content-Length`: File size in bytes
+
+**Example:**
+```bash
+# Download a screenshot
+curl -O http://localhost:3333/api/v1/jobs/{jobId}/artifacts/{artifactId}
+```
+
 ## Tech Stack
 
 ### Core Dependencies

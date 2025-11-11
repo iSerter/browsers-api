@@ -7,6 +7,11 @@ services:
       POSTGRES_DB: browser_automation
       POSTGRES_USER: automation_user
       POSTGRES_PASSWORD: secure_password
+    command: >
+      postgres
+      -c log_min_messages=warning
+      -c log_connections=off
+      -c log_disconnections=off
     ports:
       - "5432:5432"
     volumes:
@@ -39,6 +44,8 @@ services:
       DB_USERNAME: automation_user
       DB_PASSWORD: secure_password
       DB_DATABASE: browser_automation
+      DB_POOL_MIN: ${DB_POOL_MIN:-1}  # Reduced to prevent transaction conflicts on startup
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
       
       # Worker Configuration
       WORKER_POLL_INTERVAL_MS: 1000

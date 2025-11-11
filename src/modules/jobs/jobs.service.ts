@@ -11,6 +11,7 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { ListJobsQueryDto } from './dto/list-jobs-query.dto';
 import { BrowsersService } from '../browsers/browsers.service';
 import { JobEventsGateway } from './gateways/job-events.gateway';
+import { ArtifactStorageService } from './services/artifact-storage.service';
 
 @Injectable()
 export class JobsService {
@@ -21,6 +22,7 @@ export class JobsService {
     private readonly artifactRepository: Repository<JobArtifact>,
     private readonly browsersService: BrowsersService,
     private readonly jobEventsGateway: JobEventsGateway,
+    private readonly artifactStorageService: ArtifactStorageService,
   ) {}
 
   async createJob(createJobDto: CreateJobDto) {
@@ -164,5 +166,37 @@ export class JobsService {
     });
 
     return artifacts;
+  }
+
+  async getArtifactFile(jobId: string, artifactId: string) {
+    // Verify job exists
+    const job = await this.jobRepository.findOne({ where: { id: jobId } });
+    if (!job) {
+      throw new NotFoundException(`Job with ID ${jobId} not found`);
+    }
+
+    // Get artifact
+    const artifact = await this.artifactRepository.findOne({
+      where: { id: artifactId, jobId },
+    });
+
+    if (!artifact) {
+      throw new NotFoundException(
+        `Artifact with ID ${artifactId} not found for job ${jobId}`,
+      );
+    }
+
+    // Read file from storage
+    const fileBuffer = await this.artifactStorageService.readArtifactFile(
+      artifact,
+    );
+
+    return {
+      buffer: fileBuffer,
+      mimeType: artifact.mimeType || 'application/octet-stream',
+      filename: artifact.filePath
+        ? artifact.filePath.split('/').pop() || `artifact-${artifactId}`
+        : `artifact-${artifactId}`,
+    };
   }
 }

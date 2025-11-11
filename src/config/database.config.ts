@@ -17,7 +17,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
     // Connection pool configuration for better performance
     extra: {
       max: parseInt(process.env.DB_POOL_MAX || '20', 10), // Maximum pool size
-      min: parseInt(process.env.DB_POOL_MIN || '5', 10), // Minimum pool size
+      min: parseInt(process.env.DB_POOL_MIN || '1', 10), // Minimum pool size (reduced to avoid transaction conflicts on startup)
       idleTimeoutMillis: parseInt(
         process.env.DB_POOL_IDLE_TIMEOUT || '30000',
         10,
@@ -26,6 +26,8 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
         process.env.DB_CONNECTION_TIMEOUT || '5000',
         10,
       ), // 5 seconds
+      // Prevent transaction conflicts during initialization
+      statement_timeout: 30000, // 30 seconds
     },
   };
 });

@@ -12,6 +12,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Req,
+  Res,
 } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApiKeyGuard } from '../auth/guards/api-key.guard';
@@ -20,6 +21,7 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { ListJobsQueryDto } from './dto/list-jobs-query.dto';
 import { ApiKeysService } from '../api-keys/api-keys.service';
 import { Request } from 'express';
+import type { Response } from 'express';
 
 @Controller('jobs')
 @UseGuards(ThrottlerGuard)
@@ -61,6 +63,25 @@ export class JobsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async cancelJob(@Param('id') id: string) {
     return this.jobsService.cancelJob(id);
+  }
+
+  @Get(':id/artifacts/:artifactId')
+  async downloadArtifact(
+    @Param('id') jobId: string,
+    @Param('artifactId') artifactId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, mimeType, filename } =
+      await this.jobsService.getArtifactFile(jobId, artifactId);
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"`,
+    );
+    res.setHeader('Content-Length', buffer.length.toString());
+
+    return res.send(buffer);
   }
 
   @Get(':id/artifacts')

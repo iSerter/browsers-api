@@ -159,6 +159,22 @@
 				},
 				{
 					"name": "Get Job Artifacts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const artifacts = pm.response.json();",
+									"    if (artifacts && artifacts.length > 0 && artifacts[0].id) {",
+									"        pm.collectionVariables.set(\"artifactId\", artifacts[0].id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -175,7 +191,30 @@
 								"artifacts"
 							]
 						},
-						"description": "Get all artifacts (screenshots, files, etc.) associated with a job."
+						"description": "Get all artifacts (screenshots, files, etc.) associated with a job. Returns a list of artifact metadata including IDs, file paths, mime types, and sizes."
+					},
+					"response": []
+				},
+				{
+					"name": "Download Artifact",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}/artifacts/{{artifactId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"jobs",
+								"{{jobId}}",
+								"artifacts",
+								"{{artifactId}}"
+							]
+						},
+						"description": "Download a specific artifact file (screenshot, PDF, etc.) by artifact ID. Returns the file content with appropriate headers:\n- `Content-Type`: Based on artifact's mimeType\n- `Content-Disposition`: Attachment with filename\n- `Content-Length`: File size in bytes\n\n**Note:** Use this endpoint to download the actual file content. First call \"Get Job Artifacts\" to get the artifact ID."
 					},
 					"response": []
 				}
@@ -724,6 +763,11 @@
 		},
 		{
 			"key": "urlPolicyId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "artifactId",
 			"value": "",
 			"type": "string"
 		}

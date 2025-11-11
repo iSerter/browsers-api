@@ -77,6 +77,39 @@ export class ArtifactStorageService {
     });
   }
 
+  async readArtifactFile(artifact: JobArtifact): Promise<Buffer> {
+    // Try to read from filesystem first
+    if (artifact.filePath) {
+      try {
+        const fileBuffer = await fs.readFile(artifact.filePath);
+        return fileBuffer;
+      } catch (error) {
+        this.logger.warn(
+          `Failed to read artifact file from disk: ${artifact.filePath}. Error: ${error.message}`,
+        );
+        // Fall back to database storage if available
+        if (artifact.fileData) {
+          this.logger.debug(
+            `Using artifact data from database for artifact ${artifact.id}`,
+          );
+          return artifact.fileData;
+        }
+        throw new Error(
+          `Artifact file not found at ${artifact.filePath} and no database backup available`,
+        );
+      }
+    }
+
+    // Fall back to database storage
+    if (artifact.fileData) {
+      return artifact.fileData;
+    }
+
+    throw new Error(
+      `No file data available for artifact ${artifact.id}. Neither filePath nor fileData is available.`,
+    );
+  }
+
   async deleteArtifact(filePath: string): Promise<void> {
     try {
       await fs.unlink(filePath);
