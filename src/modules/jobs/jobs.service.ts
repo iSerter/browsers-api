@@ -44,6 +44,11 @@ export class JobsService {
       timeoutMs: createJobDto.timeoutMs || 30000,
       maxRetries: createJobDto.maxRetries || 3,
       status: JobStatus.PENDING,
+      ...(createJobDto.proxy && {
+        proxyServer: createJobDto.proxy.server,
+        proxyUsername: createJobDto.proxy.username,
+        proxyPassword: createJobDto.proxy.password,
+      }),
     });
 
     const savedJob = await this.jobRepository.save(job);

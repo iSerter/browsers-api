@@ -523,6 +523,133 @@ describe('JobsController (e2e)', () => {
 
       expect(response.body.success).toBe(true);
     });
+
+    it('should create a job with proxy configuration', async () => {
+      const payloadWithProxy = {
+        browserTypeId: testBrowserTypeId,
+        targetUrl: 'https://example.com',
+        actions: [
+          {
+            action: 'screenshot',
+            fullPage: true,
+            type: 'png',
+          },
+        ],
+        proxy: {
+          server: 'http://proxy.example.com:8080',
+          username: 'user',
+          password: 'pass',
+        },
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/jobs')
+        .set('X-API-Key', testApiKey)
+        .send(payloadWithProxy)
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('jobId');
+
+      // Verify proxy was saved to database
+      const job = await jobRepository.findOne({
+        where: { id: response.body.data.jobId },
+      });
+      expect(job).toBeDefined();
+      expect(job.proxyServer).toBe('http://proxy.example.com:8080');
+      expect(job.proxyUsername).toBe('user');
+      expect(job.proxyPassword).toBe('pass');
+    });
+
+    it('should create a job with proxy server only (no auth)', async () => {
+      const payloadWithProxy = {
+        browserTypeId: testBrowserTypeId,
+        targetUrl: 'https://example.com',
+        actions: [
+          {
+            action: 'screenshot',
+            fullPage: true,
+            type: 'png',
+          },
+        ],
+        proxy: {
+          server: 'http://proxy.example.com:8080',
+        },
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/jobs')
+        .set('X-API-Key', testApiKey)
+        .send(payloadWithProxy)
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+
+      // Verify proxy was saved to database
+      const job = await jobRepository.findOne({
+        where: { id: response.body.data.jobId },
+      });
+      expect(job).toBeDefined();
+      expect(job.proxyServer).toBe('http://proxy.example.com:8080');
+      expect(job.proxyUsername).toBeNull();
+      expect(job.proxyPassword).toBeNull();
+    });
+
+    it('should validate proxy server URL format', async () => {
+      const invalidPayload = {
+        browserTypeId: testBrowserTypeId,
+        targetUrl: 'https://example.com',
+        actions: [
+          {
+            action: 'screenshot',
+            fullPage: true,
+            type: 'png',
+          },
+        ],
+        proxy: {
+          server: 'not-a-valid-url',
+        },
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/jobs')
+        .set('X-API-Key', testApiKey)
+        .send(invalidPayload)
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should create a job without proxy when proxy is not provided', async () => {
+      const payloadWithoutProxy = {
+        browserTypeId: testBrowserTypeId,
+        targetUrl: 'https://example.com',
+        actions: [
+          {
+            action: 'screenshot',
+            fullPage: true,
+            type: 'png',
+          },
+        ],
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/jobs')
+        .set('X-API-Key', testApiKey)
+        .send(payloadWithoutProxy)
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+
+      // Verify no proxy was saved
+      const job = await jobRepository.findOne({
+        where: { id: response.body.data.jobId },
+      });
+      expect(job).toBeDefined();
+      expect(job.proxyServer).toBeNull();
+      expect(job.proxyUsername).toBeNull();
+      expect(job.proxyPassword).toBeNull();
+    });
   });
 });
 

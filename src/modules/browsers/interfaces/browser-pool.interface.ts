@@ -23,6 +23,11 @@ export interface CreateContextOptions {
   userAgent?: string;
   timeout?: number;
   ignoreHTTPSErrors?: boolean;
+  proxy?: {
+    server: string;
+    username?: string;
+    password?: string;
+  };
 }
 
 export interface IBrowserPool {

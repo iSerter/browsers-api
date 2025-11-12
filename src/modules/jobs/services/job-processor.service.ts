@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { AutomationJob, JobStatus } from '../entities/automation-job.entity';
 import { BrowserPoolService } from '../../browsers/services/browser-pool.service';
 import { BrowserContextManagerService } from '../../browsers/services/browser-context-manager.service';
+import { CreateContextOptions } from '../../browsers/interfaces/browser-pool.interface';
 import { ActionHandlerFactory } from '../factories/action-handler.factory';
 import { JobLogService } from './job-log.service';
 import { WorkerManagerService } from './worker-manager.service';
@@ -225,13 +226,31 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
     browser: Browser,
     job: AutomationJob,
   ): Promise<void> {
-    // Create browser context
-    const context = await this.contextManager.createContext(browser, {
+    // Prepare context options
+    const contextOptions: CreateContextOptions = {
       viewport: {
         width: 1920,
         height: 1080,
       },
-    });
+    };
+
+    // Add proxy configuration if provided
+    if (job.proxyServer) {
+      contextOptions.proxy = {
+        server: job.proxyServer,
+        ...(job.proxyUsername && { username: job.proxyUsername }),
+        ...(job.proxyPassword && { password: job.proxyPassword }),
+      };
+
+      await this.jobLogService.logJobEvent(
+        job.id,
+        LogLevel.INFO,
+        `Using proxy: ${job.proxyServer} (username: ${job.proxyUsername ? '***' : 'none'})`,
+      );
+    }
+
+    // Create browser context
+    const context = await this.contextManager.createContext(browser, contextOptions);
 
     // Create a single page for all actions to share
     const page = await context.newPage();
@@ -425,6 +444,19 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
     if (error.name === 'TimeoutError') {
       return 'TimeoutError';
     }
+    // Proxy-related errors
+    if (
+      error.message.includes('net::ERR_PROXY_CONNECTION_FAILED') ||
+      error.message.includes('Proxy connection failed')
+    ) {
+      return 'ProxyConnectionError';
+    }
+    if (
+      error.message.includes('net::ERR_PROXY_AUTH_FAILED') ||
+      error.message.includes('Proxy authentication failed')
+    ) {
+      return 'ProxyAuthenticationError';
+    }
     if (error.message.includes('net::ERR')) {
       return 'NetworkError';
     }
@@ -442,8 +474,17 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
 
   private isRetryableError(error: Error): boolean {
     const errorCategory = this.categorizeError(error);
-    const retryableErrors = ['TimeoutError', 'NetworkError', 'BrowserError'];
-    const nonRetryableErrors = ['InvalidURLError', 'AuthenticationError'];
+    const retryableErrors = [
+      'TimeoutError',
+      'NetworkError',
+      'BrowserError',
+      'ProxyConnectionError',
+    ];
+    const nonRetryableErrors = [
+      'InvalidURLError',
+      'AuthenticationError',
+      'ProxyAuthenticationError',
+    ];
 
     if (retryableErrors.includes(errorCategory)) {
       return true;

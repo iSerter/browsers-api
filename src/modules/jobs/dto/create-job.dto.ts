@@ -14,6 +14,7 @@ import {
 import { Type } from 'class-transformer';
 import { WaitUntilOption } from '../entities/automation-job.entity';
 import { ActionConfigDto } from './action-config.dto';
+import { ProxyConfigDto } from './proxy-config.dto';
 
 export class CreateJobDto {
   @IsInt()
@@ -51,4 +52,9 @@ export class CreateJobDto {
   @Min(0)
   @Max(10)
   maxRetries?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProxyConfigDto)
+  proxy?: ProxyConfigDto;
 }

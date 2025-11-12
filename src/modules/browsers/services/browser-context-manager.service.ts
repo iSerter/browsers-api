@@ -42,6 +42,18 @@ export class BrowserContextManagerService {
       contextOptions.userAgent = userAgent;
     }
 
+    // Set proxy configuration
+    if (options.proxy) {
+      contextOptions.proxy = {
+        server: options.proxy.server,
+        ...(options.proxy.username && { username: options.proxy.username }),
+        ...(options.proxy.password && { password: options.proxy.password }),
+      };
+      this.logger.debug(
+        `Creating context with proxy: ${options.proxy.server} (username: ${options.proxy.username ? '***' : 'none'})`,
+      );
+    }
+
     this.logger.debug('Creating browser context with options:', contextOptions);
 
     try {

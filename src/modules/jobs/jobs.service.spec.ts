@@ -275,6 +275,110 @@ describe('JobsService', () => {
         status: JobStatus.PENDING,
       });
     });
+
+    it('should create a job with proxy configuration', async () => {
+      const dtoWithProxy: CreateJobDto = {
+        browserTypeId: 1,
+        targetUrl: 'https://example.com',
+        actions: [
+          {
+            action: ActionType.CLICK,
+            target: 'Button',
+            getTargetBy: 'getByText' as any,
+          },
+        ],
+        proxy: {
+          server: 'http://proxy.example.com:8080',
+          username: 'user',
+          password: 'pass',
+        },
+      };
+
+      const mockJobWithProxy = {
+        ...mockSavedJob,
+        proxyServer: 'http://proxy.example.com:8080',
+        proxyUsername: 'user',
+        proxyPassword: 'pass',
+      };
+
+      browsersService.findOne.mockResolvedValue({ id: 1 } as any);
+      jobRepository.create.mockReturnValue(mockJobWithProxy as any);
+      jobRepository.save.mockResolvedValue(mockJobWithProxy);
+
+      await service.createJob(dtoWithProxy);
+
+      expect(jobRepository.create).toHaveBeenCalledWith({
+        browserTypeId: 1,
+        targetUrl: 'https://example.com',
+        actions: dtoWithProxy.actions,
+        waitUntil: undefined,
+        priority: 0,
+        timeoutMs: 30000,
+        maxRetries: 3,
+        status: JobStatus.PENDING,
+        proxyServer: 'http://proxy.example.com:8080',
+        proxyUsername: 'user',
+        proxyPassword: 'pass',
+      });
+    });
+
+    it('should create a job with proxy server only (no auth)', async () => {
+      const dtoWithProxy: CreateJobDto = {
+        browserTypeId: 1,
+        targetUrl: 'https://example.com',
+        actions: [
+          {
+            action: ActionType.CLICK,
+            target: 'Button',
+            getTargetBy: 'getByText' as any,
+          },
+        ],
+        proxy: {
+          server: 'http://proxy.example.com:8080',
+        },
+      };
+
+      const mockJobWithProxy = {
+        ...mockSavedJob,
+        proxyServer: 'http://proxy.example.com:8080',
+        proxyUsername: undefined,
+        proxyPassword: undefined,
+      };
+
+      browsersService.findOne.mockResolvedValue({ id: 1 } as any);
+      jobRepository.create.mockReturnValue(mockJobWithProxy as any);
+      jobRepository.save.mockResolvedValue(mockJobWithProxy);
+
+      await service.createJob(dtoWithProxy);
+
+      expect(jobRepository.create).toHaveBeenCalledWith({
+        browserTypeId: 1,
+        targetUrl: 'https://example.com',
+        actions: dtoWithProxy.actions,
+        waitUntil: undefined,
+        priority: 0,
+        timeoutMs: 30000,
+        maxRetries: 3,
+        status: JobStatus.PENDING,
+        proxyServer: 'http://proxy.example.com:8080',
+        proxyUsername: undefined,
+        proxyPassword: undefined,
+      });
+    });
+
+    it('should create a job without proxy when proxy is not provided', async () => {
+      browsersService.findOne.mockResolvedValue({ id: 1 } as any);
+      jobRepository.create.mockReturnValue(mockSavedJob as any);
+      jobRepository.save.mockResolvedValue(mockSavedJob);
+
+      await service.createJob(mockCreateJobDto);
+
+      expect(jobRepository.create).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          proxyServer: expect.anything(),
+        }),
+      );
+    });
   });
 });
 

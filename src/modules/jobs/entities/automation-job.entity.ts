@@ -89,6 +89,15 @@ export class AutomationJob {
   @Column({ nullable: true, type: 'jsonb' })
   result: any;
 
+  @Column({ nullable: true, type: 'varchar', length: 500, name: 'proxy_server' })
+  proxyServer: string;
+
+  @Column({ nullable: true, type: 'varchar', length: 255, name: 'proxy_username' })
+  proxyUsername: string;
+
+  @Column({ nullable: true, type: 'varchar', length: 255, name: 'proxy_password' })
+  proxyPassword: string;
+
   @OneToMany(
     () => require('./job-artifact.entity').JobArtifact,
     (artifact: any) => artifact.job,
