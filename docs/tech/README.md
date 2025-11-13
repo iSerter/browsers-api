@@ -28,6 +28,9 @@ Browser pool architecture, action handler system, and implementation details.
 ### 8. [Security & Authentication](./08-security-authentication.md)
 API key authentication, URL policies, rate limiting, and security best practices.
 
+### 9. [Proxy Configuration](./09-proxies.md)
+Default proxy configuration, job-level proxy overrides, authentication, and troubleshooting.
+
 ## Quick Links
 
 - **Getting Started**: See [README.md](../../README.md) for quick start guide

@@ -234,7 +234,7 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       },
     };
 
-    // Add proxy configuration if provided
+    // Add job-level proxy configuration if provided (overrides default proxy)
     if (job.proxyServer) {
       contextOptions.proxy = {
         server: job.proxyServer,
@@ -245,9 +245,11 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       await this.jobLogService.logJobEvent(
         job.id,
         LogLevel.INFO,
-        `Using proxy: ${job.proxyServer} (username: ${job.proxyUsername ? '***' : 'none'})`,
+        `Using job-level proxy: ${job.proxyServer} (username: ${job.proxyUsername ? '***' : 'none'})`,
       );
     }
+    // Note: If no job-level proxy is configured, the context will inherit
+    // the default proxy from browser launch (DEFAULT_PROXY env var)
 
     // Create browser context
     const context = await this.contextManager.createContext(browser, contextOptions);

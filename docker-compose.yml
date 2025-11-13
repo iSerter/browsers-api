@@ -78,6 +78,9 @@ services:
       ENABLE_METRICS: "true"
       METRICS_PORT: 9090
       LOG_LEVEL: info
+      
+      # Proxy Configuration
+      DEFAULT_PROXY: ${DEFAULT_PROXY:-}  # Optional: Default proxy for all browsers
     volumes:
       - ./artifacts:/app/artifacts
       - ./screenshots:/app/screenshots

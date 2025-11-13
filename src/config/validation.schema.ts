@@ -50,4 +50,11 @@ export const validationSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'info', 'debug')
     .default('info'),
+
+  // Proxy Configuration
+  DEFAULT_PROXY: Joi.string()
+    .optional()
+    .allow('')
+    .pattern(/^(https?|socks5):\/\/.+/)
+    .message('DEFAULT_PROXY must be a valid proxy URL (http://, https://, or socks5://)'),
 });

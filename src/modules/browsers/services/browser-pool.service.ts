@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   chromium,
   firefox,
@@ -33,6 +34,8 @@ export class BrowserPoolService
 
   private cleanupInterval: NodeJS.Timeout;
   private readonly cleanupIntervalMs = 60000; // Check every minute
+
+  constructor(private readonly configService: ConfigService) {}
 
   private readonly browserConfigs: Map<string, BrowserTypeConfig> = new Map([
     [
@@ -100,6 +103,12 @@ export class BrowserPoolService
 
   onModuleInit() {
     this.logger.log('BrowserPoolService initialized');
+    
+    const defaultProxy = this.getDefaultProxy();
+    if (defaultProxy) {
+      this.logger.log(`Default proxy enabled: ${this.maskProxyUrl(defaultProxy.server)}`);
+    }
+    
     this.startCleanupInterval();
   }
 
@@ -158,13 +167,53 @@ export class BrowserPoolService
       if (!config) {
         throw new Error(`Unsupported browser type: ${browserType}`);
       }
-      pool = new BrowserPool(browserType, config, this.config, this.logger);
+      const defaultProxy = this.getDefaultProxy();
+      pool = new BrowserPool(browserType, config, this.config, this.logger, defaultProxy);
       this.pools.set(browserType, pool);
       this.logger.log(
         `Created browser pool for ${browserType} (minSize: ${this.config.minSize}, maxSize: ${this.config.maxSize})`,
       );
     }
     return pool;
+  }
+
+  private getDefaultProxy(): { server: string; username?: string; password?: string } | null {
+    const defaultProxy = this.configService.get<string>('DEFAULT_PROXY');
+    
+    if (!defaultProxy || defaultProxy.trim() === '') {
+      return null;
+    }
+
+    try {
+      const urlObj = new URL(defaultProxy);
+      const config: { server: string; username?: string; password?: string } = {
+        server: defaultProxy,
+      };
+      
+      if (urlObj.username) {
+        config.username = decodeURIComponent(urlObj.username);
+      }
+      if (urlObj.password) {
+        config.password = decodeURIComponent(urlObj.password);
+      }
+      
+      return config;
+    } catch (error) {
+      this.logger.error(`Invalid DEFAULT_PROXY URL: ${defaultProxy}`);
+      return null;
+    }
+  }
+
+  private maskProxyUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.username || urlObj.password) {
+        return `${urlObj.protocol}//***:***@${urlObj.host}${urlObj.pathname}`;
+      }
+      return url;
+    } catch {
+      return url.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+    }
   }
 
   private startCleanupInterval() {
@@ -187,6 +236,7 @@ class BrowserPool {
     private readonly browserConfig: BrowserTypeConfig,
     private readonly config: BrowserPoolConfig,
     private readonly logger: Logger,
+    private readonly defaultProxy: { server: string; username?: string; password?: string } | null,
   ) {
     this.initializePool();
   }
@@ -366,6 +416,18 @@ class BrowserPool {
         args: this.browserConfig.launchOptions.args,
       };
 
+      // Add default proxy if configured
+      if (this.defaultProxy) {
+        launchOptions.proxy = {
+          server: this.defaultProxy.server,
+          ...(this.defaultProxy.username && { username: this.defaultProxy.username }),
+          ...(this.defaultProxy.password && { password: this.defaultProxy.password }),
+        };
+        this.logger.debug(
+          `Launching ${this.browserType} browser with default proxy: ${this.maskProxyUrl(this.defaultProxy.server)}`,
+        );
+      }
+
       let browser: Browser;
       switch (this.browserConfig.type) {
         case 'chromium':
@@ -387,6 +449,18 @@ class BrowserPool {
         `Failed to create ${this.browserType} browser: ${error.message}`,
       );
       throw error;
+    }
+  }
+
+  private maskProxyUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.username || urlObj.password) {
+        return `${urlObj.protocol}//***:***@${urlObj.host}${urlObj.pathname}`;
+      }
+      return url;
+    } catch {
+      return url.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
     }
   }
 
