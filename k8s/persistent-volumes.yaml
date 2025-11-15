@@ -1,0 +1,59 @@
+# PersistentVolume for artifacts (optional - for shared storage across pods)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: artifacts-pv
+  namespace: browsers-api
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs
+  nfs:
+    server: nfs-server.example.com
+    path: "/exports/browsers-api/artifacts"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: artifacts-pvc
+  namespace: browsers-api
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: nfs
+---
+# PersistentVolume for screenshots (optional - for shared storage across pods)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: screenshots-pv
+  namespace: browsers-api
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs
+  nfs:
+    server: nfs-server.example.com
+    path: "/exports/browsers-api/screenshots"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: screenshots-pvc
+  namespace: browsers-api
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: nfs

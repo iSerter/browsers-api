@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: browsers-api
+
+resources:
+  - namespace.yaml
+  - secrets.yaml
+  - configmap.yaml
+  - postgres-statefulset.yaml
+  - postgres-service.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - api-hpa.yaml
+  - pdb.yaml
+  - network-policy.yaml
+  # Uncomment if using shared storage
+  # - persistent-volumes.yaml
+  # Uncomment if using ingress
+  # - ingress.yaml
+
+commonLabels:
+  project: browsers-api
+  managed-by: kustomize
+
+images:
+  - name: browsers-api
+    newTag: latest

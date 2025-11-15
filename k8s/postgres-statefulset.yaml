@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: browsers-api
+  labels:
+    app: postgres
+    component: database
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: database
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
+        args:
+          - "postgres"
+          - "-c"
+          - "log_min_messages=warning"
+          - "-c"
+          - "log_connections=off"
+          - "-c"
+          - "log_disconnections=off"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - automation_user
+            - -d
+            - browser_automation
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - automation_user
+            - -d
+            - browser_automation
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi

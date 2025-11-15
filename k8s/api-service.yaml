@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: browsers-api
+  namespace: browsers-api
+  labels:
+    app: browsers-api
+    component: api
+spec:
+  type: LoadBalancer
+  selector:
+    app: browsers-api
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3333
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP

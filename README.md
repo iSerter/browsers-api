@@ -8,7 +8,9 @@ I'm experimenting with task-master and Github Speckit.
 
 Browser Automation API that provides HTTP endpoints for browser tasks using Playwright. The system follows a producer-consumer pattern where API requests are queued in PostgreSQL and processed asynchronously by browser workers.
 
-## Quick Start with Docker
+## Quick Start
+
+### Docker Compose (Development)
 
 ```bash
 # Start the full stack (PostgreSQL + API)
@@ -22,6 +24,21 @@ Browser Automation API that provides HTTP endpoints for browser tasks using Play
 ```
 
 For detailed Docker setup and deployment instructions, see [docs/DOCKER.md](docs/DOCKER.md).
+
+### Kubernetes (Production)
+
+```bash
+# Deploy to Kubernetes
+./scripts/k8s/deploy.sh all
+
+# Monitor deployment
+./scripts/k8s/monitor.sh
+
+# Access via LoadBalancer or port-forward
+kubectl port-forward -n browsers-api service/browsers-api 3333:80
+```
+
+For detailed Kubernetes setup and deployment instructions, see [docs/KUBERNETES.md](docs/KUBERNETES.md).
 
 #### `POST /api/v1/jobs`
 Create a new automation job.

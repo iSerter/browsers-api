@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: browsers-api
+  namespace: browsers-api
+  labels:
+    app: browsers-api
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: browsers-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: browsers-api
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: browsers-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3333
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: api-config
+        - secretRef:
+            name: api-secrets
+        volumeMounts:
+        - name: artifacts
+          mountPath: /app/artifacts
+        - name: screenshots
+          mountPath: /app/screenshots
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3333
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3333
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: artifacts
+        emptyDir: {}
+      - name: screenshots
+        emptyDir: {}
+      restartPolicy: Always
