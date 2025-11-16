@@ -6,6 +6,7 @@ import { BrowsersService } from './browsers.service';
 import { BrowserType } from './entities/browser-type.entity';
 import { BrowserPoolService } from './services/browser-pool.service';
 import { BrowserContextManagerService } from './services/browser-context-manager.service';
+import { StealthService } from './services/stealth.service';
 
 @Module({
   imports: [
@@ -17,7 +18,13 @@ import { BrowserContextManagerService } from './services/browser-context-manager
     BrowsersService,
     BrowserPoolService,
     BrowserContextManagerService,
+    StealthService,
   ],
-  exports: [BrowsersService, BrowserPoolService, BrowserContextManagerService],
+  exports: [
+    BrowsersService,
+    BrowserPoolService,
+    BrowserContextManagerService,
+    StealthService,
+  ],
 })
 export class BrowsersModule {}

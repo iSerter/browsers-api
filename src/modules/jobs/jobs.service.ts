@@ -49,6 +49,9 @@ export class JobsService {
         proxyUsername: createJobDto.proxy.username,
         proxyPassword: createJobDto.proxy.password,
       }),
+      ...(createJobDto.captcha && {
+        captchaConfig: createJobDto.captcha,
+      }),
     });
 
     const savedJob = await this.jobRepository.save(job);

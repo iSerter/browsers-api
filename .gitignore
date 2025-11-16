@@ -37,7 +37,7 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-./cursor/mcp.json
+.cursor/mcp.json
 
 # dotenv environment variable files
 .env

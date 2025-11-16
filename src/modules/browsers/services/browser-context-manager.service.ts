@@ -5,10 +5,14 @@ import {
   ViewportConfig,
   ViewportPreset,
 } from '../interfaces/browser-pool.interface';
+import { StealthService } from './stealth.service';
+import { DEFAULT_STEALTH_CONFIG } from '../interfaces/stealth.interface';
 
 @Injectable()
 export class BrowserContextManagerService {
   private readonly logger = new Logger(BrowserContextManagerService.name);
+
+  constructor(private readonly stealthService: StealthService) {}
 
   async createContext(
     browser: Browser,
@@ -19,6 +23,8 @@ export class BrowserContextManagerService {
       userAgent,
       timeout = 30000,
       ignoreHTTPSErrors = true,
+      timezoneId,
+      locale,
     } = options;
 
     const contextOptions: any = {
@@ -42,6 +48,16 @@ export class BrowserContextManagerService {
       contextOptions.userAgent = userAgent;
     }
 
+    // Set timezone
+    if (timezoneId) {
+      contextOptions.timezoneId = timezoneId;
+    }
+
+    // Set locale
+    if (locale) {
+      contextOptions.locale = locale;
+    }
+
     // Set proxy configuration
     if (options.proxy) {
       contextOptions.proxy = {
@@ -54,10 +70,51 @@ export class BrowserContextManagerService {
       );
     }
 
-    this.logger.debug('Creating browser context with options:', contextOptions);
+    this.logger.debug('Creating browser context with options:', {
+      ...contextOptions,
+      proxy: contextOptions.proxy ? '***' : undefined,
+    });
 
     try {
       const context = await browser.newContext(contextOptions);
+
+      // Apply stealth configuration
+      const stealthEnabled =
+        options.stealth !== false &&
+        (options.stealth === true || options.stealth !== undefined);
+
+      if (stealthEnabled) {
+        const stealthConfig =
+          typeof options.stealth === 'object'
+            ? {
+                ...DEFAULT_STEALTH_CONFIG,
+                ...options.stealth,
+                // Override with context-level settings if provided
+                ...(timezoneId && { timezoneId }),
+                ...(locale && { locale }),
+              }
+            : {
+                ...DEFAULT_STEALTH_CONFIG,
+                ...(timezoneId && { timezoneId }),
+                ...(locale && { locale }),
+              };
+
+        await this.stealthService.applyStealthToContext(context, stealthConfig);
+        this.logger.debug('Stealth mode enabled for context');
+      }
+
+      // Validate user-agent/platform consistency if stealth is enabled
+      if (stealthEnabled && userAgent) {
+        const isValid = this.stealthService.validateUserAgentConsistency(
+          userAgent,
+          contextOptions.platform,
+        );
+        if (!isValid) {
+          this.logger.warn(
+            'User-agent and platform may be inconsistent. This could trigger detection.',
+          );
+        }
+      }
 
       // Set resource limits
       await this.setResourceLimits(context);

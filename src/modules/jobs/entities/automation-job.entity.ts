@@ -98,6 +98,9 @@ export class AutomationJob {
   @Column({ nullable: true, type: 'varchar', length: 255, name: 'proxy_password' })
   proxyPassword: string;
 
+  @Column({ nullable: true, type: 'jsonb', name: 'captcha_config' })
+  captchaConfig: any;
+
   @OneToMany(
     () => require('./job-artifact.entity').JobArtifact,
     (artifact: any) => artifact.job,

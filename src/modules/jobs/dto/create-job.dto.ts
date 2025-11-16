@@ -15,6 +15,7 @@ import { Type } from 'class-transformer';
 import { WaitUntilOption } from '../entities/automation-job.entity';
 import { ActionConfigDto } from './action-config.dto';
 import { ProxyConfigDto } from './proxy-config.dto';
+import { CaptchaConfigDto } from './captcha-config.dto';
 
 export class CreateJobDto {
   @IsInt()
@@ -57,4 +58,9 @@ export class CreateJobDto {
   @ValidateNested()
   @Type(() => ProxyConfigDto)
   proxy?: ProxyConfigDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CaptchaConfigDto)
+  captcha?: CaptchaConfigDto;
 }

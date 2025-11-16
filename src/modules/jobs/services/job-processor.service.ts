@@ -17,6 +17,10 @@ import { LogLevel } from '../entities/job-log.entity';
 import { WorkerStatus } from '../../workers/entities/browser-worker.entity';
 import { Browser, Page } from 'playwright';
 import { JobEventsGateway } from '../gateways/job-events.gateway';
+import {
+  SolverOrchestrationService,
+  OrchestrationConfig,
+} from '../../captcha-solver/services/solver-orchestration.service';
 
 @Injectable()
 export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
@@ -35,6 +39,7 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
     private readonly jobLogService: JobLogService,
     private readonly workerManagerService: WorkerManagerService,
     private readonly jobEventsGateway: JobEventsGateway,
+    private readonly solverOrchestrationService: SolverOrchestrationService,
   ) {}
 
   async onModuleInit() {
@@ -270,6 +275,19 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
         `Navigated to target URL: ${job.targetUrl}`,
       );
 
+      // Handle captcha solving if enabled
+      const captchaResult = await this.handleCaptchaSolving(page, job);
+      if (captchaResult) {
+        await this.jobLogService.logJobEvent(
+          job.id,
+          captchaResult.solved ? LogLevel.INFO : LogLevel.WARN,
+          captchaResult.solved
+            ? `Captcha solved successfully using ${captchaResult.solverType}`
+            : `Captcha solving failed: ${captchaResult.error}`,
+          captchaResult,
+        );
+      }
+
       const results: any[] = [];
 
       // Execute each action in sequence on the same page
@@ -316,8 +334,17 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
         );
       }
 
-      // Store results
-      job.result = results;
+      // Store results with captcha solving information
+      // Maintain backward compatibility: if no captcha config, store as array
+      if (captchaResult) {
+        job.result = {
+          actions: results,
+          captcha: captchaResult,
+        };
+      } else {
+        // Backward compatibility: store as array if no captcha solving
+        job.result = results;
+      }
 
       await this.jobLogService.logJobEvent(
         job.id,
@@ -497,6 +524,77 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
 
     // Unknown errors default to non-retryable
     return false;
+  }
+
+  /**
+   * Handle captcha solving for a job if enabled
+   */
+  private async handleCaptchaSolving(
+    page: Page,
+    job: AutomationJob,
+  ): Promise<any | null> {
+    // Check if captcha solving is enabled for this job
+    const captchaConfig = job.captchaConfig;
+    if (!captchaConfig || captchaConfig.enabled !== true) {
+      return null;
+    }
+
+    try {
+      this.logger.log(`Captcha solving enabled for job ${job.id}`);
+
+      // Build orchestration config from job config
+      const orchestrationConfig: OrchestrationConfig = {
+        minConfidence: captchaConfig.minConfidence,
+        enableThirdPartyFallback:
+          captchaConfig.enableThirdPartyFallback !== false,
+        solverPriority: captchaConfig.solverPriority,
+        maxRetries: captchaConfig.maxRetries,
+        timeouts: captchaConfig.timeouts,
+      };
+
+      // Attempt to detect and solve captcha
+      const result = await this.solverOrchestrationService.detectAndSolve(
+        page,
+        orchestrationConfig,
+      );
+
+      if (result.solved) {
+        this.logger.log(
+          `Captcha solved successfully for job ${job.id} using ${result.solverType}`,
+        );
+        return {
+          solved: true,
+          solverType: result.solverType,
+          usedThirdParty: result.usedThirdParty,
+          duration: result.duration,
+          attempts: result.attempts,
+          detection: result.detection,
+        };
+      } else {
+        this.logger.warn(
+          `Captcha solving failed for job ${job.id}: ${result.error}`,
+        );
+        // Don't fail the job if captcha solving fails - just log it
+        return {
+          solved: false,
+          error: result.error,
+          duration: result.duration,
+          attempts: result.attempts,
+          detection: result.detection,
+        };
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Error during captcha solving for job ${job.id}: ${error.message}`,
+      );
+      // Don't fail the job if captcha solving errors - just log it
+      return {
+        solved: false,
+        error: error.message,
+        duration: 0,
+        attempts: 0,
+      };
+    }
   }
 
   private async waitForActiveJobs(timeoutMs: number): Promise<void> {

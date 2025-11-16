@@ -1,4 +1,5 @@
 import { Browser, BrowserType } from 'playwright';
+import { StealthConfig } from './stealth.interface';
 
 export enum ViewportPreset {
   DESKTOP = 'desktop',
@@ -28,6 +29,21 @@ export interface CreateContextOptions {
     username?: string;
     password?: string;
   };
+  /**
+   * Stealth configuration for anti-bot detection evasion
+   * If not provided, stealth will be enabled with default settings
+   */
+  stealth?: StealthConfig | boolean;
+  /**
+   * Timezone ID for the context (e.g., 'America/New_York')
+   * Should match stealth timezone if stealth is enabled
+   */
+  timezoneId?: string;
+  /**
+   * Locale for the context (e.g., 'en-US')
+   * Should match stealth locale if stealth is enabled
+   */
+  locale?: string;
 }
 
 export interface IBrowserPool {

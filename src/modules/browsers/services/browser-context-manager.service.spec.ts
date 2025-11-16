@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BrowserContextManagerService } from './browser-context-manager.service';
+import { StealthService } from './stealth.service';
 import { Browser, BrowserContext } from 'playwright';
 import { CreateContextOptions } from '../interfaces/browser-pool.interface';
 
 describe('BrowserContextManagerService', () => {
   let service: BrowserContextManagerService;
+  let stealthService: jest.Mocked<StealthService>;
   let mockBrowser: jest.Mocked<Browser>;
   let mockContext: jest.Mocked<BrowserContext>;
 
@@ -14,14 +16,30 @@ describe('BrowserContextManagerService', () => {
       close: jest.fn().mockResolvedValue(undefined),
       browser: jest.fn().mockReturnValue(mockBrowser),
       route: jest.fn().mockResolvedValue(undefined),
+      addInitScript: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     mockBrowser = {
       newContext: jest.fn().mockResolvedValue(mockContext),
     } as any;
 
+    stealthService = {
+      applyStealthToContext: jest.fn().mockResolvedValue(undefined),
+      applyStealthToPage: jest.fn().mockResolvedValue(undefined),
+      validateUserAgentConsistency: jest.fn().mockReturnValue(true),
+      getRealisticUserAgent: jest.fn(),
+      moveMouseHumanLike: jest.fn().mockResolvedValue(undefined),
+      clickHumanLike: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [BrowserContextManagerService],
+      providers: [
+        BrowserContextManagerService,
+        {
+          provide: StealthService,
+          useValue: stealthService,
+        },
+      ],
     }).compile();
 
     service = module.get<BrowserContextManagerService>(
@@ -134,6 +152,82 @@ describe('BrowserContextManagerService', () => {
       await expect(service.createContext(mockBrowser, options)).rejects.toThrow(
         'Failed to create context',
       );
+    });
+
+    it('should apply stealth configuration when enabled', async () => {
+      const options: CreateContextOptions = {
+        viewport: { width: 1920, height: 1080 },
+        stealth: true,
+      };
+
+      await service.createContext(mockBrowser, options);
+
+      expect(stealthService.applyStealthToContext).toHaveBeenCalledWith(
+        mockContext,
+        expect.any(Object),
+      );
+    });
+
+    it('should not apply stealth when explicitly disabled', async () => {
+      const options: CreateContextOptions = {
+        viewport: { width: 1920, height: 1080 },
+        stealth: false,
+      };
+
+      await service.createContext(mockBrowser, options);
+
+      expect(stealthService.applyStealthToContext).not.toHaveBeenCalled();
+    });
+
+    it('should apply custom stealth configuration', async () => {
+      const options: CreateContextOptions = {
+        viewport: { width: 1920, height: 1080 },
+        stealth: {
+          overrideWebdriver: true,
+          preventCanvasFingerprinting: false,
+        },
+      };
+
+      await service.createContext(mockBrowser, options);
+
+      expect(stealthService.applyStealthToContext).toHaveBeenCalledWith(
+        mockContext,
+        expect.objectContaining({
+          overrideWebdriver: true,
+          preventCanvasFingerprinting: false,
+        }),
+      );
+    });
+
+    it('should set timezone and locale in context options', async () => {
+      const options: CreateContextOptions = {
+        viewport: { width: 1920, height: 1080 },
+        timezoneId: 'America/New_York',
+        locale: 'en-US',
+      };
+
+      await service.createContext(mockBrowser, options);
+
+      expect(mockBrowser.newContext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timezoneId: 'America/New_York',
+          locale: 'en-US',
+        }),
+      );
+    });
+
+    it('should validate user-agent consistency when stealth is enabled', async () => {
+      const options: CreateContextOptions = {
+        viewport: { width: 1920, height: 1080 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0)',
+        stealth: true,
+      };
+
+      stealthService.validateUserAgentConsistency.mockReturnValue(false);
+
+      await service.createContext(mockBrowser, options);
+
+      expect(stealthService.validateUserAgentConsistency).toHaveBeenCalled();
     });
   });
 

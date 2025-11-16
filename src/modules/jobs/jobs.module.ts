@@ -9,6 +9,7 @@ import { JobLog } from './entities/job-log.entity';
 import { BrowsersModule } from '../browsers/browsers.module';
 import { WorkersModule } from '../workers/workers.module';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
+import { CaptchaSolverModule } from '../captcha-solver/captcha-solver.module';
 import { ArtifactStorageService } from './services/artifact-storage.service';
 import { JobLogService } from './services/job-log.service';
 import { JobProcessorService } from './services/job-processor.service';
@@ -28,6 +29,7 @@ import { JobEventsGateway } from './gateways/job-events.gateway';
     BrowsersModule,
     WorkersModule,
     ApiKeysModule,
+    CaptchaSolverModule,
     ConfigModule,
   ],
   controllers: [JobsController],

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Page } from 'playwright';
 import {
   AntiBotDetectionResult,
@@ -12,18 +12,104 @@ import {
   DetectionContext,
 } from '../interfaces';
 import { ConfidenceScoringService } from './confidence-scoring.service';
+import { DetectionRegistryService } from './detection-registry.service';
+import { DetectionServiceAdapter } from './detection-service-adapter';
+import { IDetectionStrategy } from './detection-strategy.interface';
 
 /**
  * Service for detecting various anti-bot systems on web pages
  * Supports: Cloudflare, DataDome, Akamai, Imperva, reCAPTCHA, hCAPTCHA
+ * 
+ * Uses a registry pattern for extensibility - new anti-bot systems can be
+ * added by registering their detection strategies.
  */
 @Injectable()
-export class DetectionService {
+export class DetectionService implements OnModuleInit {
   private readonly logger = new Logger(DetectionService.name);
 
   constructor(
     private readonly confidenceScoring: ConfidenceScoringService,
+    private readonly registry: DetectionRegistryService,
   ) {}
+
+  /**
+   * Initialize the service and register built-in detection strategies
+   */
+  onModuleInit() {
+    this.registerBuiltInStrategies();
+  }
+
+  /**
+   * Register built-in detection strategies
+   * This allows the existing detection methods to be used via the registry
+   */
+  private registerBuiltInStrategies(): void {
+    const strategies = [
+      new DetectionServiceAdapter(
+        AntiBotSystemType.CLOUDFLARE,
+        (page, context) => this.detectCloudflare(page, context),
+        'cloudflare-detection',
+      ),
+      new DetectionServiceAdapter(
+        AntiBotSystemType.DATADOME,
+        (page, context) => this.detectDataDome(page, context),
+        'datadome-detection',
+      ),
+      new DetectionServiceAdapter(
+        AntiBotSystemType.AKAMAI,
+        (page, context) => this.detectAkamai(page, context),
+        'akamai-detection',
+      ),
+      new DetectionServiceAdapter(
+        AntiBotSystemType.IMPERVA,
+        (page, context) => this.detectImperva(page, context),
+        'imperva-detection',
+      ),
+      new DetectionServiceAdapter(
+        AntiBotSystemType.RECAPTCHA,
+        (page, context) => this.detectReCaptcha(page, context),
+        'recaptcha-detection',
+      ),
+      new DetectionServiceAdapter(
+        AntiBotSystemType.HCAPTCHA,
+        (page, context) => this.detectHCaptcha(page, context),
+        'hcaptcha-detection',
+      ),
+    ];
+
+    this.registry.registerAll(strategies);
+    this.logger.log(
+      `Registered ${strategies.length} built-in detection strategies`,
+    );
+  }
+
+  /**
+   * Register a custom detection strategy
+   * 
+   * This allows external code to register new anti-bot detection strategies
+   * without modifying the core DetectionService.
+   * 
+   * @param strategy - The detection strategy to register
+   * @example
+   * ```typescript
+   * const customStrategy = new MyCustomDetectionStrategy();
+   * detectionService.registerStrategy(customStrategy);
+   * ```
+   */
+  registerStrategy(strategy: IDetectionStrategy): void {
+    this.registry.register(strategy);
+    this.logger.log(
+      `Registered custom detection strategy: ${strategy.getName()} for ${strategy.systemType}`,
+    );
+  }
+
+  /**
+   * Get the detection registry service
+   * Useful for advanced use cases that need direct registry access
+   */
+  getRegistry(): DetectionRegistryService {
+    return this.registry;
+  }
 
   /**
    * Detect all anti-bot systems on a page
@@ -35,8 +121,33 @@ export class DetectionService {
     const startTime = Date.now();
     const detections: AntiBotDetectionResult[] = [];
 
+    // Validate page object
+    if (!page) {
+      this.logger.error('Page object is null or undefined');
+      return {
+        detections: [],
+        primary: null,
+        totalDurationMs: Date.now() - startTime,
+        analyzedAt: new Date(),
+      };
+    }
+
     // Get detection context
-    const context = await this.getDetectionContext(page);
+    let context: DetectionContext;
+    try {
+      context = await this.getDetectionContext(page);
+    } catch (error) {
+      this.logger.error(
+        `Failed to get detection context: ${error.message}`,
+        { error: error.stack },
+      );
+      return {
+        detections: [],
+        primary: null,
+        totalDurationMs: Date.now() - startTime,
+        analyzedAt: new Date(),
+      };
+    }
 
     // Determine which systems to check
     const targetSystems =
@@ -56,7 +167,20 @@ export class DetectionService {
       } catch (error) {
         this.logger.warn(
           `Failed to detect ${systemType}: ${error.message}`,
+          {
+            systemType,
+            url: context.url,
+            error: error.stack,
+          },
         );
+        // Add error result to detections for visibility
+        const errorResult = this.createErrorResult(
+          systemType,
+          error,
+          0,
+          { url: context.url },
+        );
+        detections.push(errorResult);
       }
     }
 
@@ -73,6 +197,7 @@ export class DetectionService {
 
   /**
    * Detect a specific anti-bot system
+   * Uses the registry to find a strategy, falls back to built-in methods
    */
   private async detectSystem(
     page: Page,
@@ -84,48 +209,73 @@ export class DetectionService {
     try {
       let result: AntiBotDetectionResult;
 
-      switch (systemType) {
-        case AntiBotSystemType.CLOUDFLARE:
-          result = await this.detectCloudflare(page, context);
-          break;
-        case AntiBotSystemType.DATADOME:
-          result = await this.detectDataDome(page, context);
-          break;
-        case AntiBotSystemType.AKAMAI:
-          result = await this.detectAkamai(page, context);
-          break;
-        case AntiBotSystemType.IMPERVA:
-          result = await this.detectImperva(page, context);
-          break;
-        case AntiBotSystemType.RECAPTCHA:
-          result = await this.detectReCaptcha(page, context);
-          break;
-        case AntiBotSystemType.HCAPTCHA:
-          result = await this.detectHCaptcha(page, context);
-          break;
-        default:
-          result = this.createNoDetectionResult();
+      // Try to get strategy from registry first
+      const strategy = this.registry.get(systemType);
+      if (strategy) {
+        result = await strategy.detect(page, context);
+      } else {
+        // Fallback to built-in methods for backward compatibility
+        this.logger.debug(
+          `No strategy registered for ${systemType}, using built-in method`,
+        );
+        result = await this.detectSystemFallback(page, systemType, context);
       }
 
       result.durationMs = Date.now() - startTime;
       return result;
     } catch (error) {
-      return this.createErrorResult(systemType, error, Date.now() - startTime);
+      return this.createErrorResult(
+        systemType,
+        error,
+        Date.now() - startTime,
+        { url: context.url },
+      );
+    }
+  }
+
+  /**
+   * Fallback detection method using built-in switch statement
+   * Used when no strategy is registered for a system type
+   */
+  private async detectSystemFallback(
+    page: Page,
+    systemType: AntiBotSystemType,
+    context: DetectionContext,
+  ): Promise<AntiBotDetectionResult> {
+    switch (systemType) {
+      case AntiBotSystemType.CLOUDFLARE:
+        return this.detectCloudflare(page, context);
+      case AntiBotSystemType.DATADOME:
+        return this.detectDataDome(page, context);
+      case AntiBotSystemType.AKAMAI:
+        return this.detectAkamai(page, context);
+      case AntiBotSystemType.IMPERVA:
+        return this.detectImperva(page, context);
+      case AntiBotSystemType.RECAPTCHA:
+        return this.detectReCaptcha(page, context);
+      case AntiBotSystemType.HCAPTCHA:
+        return this.detectHCaptcha(page, context);
+      default:
+        return this.createNoDetectionResult();
     }
   }
 
   /**
    * Detect Cloudflare anti-bot systems
    * Checks for: Turnstile, Challenge Page, Bot Management
+   * 
+   * @protected - Can be used by strategy adapters
    */
-  private async detectCloudflare(
+  protected async detectCloudflare(
     page: Page,
     context: DetectionContext,
   ): Promise<AntiBotDetectionResult> {
     const signals: DetectionSignal[] = [];
 
     // Check for Cloudflare-specific elements and scripts
-    const cloudflareData = await page.evaluate(() => {
+    let cloudflareData: any;
+    try {
+      cloudflareData = await page.evaluate(() => {
       const data = {
         hasChallengeForm: false,
         hasTurnstile: false,
@@ -169,7 +319,26 @@ export class DetectionService {
         .filter((src): src is string => src !== null);
 
       return data;
-    });
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to evaluate page for Cloudflare detection: ${error.message}`,
+        {
+          url: context.url,
+          error: error.stack,
+        },
+      );
+      // Return empty data structure to continue with cookie/header checks
+      cloudflareData = {
+        hasChallengeForm: false,
+        hasTurnstile: false,
+        hasCfRay: false,
+        hasInterstitial: false,
+        challengeTitle: '',
+        cfRayId: '',
+        scripts: [],
+      };
+    }
 
     // Check cookies for Cloudflare markers
     const cfCookies = context.cookies?.filter((c) =>
@@ -242,10 +411,20 @@ export class DetectionService {
     }
 
     const detected = signals.length > 0;
-    const confidence = this.confidenceScoring.calculateConfidence(
-      signals,
-      AntiBotSystemType.CLOUDFLARE,
-    );
+    let confidence = 0;
+    try {
+      confidence = this.confidenceScoring.calculateConfidence(
+        signals,
+        AntiBotSystemType.CLOUDFLARE,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to calculate confidence for Cloudflare: ${error.message}`,
+        { url: context.url, error: error.stack },
+      );
+      // Default to 0 confidence on scoring error
+      confidence = 0;
+    }
 
     // Determine challenge type
     let challengeType = 'unknown';
@@ -272,14 +451,18 @@ export class DetectionService {
 
   /**
    * Detect DataDome anti-bot system
+   * 
+   * @protected - Can be used by strategy adapters
    */
-  private async detectDataDome(
+  protected async detectDataDome(
     page: Page,
     context: DetectionContext,
   ): Promise<AntiBotDetectionResult> {
     const signals: DetectionSignal[] = [];
 
-    const datadomeData = await page.evaluate(() => {
+    let datadomeData: any;
+    try {
+      datadomeData = await page.evaluate(() => {
       const data = {
         hasCaptchaDiv: false,
         hasDataDomeScript: false,
@@ -307,7 +490,23 @@ export class DetectionService {
       data.hasDataDomeTag = ddTags.length > 0;
 
       return data;
-    });
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to evaluate page for DataDome detection: ${error.message}`,
+        {
+          url: context.url,
+          error: error.stack,
+        },
+      );
+      // Return empty data structure to continue with cookie checks
+      datadomeData = {
+        hasCaptchaDiv: false,
+        hasDataDomeScript: false,
+        hasDataDomeTag: false,
+        scripts: [],
+      };
+    }
 
     // Check for DataDome cookies
     const ddCookies = context.cookies?.filter((c) =>
@@ -350,10 +549,19 @@ export class DetectionService {
     }
 
     const detected = signals.length > 0;
-    const confidence = this.confidenceScoring.calculateConfidence(
-      signals,
-      AntiBotSystemType.DATADOME,
-    );
+    let confidence = 0;
+    try {
+      confidence = this.confidenceScoring.calculateConfidence(
+        signals,
+        AntiBotSystemType.DATADOME,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to calculate confidence for DataDome: ${error.message}`,
+        { url: context.url, error: error.stack },
+      );
+      confidence = 0;
+    }
 
     return {
       detected,
@@ -367,14 +575,18 @@ export class DetectionService {
 
   /**
    * Detect Akamai Bot Manager
+   * 
+   * @protected - Can be used by strategy adapters
    */
-  private async detectAkamai(
+  protected async detectAkamai(
     page: Page,
     context: DetectionContext,
   ): Promise<AntiBotDetectionResult> {
     const signals: DetectionSignal[] = [];
 
-    const akamaiData = await page.evaluate(() => {
+    let akamaiData: any;
+    try {
+      akamaiData = await page.evaluate(() => {
       const data = {
         hasSensorScript: false,
         hasBmScript: false,
@@ -407,7 +619,23 @@ export class DetectionService {
       }
 
       return data;
-    });
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to evaluate page for Akamai detection: ${error.message}`,
+        {
+          url: context.url,
+          error: error.stack,
+        },
+      );
+      // Return empty data structure to continue with cookie checks
+      akamaiData = {
+        hasSensorScript: false,
+        hasBmScript: false,
+        hasBmpScript: false,
+        scripts: [],
+      };
+    }
 
     // Check for Akamai cookies
     const akamCookies = context.cookies?.filter((c) =>
@@ -450,10 +678,19 @@ export class DetectionService {
     }
 
     const detected = signals.length > 0;
-    const confidence = this.confidenceScoring.calculateConfidence(
-      signals,
-      AntiBotSystemType.AKAMAI,
-    );
+    let confidence = 0;
+    try {
+      confidence = this.confidenceScoring.calculateConfidence(
+        signals,
+        AntiBotSystemType.AKAMAI,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to calculate confidence for Akamai: ${error.message}`,
+        { url: context.url, error: error.stack },
+      );
+      confidence = 0;
+    }
 
     return {
       detected,
@@ -467,14 +704,18 @@ export class DetectionService {
 
   /**
    * Detect Imperva (Incapsula)
+   * 
+   * @protected - Can be used by strategy adapters
    */
-  private async detectImperva(
+  protected async detectImperva(
     page: Page,
     context: DetectionContext,
   ): Promise<AntiBotDetectionResult> {
     const signals: DetectionSignal[] = [];
 
-    const impervaData = await page.evaluate(() => {
+    let impervaData: any;
+    try {
+      impervaData = await page.evaluate(() => {
       const data = {
         hasIncapScript: false,
         hasImpervaElement: false,
@@ -499,7 +740,22 @@ export class DetectionService {
       data.hasImpervaElement = !!impervaEl;
 
       return data;
-    });
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to evaluate page for Imperva detection: ${error.message}`,
+        {
+          url: context.url,
+          error: error.stack,
+        },
+      );
+      // Return empty data structure to continue with cookie/header checks
+      impervaData = {
+        hasIncapScript: false,
+        hasImpervaElement: false,
+        scripts: [],
+      };
+    }
 
     // Check for Imperva cookies
     const impervaCookies = context.cookies?.filter((c) =>
@@ -545,10 +801,19 @@ export class DetectionService {
     }
 
     const detected = signals.length > 0;
-    const confidence = this.confidenceScoring.calculateConfidence(
-      signals,
-      AntiBotSystemType.IMPERVA,
-    );
+    let confidence = 0;
+    try {
+      confidence = this.confidenceScoring.calculateConfidence(
+        signals,
+        AntiBotSystemType.IMPERVA,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to calculate confidence for Imperva: ${error.message}`,
+        { url: context.url, error: error.stack },
+      );
+      confidence = 0;
+    }
 
     return {
       detected,
@@ -562,14 +827,18 @@ export class DetectionService {
 
   /**
    * Detect Google reCAPTCHA
+   * 
+   * @protected - Can be used by strategy adapters
    */
-  private async detectReCaptcha(
+  protected async detectReCaptcha(
     page: Page,
     context: DetectionContext,
   ): Promise<AntiBotDetectionResult> {
     const signals: DetectionSignal[] = [];
 
-    const recaptchaData = await page.evaluate(() => {
+    let recaptchaData: any;
+    try {
+      recaptchaData = await page.evaluate(() => {
       const data = {
         hasRecaptchaDiv: false,
         hasRecaptchaScript: false,
@@ -612,7 +881,25 @@ export class DetectionService {
       }
 
       return data;
-    });
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to evaluate page for reCAPTCHA detection: ${error.message}`,
+        {
+          url: context.url,
+          error: error.stack,
+        },
+      );
+      // Return empty data structure
+      recaptchaData = {
+        hasRecaptchaDiv: false,
+        hasRecaptchaScript: false,
+        hasRecaptchaFrame: false,
+        version: '',
+        sitekey: '',
+        scripts: [],
+      };
+    }
 
     // Build signals
     if (recaptchaData.hasRecaptchaDiv) {
@@ -645,10 +932,19 @@ export class DetectionService {
     }
 
     const detected = signals.length > 0;
-    const confidence = this.confidenceScoring.calculateConfidence(
-      signals,
-      AntiBotSystemType.RECAPTCHA,
-    );
+    let confidence = 0;
+    try {
+      confidence = this.confidenceScoring.calculateConfidence(
+        signals,
+        AntiBotSystemType.RECAPTCHA,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to calculate confidence for reCAPTCHA: ${error.message}`,
+        { url: context.url, error: error.stack },
+      );
+      confidence = 0;
+    }
 
     return {
       detected,
@@ -668,14 +964,18 @@ export class DetectionService {
 
   /**
    * Detect hCaptcha
+   * 
+   * @protected - Can be used by strategy adapters
    */
-  private async detectHCaptcha(
+  protected async detectHCaptcha(
     page: Page,
     context: DetectionContext,
   ): Promise<AntiBotDetectionResult> {
     const signals: DetectionSignal[] = [];
 
-    const hcaptchaData = await page.evaluate(() => {
+    let hcaptchaData: any;
+    try {
+      hcaptchaData = await page.evaluate(() => {
       const data = {
         hasHcaptchaDiv: false,
         hasHcaptchaScript: false,
@@ -708,7 +1008,24 @@ export class DetectionService {
       data.hasHcaptchaFrame = frames.length > 0;
 
       return data;
-    });
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to evaluate page for hCaptcha detection: ${error.message}`,
+        {
+          url: context.url,
+          error: error.stack,
+        },
+      );
+      // Return empty data structure
+      hcaptchaData = {
+        hasHcaptchaDiv: false,
+        hasHcaptchaScript: false,
+        hasHcaptchaFrame: false,
+        sitekey: '',
+        scripts: [],
+      };
+    }
 
     // Build signals
     if (hcaptchaData.hasHcaptchaDiv) {
@@ -738,10 +1055,19 @@ export class DetectionService {
     }
 
     const detected = signals.length > 0;
-    const confidence = this.confidenceScoring.calculateConfidence(
-      signals,
-      AntiBotSystemType.HCAPTCHA,
-    );
+    let confidence = 0;
+    try {
+      confidence = this.confidenceScoring.calculateConfidence(
+        signals,
+        AntiBotSystemType.HCAPTCHA,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to calculate confidence for hCaptcha: ${error.message}`,
+        { url: context.url, error: error.stack },
+      );
+      confidence = 0;
+    }
 
     return {
       detected,
@@ -763,11 +1089,35 @@ export class DetectionService {
    */
   private async getDetectionContext(page: Page): Promise<DetectionContext> {
     try {
+      if (!page) {
+        throw new Error('Page object is null or undefined');
+      }
+
       const url = page.url();
-      const title = await page.title().catch(() => undefined);
+      let title: string | undefined;
+      let cookies: any[] = [];
+
+      try {
+        title = await page.title();
+      } catch (error) {
+        this.logger.debug(
+          `Failed to get page title: ${error.message}`,
+          { url },
+        );
+      }
       
-      // Get cookies
-      const cookies = await page.context().cookies().catch(() => []);
+      // Get cookies with error handling
+      try {
+        const context = page.context();
+        if (context) {
+          cookies = await context.cookies();
+        }
+      } catch (error) {
+        this.logger.debug(
+          `Failed to get cookies: ${error.message}`,
+          { url },
+        );
+      }
 
       return {
         url,
@@ -777,11 +1127,19 @@ export class DetectionService {
           value: c.value,
           domain: c.domain,
         })),
+        // Headers are not easily accessible from an already-loaded page
+        // They would need to be captured during initial navigation
       };
     } catch (error) {
-      this.logger.warn(`Failed to get detection context: ${error.message}`);
+      this.logger.warn(
+        `Failed to get detection context: ${error.message}`,
+        {
+          url: page?.url() || 'unknown',
+          error: error.stack,
+        },
+      );
       return {
-        url: page.url(),
+        url: page?.url() || 'unknown',
       };
     }
   }
@@ -807,12 +1165,27 @@ export class DetectionService {
     systemType: AntiBotSystemType,
     error: any,
     durationMs: number,
+    context?: Record<string, any>,
   ): AntiBotDetectionResult {
     const detectionError: DetectionError = {
-      code: error.code || 'DETECTION_ERROR',
+      code: error.code || error.name || 'DETECTION_ERROR',
       message: error.message || 'Unknown error during detection',
       stack: error.stack,
+      context: {
+        systemType,
+        ...context,
+      },
     };
+
+    this.logger.error(
+      `Detection error for ${systemType}: ${error.message}`,
+      {
+        systemType,
+        errorCode: detectionError.code,
+        context: detectionError.context,
+        stack: error.stack,
+      },
+    );
 
     return {
       detected: false,

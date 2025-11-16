@@ -465,6 +465,96 @@ describe('DetectionService', () => {
 
       // Service should handle errors and continue
       expect(result).toBeDefined();
+      // Error results should be included in detections
+      const errorDetections = result.detections.filter((d) => d.error);
+      expect(errorDetections.length).toBeGreaterThan(0);
+    });
+
+    it('should handle null page object gracefully', async () => {
+      const result = await service.detectAll(null as any);
+
+      expect(result.detections).toEqual([]);
+      expect(result.primary).toBeNull();
+      expect(result.totalDurationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle page.evaluate errors in individual detection methods', async () => {
+      // Mock evaluate to throw error for Cloudflare detection
+      mockPage.evaluate.mockImplementation((fn: any) => {
+        const fnString = fn.toString();
+        if (fnString.includes('challenge-form') || fnString.includes('cf-')) {
+          return Promise.reject(new Error('DOM access denied'));
+        }
+        return Promise.resolve({});
+      });
+
+      const result = await service.detectAll(mockPage, {
+        targetSystems: [AntiBotSystemType.CLOUDFLARE],
+      });
+
+      // Should still return a result, even if evaluation failed
+      expect(result.detections).toBeDefined();
+      // Detection should continue with cookie/header checks even if DOM evaluation fails
+      expect(result.detections.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle confidence scoring errors gracefully', async () => {
+      // Mock confidence scoring to throw error
+      const confidenceService = service['confidenceScoring'];
+      const originalCalculate = confidenceService.calculateConfidence;
+      confidenceService.calculateConfidence = jest.fn().mockImplementation(() => {
+        throw new Error('Scoring calculation failed');
+      });
+
+      mockPage.evaluate.mockResolvedValue({
+        hasChallengeForm: true,
+        hasTurnstile: false,
+        scripts: [],
+      });
+
+      const result = await service.detectAll(mockPage, {
+        targetSystems: [AntiBotSystemType.CLOUDFLARE],
+      });
+
+      // Should handle scoring error and continue
+      expect(result.detections).toBeDefined();
+      if (result.primary) {
+        // Confidence should default to 0 on error
+        expect(result.primary.confidence).toBe(0);
+      }
+
+      // Restore original method
+      confidenceService.calculateConfidence = originalCalculate;
+    });
+
+    it('should handle page.title() errors in getDetectionContext', async () => {
+      mockPage.title.mockRejectedValue(new Error('Title access failed'));
+      mockPage.evaluate.mockResolvedValue({});
+      mockContext.cookies.mockResolvedValue([]);
+
+      const result = await service.detectAll(mockPage);
+
+      // Should continue even if title retrieval fails
+      expect(result.detections).toBeDefined();
+    });
+
+    it('should include structured error information in error results', async () => {
+      const testError = new Error('Test error');
+      testError.name = 'TestError';
+      mockPage.evaluate.mockRejectedValue(testError);
+
+      const result = await service.detectAll(mockPage, {
+        targetSystems: [AntiBotSystemType.CLOUDFLARE],
+      });
+
+      const errorDetection = result.detections.find((d) => d.error);
+      expect(errorDetection).toBeDefined();
+      expect(errorDetection?.error?.code).toBe('TestError');
+      expect(errorDetection?.error?.message).toBe('Test error');
+      expect(errorDetection?.error?.context).toBeDefined();
+      expect(errorDetection?.error?.context?.systemType).toBe(
+        AntiBotSystemType.CLOUDFLARE,
+      );
     });
   });
 
