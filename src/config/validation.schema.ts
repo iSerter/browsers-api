@@ -57,4 +57,9 @@ export const validationSchema = Joi.object({
     .allow('')
     .pattern(/^(https?|socks5):\/\/.+/)
     .message('DEFAULT_PROXY must be a valid proxy URL (http://, https://, or socks5://)'),
+
+  // Captcha Solver
+  '2CAPTCHA_API_KEY': Joi.string().optional().allow(''),
+  TWOCAPTCHA_API_KEY: Joi.string().optional().allow(''),
+  ANTICAPTCHA_API_KEY: Joi.string().optional().allow(''),
 });

@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { CaptchaSolverModule } from './modules/captcha-solver/captcha-solver.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AppLoggerService } from './common/services/logger.service';
@@ -50,6 +51,7 @@ import { throttleConfig } from './modules/auth/config/throttle.config';
     ApiKeysModule,
     MetricsModule,
     AdminModule,
+    CaptchaSolverModule,
   ],
   controllers: [AppController],
   providers: [
