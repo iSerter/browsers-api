@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AppLoggerService } from './common/services/logger.service';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
@@ -52,6 +53,24 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Swagger API Documentation
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Browsers API')
+    .setDescription('API for browser automation and captcha solving')
+    .setVersion('1.0')
+    .addTag('captcha-solver', 'Captcha solving endpoints')
+    .addTag('health', 'Health check endpoints')
+    .addTag('jobs', 'Job management endpoints')
+    .addBearerAuth()
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
+
   const port = configService.get('PORT', 3333);
   await app.listen(port);
 
@@ -65,6 +84,10 @@ async function bootstrap() {
   );
   logger.log(
     `Metrics available at: http://localhost:${port}/metrics`,
+    'Bootstrap',
+  );
+  logger.log(
+    `Swagger documentation available at: http://localhost:${port}/api/docs`,
     'Bootstrap',
   );
 }

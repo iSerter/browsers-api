@@ -22,7 +22,7 @@ export interface ICaptchaSolver {
  * Parameters for captcha solving
  */
 export interface CaptchaParams {
-  type: 'recaptcha' | 'hcaptcha' | 'datadome' | 'funcaptcha';
+  type: 'recaptcha' | 'hcaptcha' | 'datadome' | 'funcaptcha' | 'akamai';
   sitekey?: string;
   url: string;
   version?: 'v2' | 'v3'; // For reCAPTCHA

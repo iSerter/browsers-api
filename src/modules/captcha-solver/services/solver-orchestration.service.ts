@@ -6,6 +6,7 @@ import { SolverFactory } from '../factories/solver-factory.service';
 import { SolverPerformanceTracker } from '../factories/solver-performance-tracker.service';
 import { CostTrackingService } from './cost-tracking.service';
 import { ProviderRegistryService } from './provider-registry.service';
+import { CaptchaLoggingService } from './captcha-logging.service';
 import {
   ICaptchaSolver,
   CaptchaParams,
@@ -71,6 +72,7 @@ export class SolverOrchestrationService {
     private readonly costTracking: CostTrackingService,
     private readonly providerRegistry: ProviderRegistryService,
     private readonly configService: ConfigService,
+    private readonly captchaLogging: CaptchaLoggingService,
   ) {
     // Load default configuration from environment variables
     this.defaultConfig = {
@@ -144,7 +146,7 @@ export class SolverOrchestrationService {
         finalConfig,
       );
 
-      return {
+      const result = {
         solved: solveResult.solved,
         solution: solveResult.solution,
         detection: detectionResult,
@@ -154,6 +156,26 @@ export class SolverOrchestrationService {
         usedThirdParty: solveResult.usedThirdParty,
         error: solveResult.error,
       };
+
+      // Log solving result
+      this.captchaLogging.logSolving(
+        solveResult.solverType || 'unknown',
+        challengeType,
+        solveResult.solved,
+        result.duration,
+        solveResult.attempts,
+        finalConfig.maxRetries[challengeType] || 3,
+        page.url(),
+        solveResult.solution,
+        solveResult.error ? new Error(solveResult.error) : undefined,
+        solveResult.usedThirdParty,
+        {
+          detectionType: detectionResult.type,
+          confidence: detectionResult.confidence,
+        },
+      );
+
+      return result;
     } catch (error: any) {
       this.logger.error(`Orchestration failed: ${error.message}`, {
         error: error.stack,
@@ -209,7 +231,7 @@ export class SolverOrchestrationService {
       {
         [AntiBotSystemType.CLOUDFLARE]: 'recaptcha', // Cloudflare uses Turnstile/reCAPTCHA
         [AntiBotSystemType.DATADOME]: 'datadome',
-        [AntiBotSystemType.AKAMAI]: null, // Akamai doesn't map directly
+        [AntiBotSystemType.AKAMAI]: 'akamai',
         [AntiBotSystemType.IMPERVA]: null, // Imperva doesn't map directly
         [AntiBotSystemType.RECAPTCHA]: 'recaptcha',
         [AntiBotSystemType.HCAPTCHA]: 'hcaptcha',
@@ -360,6 +382,20 @@ export class SolverOrchestrationService {
             true,
           );
 
+          // Log success
+          this.captchaLogging.logSolving(
+            solverType,
+            challengeType,
+            true,
+            duration,
+            attempt,
+            maxRetries,
+            page.url(),
+            solution,
+            undefined,
+            false,
+          );
+
           this.logger.log(
             `Successfully solved with ${solverType} in ${duration}ms`,
           );
@@ -374,6 +410,20 @@ export class SolverOrchestrationService {
           const duration = Date.now() - attemptStartTime;
           const errorMessage =
             error.message || 'Unknown error during solving';
+
+          // Log failure
+          this.captchaLogging.logSolving(
+            solverType,
+            challengeType,
+            false,
+            duration,
+            attempt,
+            maxRetries,
+            page.url(),
+            undefined,
+            error,
+            false,
+          );
 
           this.logger.warn(
             `Attempt ${attempt} failed with ${solverType}: ${errorMessage}`,
@@ -486,6 +536,20 @@ export class SolverOrchestrationService {
           );
           this.costTracking.recordSuccess(providerName, challengeType);
 
+          // Log success
+          this.captchaLogging.logSolving(
+            providerName,
+            challengeType,
+            true,
+            duration,
+            attempt,
+            maxRetries,
+            page.url(),
+            solution,
+            undefined,
+            true,
+          );
+
           this.logger.log(
             `Successfully solved with ${providerName} in ${duration}ms`,
           );
@@ -500,6 +564,20 @@ export class SolverOrchestrationService {
           const duration = Date.now() - attemptStartTime;
           const errorMessage =
             error.message || 'Unknown error during solving';
+
+          // Log failure
+          this.captchaLogging.logSolving(
+            providerName,
+            challengeType,
+            false,
+            duration,
+            attempt,
+            maxRetries,
+            page.url(),
+            undefined,
+            error,
+            true,
+          );
 
           this.logger.warn(
             `Attempt ${attempt} failed with ${providerName}: ${errorMessage}`,

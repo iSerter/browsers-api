@@ -331,7 +331,7 @@
           "5",
           "6"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -350,8 +350,97 @@
           "8",
           "9"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "in-progress",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Write unit tests for missing services",
+            "description": "Implement unit tests for cost-tracking, detection-registry, provider-registry, native-solver-registry, and solver-factory services",
+            "dependencies": [],
+            "details": "Use Jest to create test suites for each service. Mock dependencies using Jest's spyOn and mockImplementation. Test edge cases and error handling. Verify service methods meet functional requirements.\n<info added on 2025-11-16T23:30:30.411Z>\nCompleted comprehensive unit tests for all five missing services with full coverage of core functionality:\n\ncost-tracking.service.spec.ts: Tests for recordSuccess, getUsageStatistics, getAllUsageStatistics, getTotalCost, getCostForPeriod, clearOldEntries, and provider-specific cost calculations with proper mocking of date/time functions.\n\ndetection-registry.service.spec.ts: Tests for register, registerAll, get, has, getRegisteredTypes, getAll, unregister, clear, and getCount methods including duplicate registration handling and error cases.\n\nprovider-registry.service.spec.ts: Tests for provider registration, retrieval, availability checking, and complete lifecycle management including initialization and cleanup.\n\nnative-solver-registry.service.spec.ts: Tests for onModuleInit lifecycle hook, automatic solver registration with correct capability metadata, and validation of solver metadata structure.\n\nsolver-factory.service.spec.ts: Tests for createSolver instantiation, selectBestSolver selection logic, solveWithFallback retry behavior, and getAvailableSolvers filtering with proper dependency mocking.\n\nAll test suites follow NestJS testing patterns using Jest's spyOn and mockImplementation for dependency isolation. Edge cases, error handling, and method contracts verified. Code passes linting with zero errors.\n</info added on 2025-11-16T23:30:30.411Z>",
+            "status": "done",
+            "testStrategy": "Run Jest unit tests with coverage reporting"
+          },
+          {
+            "id": 2,
+            "title": "Implement job workflow integration tests",
+            "description": "Create integration tests for captcha solving job workflow",
+            "dependencies": [
+              1
+            ],
+            "details": "Use Jest and Supertest to simulate job execution flow. Test detection → solver selection → execution → result handling. Verify fallback behavior and retry logic. Mock external dependencies using Jest mock functions.",
+            "status": "pending",
+            "testStrategy": "Run integration tests with mocked services"
+          },
+          {
+            "id": 3,
+            "title": "Develop E2E mock captcha tests",
+            "description": "Implement end-to-end tests with mock captcha challenges",
+            "dependencies": [
+              2
+            ],
+            "details": "Create test endpoints serving mock captchas. Use Playwright to simulate browser interactions. Test detection, solving, and submission workflow. Include reCAPTCHA v2, hCAPTCHA, and audio captcha variants.",
+            "status": "pending",
+            "testStrategy": "Run E2E tests with Playwright and mocked captchas"
+          },
+          {
+            "id": 4,
+            "title": "Generate Swagger API documentation",
+            "description": "Implement OpenAPI documentation using NestJS Swagger",
+            "dependencies": [],
+            "details": "Add @Api decorators to controller methods. Document request/response formats, status codes, and error responses. Use DTO classes for request/response models. Enable Swagger UI endpoint.\n<info added on 2025-11-16T23:30:35.786Z>\nCompleted Swagger API documentation setup:\n- Installed @nestjs/swagger and swagger-ui-express packages\n- Configured Swagger in main.ts with DocumentBuilder and SwaggerModule.setup\n- Added @ApiTags, @ApiOperation, @ApiOkResponse, and @ApiBadRequestResponse decorators to all controller endpoints\n- Added @ApiProperty and @ApiPropertyOptional decorators to all DTOs (TestCaptchaDto, UpdateConfigDto, ProxyConfigDto)\n- Swagger UI available at /api/docs endpoint\n- All endpoints documented with descriptions, examples, and response schemas\n</info added on 2025-11-16T23:30:35.786Z>",
+            "status": "done",
+            "testStrategy": "Verify documentation matches implemented endpoints"
+          },
+          {
+            "id": 5,
+            "title": "Write usage guide documentation",
+            "description": "Create comprehensive usage documentation for developers",
+            "dependencies": [
+              4
+            ],
+            "details": "Document module installation, configuration, and usage patterns. Include code examples for common use cases. Describe environment variables and configuration options. Add troubleshooting tips.",
+            "status": "pending",
+            "testStrategy": "Validate examples through code execution"
+          },
+          {
+            "id": 6,
+            "title": "Create troubleshooting documentation",
+            "description": "Develop troubleshooting guide for common issues",
+            "dependencies": [
+              5
+            ],
+            "details": "Document error codes, log analysis techniques, and resolution steps. Include network issues, solver failures, and configuration problems. Add diagnostic command examples.",
+            "status": "pending",
+            "testStrategy": "Verify solutions through scenario testing"
+          },
+          {
+            "id": 7,
+            "title": "Verify test coverage metrics",
+            "description": "Ensure test coverage exceeds 80% threshold",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Run Jest coverage reports. Identify and address gaps in service method coverage. Add missing test cases. Generate lcov report for verification.",
+            "status": "pending",
+            "testStrategy": "Analyze Jest coverage reports and improve tests"
+          },
+          {
+            "id": 8,
+            "title": "Review and validate documentation",
+            "description": "Conduct peer review and validation of all documentation",
+            "dependencies": [
+              4,
+              5,
+              6
+            ],
+            "details": "Perform technical review for accuracy. Validate documentation through developer walkthroughs. Check Swagger UI functionality. Verify examples work as described. Update documentation based on feedback.",
+            "status": "pending",
+            "testStrategy": "Peer review and example validation"
+          }
+        ]
       },
       {
         "id": 11,
@@ -389,7 +478,7 @@
         "description": "Implement a comprehensive native hCAPTCHA solver supporting audio and accessibility challenges through browser automation, leveraging speech-to-text transcription techniques similar to reCAPTCHA, with widget interaction, token extraction, and difficulty detection.",
         "details": "Create a NativeHcaptchaSolver class that extends the base solver interface. Implement hCAPTCHA widget detection by inspecting iframe elements with 'h-captcha' class and data-sitekey attributes to identify challenge variations (checkbox, invisible). For audio challenges: locate and click the accessibility button to reveal audio option, extract the audio challenge URL from the iframe, download the audio file using axios or fetch, reuse the speech-to-text transcription logic from the NativeRecaptchaSolver (sharing the audio processing module), submit the transcribed text to the challenge input field, and verify token generation. Implement hCAPTCHA-specific widget interaction patterns including proper iframe switching using Playwright's frame locators, handling the challenge modal overlay, and managing multi-step challenge flows. For accessibility challenges, detect and interact with the text-based alternative challenge option when available. Implement token extraction by monitoring the textarea element with name 'h-captcha-response' or 'g-recaptcha-response' that receives the solved token, and extract the token value after successful challenge completion. Implement automatic form submission by locating the parent form element and triggering submit, or invoking callback functions specified in data-callback attributes. Add challenge difficulty detection by analyzing challenge metadata, tracking solve attempts, and implementing adaptive retry strategies based on difficulty indicators such as challenge type, number of required selections, or time constraints. Implement exponential backoff retry logic with configurable max attempts (default 3). Use structured logging to track solving attempts, success rates, audio transcription accuracy, and difficulty levels. Handle edge cases including challenge timeouts, invalid audio files, network errors during audio download, and token validation failures. Ensure compatibility with different hCAPTCHA configurations and site implementations.",
         "testStrategy": "Unit tests for hCAPTCHA widget detection using mocked Playwright page objects with sample hCAPTCHA DOM structures for checkbox and invisible variants. Test audio challenge workflow with mocked audio files and speech-to-text responses, validating transcription submission and token extraction. Test accessibility challenge detection and interaction logic. Validate token extraction from the h-captcha-response textarea element with various token formats. Test form submission logic with mocked form elements and callback functions. Test difficulty detection with simulated challenges of varying complexity levels. Validate retry logic with simulated failures and verify exponential backoff timing. Integration tests on live hCAPTCHA demo pages to verify end-to-end solving workflow including audio download, transcription, submission, and token retrieval. Test performance metrics tracking and logging output. Validate error handling for network failures, invalid audio, and timeout scenarios. Compare success rates and performance against the reCAPTCHA solver to ensure consistency in audio processing approach.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           4,
@@ -405,7 +494,7 @@
         "description": "Implement a comprehensive native DataDome solver that analyzes sensor data requirements, generates realistic browser fingerprints and behavioral patterns, manipulates challenge cookies, and handles CAPTCHA and slider challenge variations with success rate tracking.",
         "details": "Create a NativeDataDomeSolver class that extends the base solver interface. Implement DataDome detection by inspecting cookies (datadome, dd_testcookie), script tags with datadome-tags.js or dd.js sources, and window.DD_RUM or window.datadomeOptions objects. Analyze DataDome sensor data requirements by intercepting network requests to datadome.co/js/ endpoints and examining the payload structure including device fingerprint (screen resolution, timezone, plugins, canvas fingerprint, WebGL renderer), behavioral signals (mouse movements, keyboard timing, touch events), and browser characteristics (user agent, language, platform, hardware concurrency). Implement fingerprint generation using canvas fingerprinting with randomized but consistent noise, WebGL fingerprinting with realistic renderer strings, audio context fingerprinting, and font enumeration that matches the browser profile. Generate realistic mouse movement patterns using Bezier curves with natural acceleration/deceleration, random micro-movements and pauses, coordinate jitter within 1-3 pixels, and timing variations following human reaction time distributions (200-400ms). Implement sensor data collection and transmission by hooking into DataDome's data collection methods, generating synthetic sensor data that includes mousemove events with timestamps and coordinates, scroll events with delta values, keyboard events with realistic timing intervals, and touch events for mobile emulation. Handle challenge cookie manipulation by extracting the datadome cookie value, analyzing the challenge response structure, and injecting valid challenge tokens into cookies and localStorage. Implement CAPTCHA challenge solving by detecting iframe-based CAPTCHA presentations, extracting challenge parameters (site key, challenge type), and integrating with the existing native solver implementations for reCAPTCHA or hCAPTCHA if DataDome uses them as backend. Handle slider challenges by detecting slider widget elements, calculating required drag distance and trajectory, simulating realistic drag interactions with variable speed and micro-adjustments, and validating successful completion. Implement retry logic with exponential backoff (initial 2s, max 30s) for failed attempts, maximum 3 retries per challenge type. Track bypass success rates by challenge type using a statistics service that records attempt timestamp, challenge type (sensor validation, CAPTCHA, slider), success/failure status, solving duration, and fingerprint configuration used. Store statistics in a time-series format for analysis. Implement configuration options for fingerprint consistency (session-based vs request-based), sensor data verbosity level, and challenge timeout values. Use Playwright's CDP (Chrome DevTools Protocol) for low-level browser manipulation when needed. Ensure all generated data passes DataDome's entropy and consistency checks by maintaining correlation between fingerprint elements and avoiding impossible combinations.",
         "testStrategy": "Unit tests for DataDome detection logic using mocked Playwright page objects with sample DataDome cookies, script tags, and window objects. Test fingerprint generation functions to ensure consistency within sessions and realistic variation across sessions, validating canvas, WebGL, and audio fingerprints against known DataDome validation patterns. Test mouse movement generation with assertions on Bezier curve smoothness, timing distributions, and coordinate realism. Mock DataDome sensor data collection endpoints and validate payload structure, field presence, and value ranges. Test challenge cookie manipulation with sample cookie values and verify correct extraction and injection. Test slider challenge interaction with mocked slider widgets, validating drag trajectory calculation and interaction timing. Integration tests with live DataDome-protected pages to measure actual bypass success rates across challenge types. Validate statistics tracking by simulating multiple solving attempts and verifying recorded metrics. Test retry logic with simulated failures and verify exponential backoff timing and maximum retry limits. Performance tests to ensure sensor data generation and fingerprinting complete within acceptable timeframes (under 500ms). Create E2E tests that navigate through DataDome-protected pages with various challenge types and validate successful page access and data extraction.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           4,
@@ -422,7 +511,7 @@
         "description": "Implement a comprehensive native Akamai Bot Manager solver that reverse engineers sensor data requirements, generates valid sensor payloads with realistic browser fingerprints and behavioral telemetry, implements bmak cookie generation, handles various challenge levels, and performs request signing for sensor submissions.",
         "details": "Create a NativeAkamaiSolver class that extends the base solver interface. Implement Akamai detection by inspecting script tags with akamai-related sources (akam.net, akamaihd.net), cookies (_abck, bm_sz, ak_bmsc), and window objects (window._cf, window.bmak). Reverse engineer sensor data requirements by intercepting network requests to Akamai endpoints and analyzing payload structures including sensor version, device fingerprints (screen dimensions, color depth, timezone offset, language, platform), browser capabilities (plugins, mime types, WebGL renderer, canvas fingerprint), behavioral telemetry (mouse movements, keyboard events, touch events, scroll patterns), and timing data (page load time, script execution time). Implement sensor data generation using Playwright's page.evaluate to collect genuine browser properties and augment with realistic synthetic behavioral data. Generate mouse movement patterns using bezier curves with random jitter, keyboard timing with realistic inter-key delays, and scroll events with natural acceleration/deceleration. Implement bmak cookie (_abck) generation by analyzing the cookie structure including version identifier, timestamp, session token, sensor data hash, and challenge response token. Use crypto libraries to generate HMAC signatures matching Akamai's validation requirements. Handle various Akamai challenge levels: Level 1 (passive monitoring - inject sensor data without interaction), Level 2 (interactive challenges - solve JavaScript challenges and proof-of-work), Level 3 (advanced challenges - handle dynamic script obfuscation and anti-debugging). Implement request signing for sensor submissions by calculating request signatures using collected sensor data, timestamp, and secret derived from page context. Submit sensor data via POST requests to Akamai endpoints with proper headers (Content-Type, User-Agent, Referer) and handle response validation. Implement retry logic with exponential backoff for failed submissions. Track sensor generation success rates, challenge level distribution, and average solving times. Integrate with existing stealth configuration to ensure sensor data matches browser fingerprint. Use TypeScript interfaces for sensor data structures and challenge responses. Implement caching for generated sensor data to maintain consistency within sessions while varying across sessions.",
         "testStrategy": "Unit tests for Akamai detection logic using mocked Playwright page objects with sample Akamai script tags, cookies (_abck, bm_sz), and window objects. Test sensor data generation functions to validate realistic fingerprint values, behavioral telemetry patterns, and timing data consistency. Verify mouse movement generation produces smooth bezier curves with appropriate jitter and keyboard timing follows realistic distributions. Test bmak cookie generation with known input values and validate cookie structure, timestamp encoding, and HMAC signature format. Test challenge level detection and handling for Levels 1-3 using mocked challenge scenarios. Validate request signing logic produces consistent signatures for identical inputs and varies appropriately with different sensor data. Test sensor submission workflow with mocked network responses, validating request headers, payload structure, and response parsing. Verify retry logic with simulated failures and confirm exponential backoff timing. Integration tests on live Akamai-protected sites to measure detection bypass rates across challenge levels. Test session consistency by validating sensor data remains stable within a session while varying across sessions. Performance tests to ensure sensor generation completes within acceptable timeframes (under 2 seconds for Level 1, under 5 seconds for Level 2, under 10 seconds for Level 3).",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           4,
@@ -581,7 +670,7 @@
       ],
       "created": "2025-11-15T23:03:16.055Z",
       "description": "Tasks for master context",
-      "updated": "2025-11-16T22:14:16.588Z"
+      "updated": "2025-11-16T23:30:19.970Z"
     }
   }
 }

@@ -8,12 +8,20 @@ import {
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBadRequestResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { CaptchaSolverService } from './captcha-solver.service';
 import { ProviderRegistryService } from './services/provider-registry.service';
 import { UpdateConfigDto } from './dto/update-config.dto';
 import { TestCaptchaDto } from './dto/test-captcha.dto';
 import { CaptchaParams } from './interfaces/captcha-solver.interface';
 
+@ApiTags('captcha-solver')
 @Controller('captcha-solver')
 export class CaptchaSolverController {
   constructor(
@@ -22,6 +30,30 @@ export class CaptchaSolverController {
   ) {}
 
   @Get('providers')
+  @ApiOperation({
+    summary: 'Get available captcha solver providers',
+    description: 'Returns a list of all registered captcha solver providers and their availability status',
+  })
+  @ApiOkResponse({
+    description: 'List of providers with availability status',
+    schema: {
+      type: 'object',
+      properties: {
+        providers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', example: '2captcha' },
+              available: { type: 'boolean', example: true },
+            },
+          },
+        },
+        availableCount: { type: 'number', example: 2 },
+        totalCount: { type: 'number', example: 2 },
+      },
+    },
+  })
   async getProviders() {
     const availableProviders = this.captchaSolverService.getAvailableProviders();
     const allProviders = this.providerRegistry.getProviderNames();
@@ -49,6 +81,38 @@ export class CaptchaSolverController {
 
   @Post('test')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Test captcha solving',
+    description: 'Attempts to solve a captcha challenge using the configured providers. Supports reCAPTCHA, hCAPTCHA, DataDome, and FunCaptcha.',
+  })
+  @ApiOkResponse({
+    description: 'Captcha solved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        solution: {
+          type: 'object',
+          properties: {
+            token: { type: 'string', example: '03AGdBq24...' },
+            solvedAt: { type: 'string', format: 'date-time' },
+            solverId: { type: 'string', example: '2captcha-123' },
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid request or no providers available',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 400 },
+        message: { type: 'string', example: 'No captcha solver providers are available' },
+        error: { type: 'string', example: 'Bad Request' },
+      },
+    },
+  })
   async testCaptcha(@Body() testCaptchaDto: TestCaptchaDto) {
     // Validate that at least one provider is available
     const availableProviders = this.captchaSolverService.getAvailableProviders();
@@ -94,6 +158,30 @@ export class CaptchaSolverController {
   }
 
   @Get('config')
+  @ApiOperation({
+    summary: 'Get captcha solver configuration',
+    description: 'Retrieves the current configuration settings for the captcha solver module',
+  })
+  @ApiOkResponse({
+    description: 'Configuration retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        configs: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          example: {
+            CAPTCHA_MIN_CONFIDENCE: '0.5',
+            CAPTCHA_ENABLE_THIRD_PARTY_FALLBACK: 'true',
+          },
+        },
+        configuration: {
+          type: 'object',
+          description: 'Additional configuration object',
+        },
+      },
+    },
+  })
   async getConfig() {
     const configs = await this.captchaSolverService.getAllConfigs();
     const configuration = this.captchaSolverService.getConfiguration();
@@ -107,6 +195,29 @@ export class CaptchaSolverController {
   }
 
   @Patch('config')
+  @ApiOperation({
+    summary: 'Update captcha solver configuration',
+    description: 'Updates a specific configuration key-value pair for the captcha solver module',
+  })
+  @ApiOkResponse({
+    description: 'Configuration updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Configuration updated successfully' },
+        config: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', example: 'CAPTCHA_MIN_CONFIDENCE' },
+            value: { type: 'string', example: '0.7' },
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid configuration key or value',
+  })
   async updateConfig(@Body() updateConfigDto: UpdateConfigDto) {
     const { key, value } = updateConfigDto;
     const config = await this.captchaSolverService.setConfig(key, value);
@@ -120,6 +231,45 @@ export class CaptchaSolverController {
   }
 
   @Get('stats')
+  @ApiOperation({
+    summary: 'Get captcha solver usage statistics',
+    description: 'Retrieves usage statistics including total cost, provider usage, and summary metrics',
+  })
+  @ApiOkResponse({
+    description: 'Statistics retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        totalCost: { type: 'number', example: 0.125 },
+        availableProviders: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['2captcha', 'anticaptcha'],
+        },
+        usage: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              provider: { type: 'string', example: '2captcha' },
+              totalUses: { type: 'number', example: 50 },
+              totalCost: { type: 'number', example: 0.1 },
+              successCount: { type: 'number', example: 48 },
+              failureCount: { type: 'number', example: 2 },
+            },
+          },
+        },
+        summary: {
+          type: 'object',
+          properties: {
+            totalUses: { type: 'number', example: 50 },
+            totalCost: { type: 'number', example: 0.125 },
+            providerCount: { type: 'number', example: 2 },
+          },
+        },
+      },
+    },
+  })
   async getStats() {
     const stats = this.captchaSolverService.getUsageStatistics();
     const totalCost = this.captchaSolverService.getTotalCost();

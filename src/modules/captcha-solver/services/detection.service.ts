@@ -15,6 +15,7 @@ import { ConfidenceScoringService } from './confidence-scoring.service';
 import { DetectionRegistryService } from './detection-registry.service';
 import { DetectionServiceAdapter } from './detection-service-adapter';
 import { IDetectionStrategy } from './detection-strategy.interface';
+import { CaptchaLoggingService } from './captcha-logging.service';
 
 /**
  * Service for detecting various anti-bot systems on web pages
@@ -30,6 +31,7 @@ export class DetectionService implements OnModuleInit {
   constructor(
     private readonly confidenceScoring: ConfidenceScoringService,
     private readonly registry: DetectionRegistryService,
+    private readonly captchaLogging: CaptchaLoggingService,
   ) {}
 
   /**
@@ -187,12 +189,47 @@ export class DetectionService implements OnModuleInit {
     // Sort by confidence (highest first)
     detections.sort((a, b) => b.confidence - a.confidence);
 
-    return {
+    const result = {
       detections,
       primary: detections.length > 0 ? detections[0] : null,
       totalDurationMs: Date.now() - startTime,
       analyzedAt: new Date(),
     };
+
+    // Log detection results
+    if (result.primary) {
+      this.captchaLogging.logDetection(
+        result.primary,
+        result.totalDurationMs,
+        context.url,
+      );
+    } else if (detections.length > 0) {
+      // Log all detections if no primary
+      for (const detection of detections) {
+        this.captchaLogging.logDetection(
+          detection,
+          detection.durationMs || 0,
+          context.url,
+        );
+      }
+    } else {
+      // Log "no detection" result
+      const noDetectionResult: AntiBotDetectionResult = {
+        detected: false,
+        type: null,
+        confidence: 0,
+        details: {},
+        detectedAt: new Date(),
+        durationMs: result.totalDurationMs,
+      };
+      this.captchaLogging.logDetection(
+        noDetectionResult,
+        result.totalDurationMs,
+        context.url,
+      );
+    }
+
+    return result;
   }
 
   /**

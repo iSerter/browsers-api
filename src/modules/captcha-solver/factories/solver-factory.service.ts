@@ -53,6 +53,33 @@ export class SolverFactory {
         return solver;
       }
 
+      // For native hCAPTCHA solver, pass required services
+      if (solverType === 'hcaptcha-native' && this.widgetInteraction) {
+        // NativeHcaptchaSolver requires: page, widgetInteraction, audioProcessing, performanceTracker, config
+        // We need to get these from the module or pass them as args
+        // For now, assume they're passed in args
+        const solver = new metadata.constructor(...args);
+        return solver;
+      }
+
+      // For native DataDome solver, pass required services
+      if (solverType === 'datadome-native' && this.widgetInteraction) {
+        // NativeDataDomeSolver requires: page, widgetInteraction, behaviorSimulation, performanceTracker, config
+        // We need to get these from the module or pass them as args
+        // For now, assume they're passed in args
+        const solver = new metadata.constructor(...args);
+        return solver;
+      }
+
+      // For native Akamai solver, pass required services
+      if (solverType === 'akamai-native' && this.widgetInteraction) {
+        // NativeAkamaiSolver requires: page, widgetInteraction, behaviorSimulation, performanceTracker, config
+        // We need to get these from the module or pass them as args
+        // For now, assume they're passed in args
+        const solver = new metadata.constructor(...args);
+        return solver;
+      }
+
       // For other solvers, use standard instantiation
       const solver = new metadata.constructor(...args);
       return solver;

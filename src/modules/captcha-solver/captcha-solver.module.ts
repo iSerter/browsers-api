@@ -30,6 +30,8 @@ import {
   SolverPerformanceTracker,
 } from './factories';
 import { NativeSolverRegistryService } from './services/native-solver-registry.service';
+import { WinstonLoggerService } from '../../common/services/winston-logger.service';
+import { CaptchaLoggingService } from './services/captcha-logging.service';
 
 @Module({
   imports: [
@@ -60,6 +62,8 @@ import { NativeSolverRegistryService } from './services/native-solver-registry.s
     SolverHealthChecker,
     SolverPerformanceTracker,
     NativeSolverRegistryService,
+    WinstonLoggerService,
+    CaptchaLoggingService,
   ],
   exports: [
     CaptchaSolverService,
@@ -77,6 +81,7 @@ import { NativeSolverRegistryService } from './services/native-solver-registry.s
     SolverFactory,
     SolverHealthChecker,
     SolverPerformanceTracker,
+    CaptchaLoggingService,
   ],
 })
 export class CaptchaSolverModule {}
