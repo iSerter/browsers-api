@@ -4,6 +4,10 @@ import {
   SolverMetadata,
   SolverCapability,
 } from './interfaces/solver-capability.interface';
+import {
+  SolverCircuitBreakerService,
+  CircuitState,
+} from '../services/solver-circuit-breaker.service';
 
 /**
  * Registry service for managing solver registrations
@@ -13,6 +17,10 @@ import {
 export class SolverRegistry implements OnModuleInit {
   private readonly logger = new Logger(SolverRegistry.name);
   private readonly solvers: Map<string, SolverMetadata> = new Map();
+
+  constructor(
+    private readonly circuitBreaker: SolverCircuitBreakerService,
+  ) {}
 
   async onModuleInit() {
     this.logger.log('Solver Registry initialized');
@@ -78,6 +86,7 @@ export class SolverRegistry implements OnModuleInit {
 
   /**
    * Get solvers that support a specific challenge type
+   * This method returns all enabled solvers regardless of circuit breaker state
    */
   getSolversForChallengeType(challengeType: string): SolverMetadata[] {
     return Array.from(this.solvers.values()).filter(
@@ -89,10 +98,39 @@ export class SolverRegistry implements OnModuleInit {
   }
 
   /**
+   * Get available solvers for a challenge type, filtered by circuit breaker state
+   * Only returns solvers where the circuit breaker is available (closed or half-open)
+   */
+  getAvailableSolvers(challengeType: string): SolverMetadata[] {
+    const allSolvers = this.getSolversForChallengeType(challengeType);
+    const availableSolvers: SolverMetadata[] = [];
+
+    for (const metadata of allSolvers) {
+      const isAvailable = this.circuitBreaker.isAvailable(metadata.solverType);
+      if (isAvailable) {
+        availableSolvers.push(metadata);
+      } else {
+        this.logger.debug(
+          `Solver '${metadata.solverType}' excluded from available solvers due to circuit breaker (state: ${this.circuitBreaker.getState(metadata.solverType)})`,
+        );
+      }
+    }
+
+    if (availableSolvers.length === 0 && allSolvers.length > 0) {
+      this.logger.warn(
+        `No available solvers for challenge type '${challengeType}' - all ${allSolvers.length} solvers are circuit-broken`,
+      );
+    }
+
+    return availableSolvers;
+  }
+
+  /**
    * Get solvers sorted by priority for a challenge type
+   * Only returns solvers that are available according to circuit breaker
    */
   getSolversByPriority(challengeType: string): SolverMetadata[] {
-    const solvers = this.getSolversForChallengeType(challengeType);
+    const solvers = this.getAvailableSolvers(challengeType);
     return solvers.sort((a, b) => {
       // First sort by health status (healthy > unknown > unhealthy)
       const healthOrder = {
@@ -117,6 +155,33 @@ export class SolverRegistry implements OnModuleInit {
       return (
         b.capabilities.successRate - a.capabilities.successRate
       );
+    });
+  }
+
+  /**
+   * Get all solvers for a challenge type including unavailable ones (for monitoring)
+   * Returns both available and circuit-broken solvers with their states
+   */
+  getAllSolversForChallengeType(challengeType: string): Array<
+    SolverMetadata & {
+      circuitBreakerState: CircuitState | null;
+      isCircuitBreakerAvailable: boolean;
+    }
+  > {
+    const allSolvers = this.getSolversForChallengeType(challengeType);
+    return allSolvers.map((metadata) => {
+      const circuitBreakerState = this.circuitBreaker.getState(
+        metadata.solverType,
+      );
+      const isCircuitBreakerAvailable = this.circuitBreaker.isAvailable(
+        metadata.solverType,
+      );
+
+      return {
+        ...metadata,
+        circuitBreakerState: circuitBreakerState || null,
+        isCircuitBreakerAvailable,
+      };
     });
   }
 
@@ -230,6 +295,58 @@ export class SolverRegistry implements OnModuleInit {
    */
   getCount(): number {
     return this.solvers.size;
+  }
+
+  /**
+   * Get circuit breaker states for all solvers (for health check reporting)
+   */
+  getCircuitBreakerStates(): Record<
+    string,
+    {
+      state: CircuitState | null;
+      isAvailable: boolean;
+      details: {
+        state: CircuitState;
+        consecutiveFailures: number;
+        lastFailureTime: number;
+        nextAttemptTime: number;
+      } | null;
+    }
+  > {
+    const states: Record<
+      string,
+      {
+        state: CircuitState | null;
+        isAvailable: boolean;
+        details: {
+          state: CircuitState;
+          consecutiveFailures: number;
+          lastFailureTime: number;
+          nextAttemptTime: number;
+        } | null;
+      }
+    > = {};
+
+    for (const metadata of this.solvers.values()) {
+      const state = this.circuitBreaker.getState(metadata.solverType);
+      const details = this.circuitBreaker.getStateDetails(metadata.solverType);
+      const isAvailable = this.circuitBreaker.isAvailable(metadata.solverType);
+
+      states[metadata.solverType] = {
+        state: state || null,
+        isAvailable,
+        details: details
+          ? {
+              state: details.state,
+              consecutiveFailures: details.consecutiveFailures,
+              lastFailureTime: details.lastFailureTime,
+              nextAttemptTime: details.nextAttemptTime,
+            }
+          : null,
+      };
+    }
+
+    return states;
   }
 }
 

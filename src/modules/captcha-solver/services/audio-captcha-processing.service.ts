@@ -679,7 +679,7 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
       'all_providers_failed',
       {
         attemptedProviders: this.config.providerPriority,
-        attempts,
+        attempt,
       },
     );
   }

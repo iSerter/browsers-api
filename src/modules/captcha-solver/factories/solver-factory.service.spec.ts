@@ -3,6 +3,7 @@ import { SolverFactory } from './solver-factory.service';
 import { SolverRegistry } from './solver-registry.service';
 import { SolverPerformanceTracker } from './solver-performance-tracker.service';
 import { CaptchaWidgetInteractionService } from '../services/captcha-widget-interaction.service';
+import { SolverCircuitBreakerService } from '../services/solver-circuit-breaker.service';
 import { ICaptchaSolver, CaptchaParams, CaptchaSolution } from '../interfaces/captcha-solver.interface';
 
 describe('SolverFactory', () => {
@@ -10,6 +11,7 @@ describe('SolverFactory', () => {
   let solverRegistry: jest.Mocked<SolverRegistry>;
   let performanceTracker: jest.Mocked<SolverPerformanceTracker>;
   let widgetInteraction: jest.Mocked<CaptchaWidgetInteractionService>;
+  let circuitBreaker: jest.Mocked<SolverCircuitBreakerService>;
 
   // Mock solver class
   class MockSolver implements ICaptchaSolver {
@@ -37,6 +39,8 @@ describe('SolverFactory', () => {
       get: jest.fn(),
       getSolversByPriority: jest.fn(),
       getSolversForChallengeType: jest.fn(),
+      getAvailableSolvers: jest.fn(),
+      getAllSolversForChallengeType: jest.fn(),
       recordSuccess: jest.fn(),
       recordFailure: jest.fn(),
     };
@@ -48,6 +52,14 @@ describe('SolverFactory', () => {
 
     const mockWidgetInteraction = {
       interactWithWidget: jest.fn(),
+    };
+
+    const mockCircuitBreaker = {
+      isAvailable: jest.fn().mockReturnValue(true),
+      recordSuccess: jest.fn(),
+      recordFailure: jest.fn(),
+      getState: jest.fn().mockReturnValue('CLOSED'),
+      getStateDetails: jest.fn().mockReturnValue({}),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -65,6 +77,10 @@ describe('SolverFactory', () => {
           provide: CaptchaWidgetInteractionService,
           useValue: mockWidgetInteraction,
         },
+        {
+          provide: SolverCircuitBreakerService,
+          useValue: mockCircuitBreaker,
+        },
       ],
     }).compile();
 
@@ -72,6 +88,7 @@ describe('SolverFactory', () => {
     solverRegistry = module.get(SolverRegistry);
     performanceTracker = module.get(SolverPerformanceTracker);
     widgetInteraction = module.get(CaptchaWidgetInteractionService);
+    circuitBreaker = module.get(SolverCircuitBreakerService);
   });
 
   afterEach(() => {
@@ -210,11 +227,17 @@ describe('SolverFactory', () => {
         metadata1,
         metadata2,
       ]);
-      performanceTracker.getStats.mockReturnValue({
-        successRate: 0.9,
-        totalAttempts: 10,
-        lastSuccessfulAttempt: new Date(),
-      });
+      performanceTracker.getStats
+        .mockReturnValueOnce({
+          successRate: 0.5,
+          totalAttempts: 5,
+          lastSuccessfulAttempt: new Date(),
+        })
+        .mockReturnValueOnce({
+          successRate: 0.9,
+          totalAttempts: 10,
+          lastSuccessfulAttempt: new Date(),
+        });
 
       const selected = factory.selectBestSolver('recaptcha');
 
@@ -223,6 +246,7 @@ describe('SolverFactory', () => {
 
     it('should return null when no solvers available', () => {
       solverRegistry.getSolversByPriority.mockReturnValue([]);
+      solverRegistry.getSolversForChallengeType.mockReturnValue([]);
 
       const selected = factory.selectBestSolver('recaptcha');
 
@@ -304,7 +328,7 @@ describe('SolverFactory', () => {
       solverRegistry.getSolversByPriority.mockReturnValue([metadata]);
       solverRegistry.get.mockReturnValue(metadata);
 
-      const solution = await factory.solveWithFallback(params);
+      const solution = await factory.solveWithFallback(params, ['test-solver']);
 
       expect(solution.token).toBe('test-token');
       expect(solution.solverId).toBe('test-solver');
@@ -372,10 +396,15 @@ describe('SolverFactory', () => {
       solverRegistry.get
         .mockReturnValueOnce(failingMetadata)
         .mockReturnValueOnce(workingMetadata);
+      
+      // Ensure circuit breaker allows both solvers
+      circuitBreaker.isAvailable.mockReturnValue(true);
+      circuitBreaker.getState.mockReturnValue('CLOSED');
 
-      const solution = await factory.solveWithFallback(params);
+      const solution = await factory.solveWithFallback(params, ['working-solver']);
 
       expect(solution.solverId).toBe('working-solver');
+      expect(solution.token).toBe('test-token');
       expect(solverRegistry.recordFailure).toHaveBeenCalledWith(
         'failing-solver',
       );
@@ -436,6 +465,7 @@ describe('SolverFactory', () => {
       };
 
       solverRegistry.getSolversByPriority.mockReturnValue([]);
+      solverRegistry.getSolversForChallengeType.mockReturnValue([]);
 
       await expect(factory.solveWithFallback(params)).rejects.toThrow(
         'No enabled solvers found',
@@ -479,7 +509,7 @@ describe('SolverFactory', () => {
         totalFailures: 0,
       };
 
-      solverRegistry.getSolversForChallengeType.mockReturnValue([
+      solverRegistry.getAvailableSolvers.mockReturnValue([
         metadata1,
         metadata2,
       ]);
@@ -490,7 +520,7 @@ describe('SolverFactory', () => {
     });
 
     it('should return empty array when no solvers available', () => {
-      solverRegistry.getSolversForChallengeType.mockReturnValue([]);
+      solverRegistry.getAvailableSolvers.mockReturnValue([]);
 
       const available = factory.getAvailableSolvers('recaptcha');
 

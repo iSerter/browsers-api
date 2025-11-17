@@ -2,6 +2,10 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SolverRegistry } from './solver-registry.service';
 import { ICaptchaSolver } from '../interfaces/captcha-solver.interface';
+import {
+  SolverCircuitBreakerService,
+  CircuitState,
+} from '../services/solver-circuit-breaker.service';
 
 /**
  * Service for periodically checking solver health
@@ -16,6 +20,7 @@ export class SolverHealthChecker implements OnModuleInit {
   constructor(
     private readonly registry: SolverRegistry,
     private readonly configService: ConfigService,
+    private readonly circuitBreaker: SolverCircuitBreakerService,
   ) {
     // Default to checking every 5 minutes, configurable via env
     this.checkIntervalMs =
@@ -155,6 +160,53 @@ export class SolverHealthChecker implements OnModuleInit {
     for (const metadata of this.registry.getAll()) {
       status[metadata.solverType] = metadata.healthStatus;
     }
+    return status;
+  }
+
+  /**
+   * Get comprehensive health status including circuit breaker states
+   */
+  getHealthStatusWithCircuitBreaker(): Record<
+    string,
+    {
+      healthStatus: string;
+      circuitBreakerState: CircuitState | null;
+      isCircuitBreakerAvailable: boolean;
+      circuitBreakerDetails: {
+        state: CircuitState;
+        consecutiveFailures: number;
+        lastFailureTime: number;
+        nextAttemptTime: number;
+      } | null;
+    }
+  > {
+    const status: Record<
+      string,
+      {
+        healthStatus: string;
+        circuitBreakerState: CircuitState | null;
+        isCircuitBreakerAvailable: boolean;
+        circuitBreakerDetails: {
+          state: CircuitState;
+          consecutiveFailures: number;
+          lastFailureTime: number;
+          nextAttemptTime: number;
+        } | null;
+      }
+    > = {};
+
+    const circuitBreakerStates = this.registry.getCircuitBreakerStates();
+
+    for (const metadata of this.registry.getAll()) {
+      const cbState = circuitBreakerStates[metadata.solverType];
+      status[metadata.solverType] = {
+        healthStatus: metadata.healthStatus,
+        circuitBreakerState: cbState?.state || null,
+        isCircuitBreakerAvailable: cbState?.isAvailable ?? true,
+        circuitBreakerDetails: cbState?.details || null,
+      };
+    }
+
     return status;
   }
 }

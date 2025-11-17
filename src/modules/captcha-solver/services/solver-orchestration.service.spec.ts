@@ -7,6 +7,8 @@ import { SolverFactory } from '../factories/solver-factory.service';
 import { SolverPerformanceTracker } from '../factories/solver-performance-tracker.service';
 import { CostTrackingService } from './cost-tracking.service';
 import { ProviderRegistryService } from './provider-registry.service';
+import { CaptchaLoggingService } from './captcha-logging.service';
+import { CaptchaSolverConfigService } from '../config';
 import {
   ICaptchaSolver,
   CaptchaParams,
@@ -56,6 +58,35 @@ describe('SolverOrchestrationService', () => {
       get: jest.fn(),
     };
 
+    const mockCaptchaLogging = {
+      logSolveAttempt: jest.fn(),
+      logSolveSuccess: jest.fn(),
+      logSolveFailure: jest.fn(),
+    };
+
+    const mockCaptchaConfig = {
+      getRetryConfig: jest.fn().mockReturnValue({
+        maxAttempts: 3,
+        backoffMs: 1000,
+        maxBackoffMs: 10000,
+      }),
+      getTimeoutConfig: jest.fn().mockReturnValue({
+        solveTimeout: 30000,
+        detectionTimeout: 5000,
+        widgetInteractionTimeout: 5000,
+        audioTranscriptionTimeout: 30000,
+      }),
+      getSolverTimeoutConfig: jest.fn().mockReturnValue({
+        recaptchaV2Checkbox: 30000,
+        hcaptchaCheckbox: 30000,
+        datadomeCaptcha: 60000,
+      }),
+      getDetectionConfig: jest.fn().mockReturnValue({
+        minConfidenceThreshold: 0.5,
+        minStrongConfidence: 0.7,
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SolverOrchestrationService,
@@ -82,6 +113,14 @@ describe('SolverOrchestrationService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: CaptchaLoggingService,
+          useValue: mockCaptchaLogging,
+        },
+        {
+          provide: CaptchaSolverConfigService,
+          useValue: mockCaptchaConfig,
         },
       ],
     }).compile();

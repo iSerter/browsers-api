@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { AntiCaptchaProvider } from './anti-captcha.provider';
 import { ApiKeyManagerService } from '../services/api-key-manager.service';
 import { CaptchaParams } from '../interfaces/captcha-solver.interface';
+import { CaptchaSolverConfigService } from '../config';
 import { of, throwError } from 'rxjs';
 
 describe('AntiCaptchaProvider', () => {
@@ -28,6 +29,14 @@ describe('AntiCaptchaProvider', () => {
       recordFailure: jest.fn(),
     };
 
+    const mockCaptchaConfig = {
+      getProviderConfig: jest.fn().mockReturnValue({
+        maxRetries: 3,
+        timeoutSeconds: 60,
+        rateLimitPerMinute: 60,
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
@@ -42,6 +51,10 @@ describe('AntiCaptchaProvider', () => {
           provide: ApiKeyManagerService,
           useValue: mockApiKeyManager,
         },
+        {
+          provide: CaptchaSolverConfigService,
+          useValue: mockCaptchaConfig,
+        },
       ],
     }).compile();
 
@@ -53,6 +66,7 @@ describe('AntiCaptchaProvider', () => {
       httpService,
       configService,
       apiKeyManager,
+      module.get(CaptchaSolverConfigService),
     );
 
     // Reset mocks before each test (but keep mock implementations)

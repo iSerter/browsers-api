@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { TwoCaptchaProvider } from './two-captcha.provider';
 import { ApiKeyManagerService } from '../services/api-key-manager.service';
 import { CaptchaParams } from '../interfaces/captcha-solver.interface';
+import { CaptchaSolverConfigService } from '../config';
 import { of, throwError } from 'rxjs';
 
 describe('TwoCaptchaProvider', () => {
@@ -28,6 +29,14 @@ describe('TwoCaptchaProvider', () => {
       recordFailure: jest.fn(),
     };
 
+    const mockCaptchaConfig = {
+      getProviderConfig: jest.fn().mockReturnValue({
+        maxRetries: 3,
+        timeoutSeconds: 60,
+        rateLimitPerMinute: 60,
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
@@ -42,6 +51,10 @@ describe('TwoCaptchaProvider', () => {
           provide: ApiKeyManagerService,
           useValue: mockApiKeyManager,
         },
+        {
+          provide: CaptchaSolverConfigService,
+          useValue: mockCaptchaConfig,
+        },
       ],
     }).compile();
 
@@ -53,6 +66,7 @@ describe('TwoCaptchaProvider', () => {
       httpService,
       configService,
       apiKeyManager,
+      module.get(CaptchaSolverConfigService),
     );
   });
 

@@ -61,7 +61,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -74,7 +74,7 @@
         "dependencies": [
           5
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -87,7 +87,7 @@
         "dependencies": [
           6
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -100,7 +100,7 @@
         "dependencies": [
           7
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -114,7 +114,7 @@
           4,
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -495,11 +495,27 @@
         ],
         "priority": "high",
         "subtasks": []
+      },
+      {
+        "id": 38,
+        "title": "Fix Test Failures in solver-orchestration.service.spec.ts",
+        "description": "Resolve 10 failing tests in solver-orchestration.service.spec.ts by implementing proper mocks for solver factory methods, correcting Cloudflare detection mapping expectations, handling unsupported anti-bot system types, fixing sitekey extraction from detection details, and properly configuring hCAPTCHA/DataDome challenge handling test scenarios",
+        "details": "1. Analyze solver-orchestration.service.spec.ts to identify all 10 failing tests:\n   - Solver factory method mock failures (createSolver, getSolver, etc.)\n   - Cloudflare detection mapping test expectation mismatches\n   - Unsupported anti-bot system type handling errors\n   - Sitekey extraction from detection details assertion failures\n   - hCAPTCHA challenge handling test setup issues\n   - DataDome challenge handling test configuration problems\n2. Fix solver factory method mocks:\n   - Mock SolverFactoryService methods: jest.spyOn(solverFactory, 'createSolver').mockResolvedValue(mockSolver)\n   - Ensure factory returns appropriate solver instances for each anti-bot type\n   - Configure mock solver responses for success/failure scenarios\n   - Example: mockSolverFactory.getSolver.mockReturnValue({ solve: jest.fn().mockResolvedValue({ success: true, token: 'mock-token' }) })\n3. Correct Cloudflare detection mapping expectations:\n   - Review current implementation of Cloudflare detection type mapping\n   - Update test expectations to match actual detection result format\n   - Verify detection details structure: { type: 'cloudflare', subtype: 'turnstile', sitekey: '...' }\n   - Ensure mapping from DetectionResult to solver input parameters is correct\n4. Handle unsupported anti-bot system types:\n   - Add error handling tests for unknown/unsupported anti-bot types\n   - Mock detection results with invalid types: { type: 'unknown-system' }\n   - Verify orchestration service throws appropriate error or returns failure result\n   - Test fallback behavior when primary solver type is unsupported\n5. Fix sitekey extraction from detection details:\n   - Review detection details structure in test data\n   - Ensure sitekey is properly nested: detectionDetails.challenge.sitekey or detectionDetails.sitekey\n   - Update test mocks to include sitekey in correct location\n   - Verify extraction logic handles missing sitekey gracefully\n6. Configure hCAPTCHA challenge handling:\n   - Mock hCAPTCHA detection results with proper structure\n   - Set up hCAPTCHA solver mock with expected solve method signature\n   - Configure test data: { type: 'hcaptcha', sitekey: 'test-key', url: 'https://example.com' }\n   - Verify orchestration correctly routes to hCAPTCHA solver\n7. Configure DataDome challenge handling:\n   - Mock DataDome detection results with challenge type information\n   - Set up DataDome solver mock for slider/CAPTCHA challenges\n   - Configure test data: { type: 'datadome', challengeType: 'slider', url: 'https://example.com' }\n   - Verify orchestration correctly routes to DataDome solver\n8. Update service dependency mocks:\n   - Mock DetectionService with proper detection result formats\n   - Mock SolverFactoryService with all required methods\n   - Mock PerformanceTrackingService for metrics collection\n   - Mock CircuitBreakerService for failure handling\n9. Verify test data consistency:\n   - Ensure all mock detection results match current DetectionResult interface\n   - Update solver response formats to match SolverResult interface\n   - Align test expectations with actual implementation behavior",
+        "testStrategy": "Run 'npm test solver-orchestration.service.spec.ts' to verify all 10 tests pass without mock configuration errors. Specifically verify solver factory mock tests correctly create and return solver instances for each anti-bot type. Confirm Cloudflare detection mapping tests pass with correct expectation values matching implementation. Verify unsupported anti-bot type tests properly handle errors and return appropriate failure results. Test sitekey extraction logic correctly retrieves sitekey from various detection detail structures. Confirm hCAPTCHA challenge handling tests successfully route to hCAPTCHA solver with correct parameters. Verify DataDome challenge handling tests properly identify challenge types and route to appropriate solver. Run full solver-orchestration test suite to ensure no regressions in other test cases. Check test execution time remains under 30 seconds total. Verify all mocks are properly cleaned up between tests to prevent test pollution",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6,
+          31,
+          33
+        ],
+        "priority": "high",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-11-17T01:03:11.457Z",
-      "updated": "2025-11-17T03:40:43.546Z",
+      "updated": "2025-11-17T16:07:12.898Z",
       "description": "Tasks for master context"
     }
   }

@@ -63,7 +63,11 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
 
         // Wait before retrying (exponential backoff)
         if (attempt < this.maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          // Use exponential backoff: initialDelay * 2^(attempt-1), capped at maxBackoff
+          // Default: 1000ms * 2^(attempt-1), max 10000ms
+          const initialBackoff = 1000;
+          const maxBackoff = 10000;
+          const delay = Math.min(initialBackoff * Math.pow(2, attempt - 1), maxBackoff);
           await this.sleep(delay);
         }
       }

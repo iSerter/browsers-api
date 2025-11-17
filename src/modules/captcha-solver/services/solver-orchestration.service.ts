@@ -17,6 +17,7 @@ import {
   AntiBotDetectionResult,
   AntiBotSystemType,
 } from '../interfaces/detection.interface';
+import { CaptchaSolverConfigService } from '../config';
 
 /**
  * Configuration for solver orchestration
@@ -73,15 +74,13 @@ export class SolverOrchestrationService {
     private readonly providerRegistry: ProviderRegistryService,
     private readonly configService: ConfigService,
     private readonly captchaLogging: CaptchaLoggingService,
+    private readonly captchaConfig: CaptchaSolverConfigService,
   ) {
     // Load default configuration from environment variables
     this.defaultConfig = {
       maxRetries: this.loadRetryConfig(),
       timeouts: this.loadTimeoutConfig(),
-      minConfidence: this.configService.get<number>(
-        'CAPTCHA_MIN_CONFIDENCE',
-        0.5,
-      ),
+      minConfidence: this.captchaConfig.getDetectionConfig().minConfidenceThreshold,
       enableThirdPartyFallback: this.configService.get<boolean>(
         'CAPTCHA_ENABLE_THIRD_PARTY_FALLBACK',
         true,
@@ -669,11 +668,12 @@ export class SolverOrchestrationService {
    * Load retry configuration from environment
    */
   private loadRetryConfig(): Record<string, number> {
+    const retryConfig = this.captchaConfig.getRetryConfig();
     const defaults: Record<string, number> = {
-      recaptcha: 3,
-      hcaptcha: 3,
-      datadome: 3,
-      funcaptcha: 3,
+      recaptcha: retryConfig.maxAttempts,
+      hcaptcha: retryConfig.maxAttempts,
+      datadome: retryConfig.maxAttempts,
+      funcaptcha: retryConfig.maxAttempts,
     };
 
     // Try to load from environment
@@ -698,11 +698,13 @@ export class SolverOrchestrationService {
    * Load timeout configuration from environment
    */
   private loadTimeoutConfig(): Record<string, number> {
+    const timeoutConfig = this.captchaConfig.getTimeoutConfig();
+    const solverTimeouts = this.captchaConfig.getSolverTimeoutConfig();
     const defaults: Record<string, number> = {
-      recaptcha: 30000, // 30 seconds
-      hcaptcha: 30000,
-      datadome: 45000, // 45 seconds (DataDome can be slower)
-      funcaptcha: 30000,
+      recaptcha: solverTimeouts.recaptchaV2Checkbox,
+      hcaptcha: solverTimeouts.hcaptchaCheckbox,
+      datadome: solverTimeouts.datadomeCaptcha, // DataDome can be slower
+      funcaptcha: timeoutConfig.solveTimeout,
     };
 
     // Try to load from environment

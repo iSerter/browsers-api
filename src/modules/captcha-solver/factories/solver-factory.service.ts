@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
 import { ICaptchaSolver, CaptchaParams, CaptchaSolution } from '../interfaces/captcha-solver.interface';
 import { SolverRegistry } from './solver-registry.service';
 import { SolverPerformanceTracker } from './solver-performance-tracker.service';
@@ -8,6 +9,15 @@ import {
   InternalException,
   ProviderException,
 } from '../exceptions';
+import { SolverCircuitBreakerService, CircuitState } from '../services/solver-circuit-breaker.service';
+
+/**
+ * Type for solver creation strategy function
+ */
+type SolverCreationStrategy = (
+  metadata: any,
+  args: any[],
+) => ICaptchaSolver | null;
 
 /**
  * Factory service for creating and selecting solvers
@@ -17,14 +27,31 @@ import {
 export class SolverFactory {
   private readonly logger = new Logger(SolverFactory.name);
 
+  /**
+   * Map of solver types to their creation strategies
+   * Adding new solver types only requires adding an entry here
+   */
+  private readonly solverStrategies = new Map<
+    string,
+    SolverCreationStrategy
+  >([
+    ['turnstile-native', this.createTurnstileNativeSolver.bind(this)],
+    ['recaptcha-native', this.createRecaptchaNativeSolver.bind(this)],
+    ['hcaptcha-native', this.createHCaptchaNativeSolver.bind(this)],
+    ['datadome-native', this.createDataDomeNativeSolver.bind(this)],
+    ['akamai-native', this.createAkamaiNativeSolver.bind(this)],
+  ]);
+
   constructor(
     private readonly registry: SolverRegistry,
     private readonly performanceTracker: SolverPerformanceTracker,
+    private readonly circuitBreaker: SolverCircuitBreakerService,
     private readonly widgetInteraction?: CaptchaWidgetInteractionService,
   ) {}
 
   /**
    * Create a solver instance by type
+   * Uses strategy pattern to simplify solver creation logic
    */
   createSolver(solverType: string, ...args: any[]): ICaptchaSolver | null {
     const metadata = this.registry.get(solverType);
@@ -39,55 +66,14 @@ export class SolverFactory {
     }
 
     try {
-      // For native solvers, pass required services
-      if (solverType === 'turnstile-native' && this.widgetInteraction) {
-        const solver = new metadata.constructor(
-          ...args,
-          this.widgetInteraction,
-          this.performanceTracker,
-        );
-        return solver;
+      // Get strategy for this solver type, or use default standard instantiation
+      const strategy = this.solverStrategies.get(solverType);
+      if (strategy) {
+        return strategy(metadata, args);
       }
 
-      // For native reCAPTCHA solver, pass required services
-      if (solverType === 'recaptcha-native' && this.widgetInteraction) {
-        // NativeRecaptchaSolver requires: page, widgetInteraction, audioProcessing, behaviorSimulation, performanceTracker, config
-        // We need to get these from the module or pass them as args
-        // For now, assume they're passed in args
-        const solver = new metadata.constructor(...args);
-        return solver;
-      }
-
-      // For native hCAPTCHA solver, pass required services
-      if (solverType === 'hcaptcha-native' && this.widgetInteraction) {
-        // NativeHcaptchaSolver requires: page, widgetInteraction, audioProcessing, performanceTracker, config
-        // We need to get these from the module or pass them as args
-        // For now, assume they're passed in args
-        const solver = new metadata.constructor(...args);
-        return solver;
-      }
-
-      // For native DataDome solver, pass required services
-      if (solverType === 'datadome-native' && this.widgetInteraction) {
-        // NativeDataDomeSolver requires: page, widgetInteraction, behaviorSimulation, performanceTracker, config
-        // We need to get these from the module or pass them as args
-        // For now, assume they're passed in args
-        const solver = new metadata.constructor(...args);
-        return solver;
-      }
-
-      // For native Akamai solver, pass required services
-      if (solverType === 'akamai-native' && this.widgetInteraction) {
-        // NativeAkamaiSolver requires: page, widgetInteraction, behaviorSimulation, performanceTracker, config
-        // We need to get these from the module or pass them as args
-        // For now, assume they're passed in args
-        const solver = new metadata.constructor(...args);
-        return solver;
-      }
-
-      // For other solvers, use standard instantiation
-      const solver = new metadata.constructor(...args);
-      return solver;
+      // For solvers not in the strategy map, use standard instantiation
+      return this.createStandardSolver(metadata, args);
     } catch (error: any) {
       this.logger.error(
         `Failed to create solver ${solverType}: ${error.message}`,
@@ -97,16 +83,128 @@ export class SolverFactory {
   }
 
   /**
+   * Create Turnstile native solver with required services
+   */
+  private createTurnstileNativeSolver(
+    metadata: any,
+    args: any[],
+  ): ICaptchaSolver | null {
+    if (!this.widgetInteraction) {
+      this.logger.warn(
+        'Turnstile native solver requires widgetInteraction service',
+      );
+      return null;
+    }
+    return new metadata.constructor(
+      ...args,
+      this.widgetInteraction,
+      this.performanceTracker,
+    );
+  }
+
+  /**
+   * Create reCAPTCHA native solver
+   * NativeRecaptchaSolver requires: page, widgetInteraction, audioProcessing, behaviorSimulation, performanceTracker, config
+   * These are passed in args
+   */
+  private createRecaptchaNativeSolver(
+    metadata: any,
+    args: any[],
+  ): ICaptchaSolver | null {
+    if (!this.widgetInteraction) {
+      this.logger.warn(
+        'reCAPTCHA native solver requires widgetInteraction service',
+      );
+      return null;
+    }
+    return new metadata.constructor(...args);
+  }
+
+  /**
+   * Create hCAPTCHA native solver
+   * NativeHcaptchaSolver requires: page, widgetInteraction, audioProcessing, performanceTracker, config
+   * These are passed in args
+   */
+  private createHCaptchaNativeSolver(
+    metadata: any,
+    args: any[],
+  ): ICaptchaSolver | null {
+    if (!this.widgetInteraction) {
+      this.logger.warn(
+        'hCAPTCHA native solver requires widgetInteraction service',
+      );
+      return null;
+    }
+    return new metadata.constructor(...args);
+  }
+
+  /**
+   * Create DataDome native solver
+   * NativeDataDomeSolver requires: page, widgetInteraction, behaviorSimulation, performanceTracker, config
+   * These are passed in args
+   */
+  private createDataDomeNativeSolver(
+    metadata: any,
+    args: any[],
+  ): ICaptchaSolver | null {
+    if (!this.widgetInteraction) {
+      this.logger.warn(
+        'DataDome native solver requires widgetInteraction service',
+      );
+      return null;
+    }
+    return new metadata.constructor(...args);
+  }
+
+  /**
+   * Create Akamai native solver
+   * NativeAkamaiSolver requires: page, widgetInteraction, behaviorSimulation, performanceTracker, config
+   * These are passed in args
+   */
+  private createAkamaiNativeSolver(
+    metadata: any,
+    args: any[],
+  ): ICaptchaSolver | null {
+    if (!this.widgetInteraction) {
+      this.logger.warn(
+        'Akamai native solver requires widgetInteraction service',
+      );
+      return null;
+    }
+    return new metadata.constructor(...args);
+  }
+
+  /**
+   * Create standard solver with default instantiation
+   * Used for solvers not requiring special service injection
+   */
+  private createStandardSolver(
+    metadata: any,
+    args: any[],
+  ): ICaptchaSolver {
+    return new metadata.constructor(...args);
+  }
+
+  /**
    * Select the best solver for a challenge type
    * Returns solver metadata sorted by priority, health, and performance
+   * Only considers solvers that are available according to circuit breaker
    */
   selectBestSolver(challengeType: CaptchaParams['type']): string | null {
     const candidates = this.registry.getSolversByPriority(challengeType);
 
     if (candidates.length === 0) {
-      this.logger.warn(
-        `No enabled solvers found for challenge type: ${challengeType}`,
-      );
+      // Check if there are any solvers registered but circuit-broken
+      const allSolvers = this.registry.getSolversForChallengeType(challengeType);
+      if (allSolvers.length > 0) {
+        this.logger.warn(
+          `No available solvers for challenge type: ${challengeType} - all ${allSolvers.length} solvers are circuit-broken or unavailable`,
+        );
+      } else {
+        this.logger.warn(
+          `No enabled solvers found for challenge type: ${challengeType}`,
+        );
+      }
       return null;
     }
 
@@ -181,85 +279,176 @@ export class SolverFactory {
     solverArgs: any[] = [],
   ): Promise<CaptchaSolution> {
     const challengeType = params.type;
+    const correlationId = uuidv4();
     const candidates = this.registry.getSolversByPriority(challengeType);
 
     if (candidates.length === 0) {
-      throw new SolverUnavailableException(
-        `No enabled solvers found for challenge type: ${challengeType}`,
-        'native',
-        'no_solvers_enabled',
-        { challengeType },
-      );
+      // Check if there are any solvers registered but circuit-broken
+      const allSolvers = this.registry.getSolversForChallengeType(challengeType);
+      if (allSolvers.length > 0) {
+        const circuitBrokenSolvers = allSolvers
+          .filter(m => !this.circuitBreaker.isAvailable(m.solverType))
+          .map(m => ({
+            solverType: m.solverType,
+            state: this.circuitBreaker.getState(m.solverType),
+          }));
+        
+        throw new SolverUnavailableException(
+          `No available solvers for challenge type: ${challengeType} - all ${allSolvers.length} solvers are circuit-broken or unavailable`,
+          'native',
+          'all_solvers_circuit_broken',
+          {
+            challengeType,
+            correlationId,
+            registeredSolvers: allSolvers.map(m => m.solverType),
+            circuitBrokenSolvers,
+          },
+        );
+      } else {
+        throw new SolverUnavailableException(
+          `No enabled solvers found for challenge type: ${challengeType}`,
+          'native',
+          'no_solvers_enabled',
+          { challengeType, correlationId },
+        );
+      }
     }
 
     let lastError: Error | null = null;
     const startTime = Date.now();
 
+    this.logger.log(
+      `Starting solve attempt for ${challengeType} [correlationId: ${correlationId}]`,
+    );
+
     // Try each solver in priority order
     for (const metadata of candidates) {
       const attemptStartTime = Date.now();
+      const solverType = metadata.solverType;
+      
+      // Check circuit breaker state before attempting
+      const previousState = this.circuitBreaker.getState(solverType);
+      const isAvailable = this.circuitBreaker.isAvailable(solverType);
+      
+      if (!isAvailable) {
+        const stateDetails = this.circuitBreaker.getStateDetails(solverType);
+        this.logger.warn(
+          `Skipping solver ${solverType} - circuit breaker is ${previousState} [correlationId: ${correlationId}]`,
+          { solverType, state: previousState, stateDetails },
+        );
+        continue;
+      }
+
       try {
         this.logger.log(
-          `Attempting to solve ${challengeType} with ${metadata.solverType}`,
+          `Attempting to solve ${challengeType} with ${solverType} [correlationId: ${correlationId}]`,
         );
 
-        const solver = this.createSolver(metadata.solverType, ...solverArgs);
+        const solver = this.createSolver(solverType, ...solverArgs);
         if (!solver) {
+          this.logger.warn(
+            `Failed to create solver ${solverType} [correlationId: ${correlationId}]`,
+          );
           continue;
         }
 
         const solution = await solver.solve(params);
         const duration = Date.now() - attemptStartTime;
 
-        // Record success
-        this.registry.recordSuccess(metadata.solverType);
+        // Record success with circuit breaker
+        const stateBeforeSuccess = this.circuitBreaker.getState(solverType);
+        this.circuitBreaker.recordSuccess(solverType);
+        const stateAfterSuccess = this.circuitBreaker.getState(solverType);
+        
+        // Log state transition if it occurred
+        if (stateBeforeSuccess !== stateAfterSuccess) {
+          this.logger.log(
+            `Circuit breaker for solver '${solverType}' transitioned from ${stateBeforeSuccess} to ${stateAfterSuccess} after successful solve [correlationId: ${correlationId}]`,
+          );
+        }
+
+        // Record success with registry and performance tracker
+        this.registry.recordSuccess(solverType);
         this.performanceTracker.recordAttempt(
-          metadata.solverType,
+          solverType,
           challengeType,
           duration,
           true,
         );
 
         this.logger.log(
-          `Successfully solved ${challengeType} with ${metadata.solverType} in ${duration}ms`,
+          `Successfully solved ${challengeType} with ${solverType} in ${duration}ms [correlationId: ${correlationId}]`,
         );
 
         return solution;
       } catch (error: any) {
         lastError = error;
+        
+        // Record failure with circuit breaker
+        const stateBeforeFailure = this.circuitBreaker.getState(solverType);
+        this.circuitBreaker.recordFailure(solverType);
+        const stateAfterFailure = this.circuitBreaker.getState(solverType);
+        
+        // Log state transition if it occurred
+        if (stateBeforeFailure !== stateAfterFailure) {
+          this.logger.warn(
+            `Circuit breaker for solver '${solverType}' transitioned from ${stateBeforeFailure} to ${stateAfterFailure} after failure [correlationId: ${correlationId}]`,
+          );
+        }
+
+        const failureDuration = Date.now() - attemptStartTime;
+        const isCircuitBroken = !this.circuitBreaker.isAvailable(solverType);
+        
+        // Update error message to indicate circuit breaker state
+        let errorMessage = error.message || 'Unknown error';
+        if (isCircuitBroken) {
+          errorMessage = `Solver ${solverType} failed and circuit breaker is now ${stateAfterFailure}: ${errorMessage}`;
+        }
+
         this.logger.warn(
-          `Failed to solve with ${metadata.solverType}: ${error.message}`,
+          `Failed to solve with ${solverType}: ${errorMessage} [correlationId: ${correlationId}]`,
+          {
+            solverType,
+            challengeType,
+            duration: failureDuration,
+            circuitBreakerState: stateAfterFailure,
+            isCircuitBroken,
+          },
         );
 
-        // Record failure
-        this.registry.recordFailure(metadata.solverType);
-        const failureDuration = Date.now() - attemptStartTime;
+        // Record failure with registry and performance tracker
+        this.registry.recordFailure(solverType);
         this.performanceTracker.recordAttempt(
-          metadata.solverType,
+          solverType,
           challengeType,
           failureDuration,
           false,
-          error.message,
+          errorMessage,
         );
 
         // Continue to next solver
       }
     }
 
-    // If last error is already a custom exception, rethrow it
+    // If last error is already a custom exception, enhance it with correlation ID
     if (lastError instanceof SolverUnavailableException ||
         lastError instanceof ProviderException ||
         lastError instanceof InternalException) {
+      // Add correlation ID to context if not already present
+      if (lastError.context && !lastError.context.correlationId) {
+        lastError.context.correlationId = correlationId;
+      }
       throw lastError;
     }
 
-    // Wrap in SolverUnavailableException
+    // Wrap in SolverUnavailableException with correlation ID
     throw new SolverUnavailableException(
       `All solvers failed to solve ${challengeType}: ${lastError?.message || 'Unknown error'}`,
       'native',
       'all_solvers_failed',
       {
         challengeType,
+        correlationId,
         attemptedSolvers: candidates.map(m => m.solverType),
         originalError: lastError?.message,
       },
@@ -268,11 +457,31 @@ export class SolverFactory {
 
   /**
    * Get available solvers for a challenge type
+   * Only returns solvers that are available according to circuit breaker
    */
   getAvailableSolvers(challengeType: CaptchaParams['type']): string[] {
     return this.registry
-      .getSolversForChallengeType(challengeType)
+      .getAvailableSolvers(challengeType)
       .map((m) => m.solverType);
+  }
+
+  /**
+   * Get all solvers for a challenge type including unavailable ones (for monitoring)
+   */
+  getAllSolvers(challengeType: CaptchaParams['type']): Array<{
+    solverType: string;
+    circuitBreakerState: string | null;
+    isCircuitBreakerAvailable: boolean;
+  }> {
+    // Note: circuitBreakerState is returned as string to avoid circular dependency
+    // The actual type is CircuitState | null
+    return this.registry
+      .getAllSolversForChallengeType(challengeType)
+      .map((m) => ({
+        solverType: m.solverType,
+        circuitBreakerState: m.circuitBreakerState,
+        isCircuitBreakerAvailable: m.isCircuitBreakerAvailable,
+      }));
   }
 }
 

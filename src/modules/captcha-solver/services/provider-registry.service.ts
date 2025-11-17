@@ -6,6 +6,7 @@ import { TwoCaptchaProvider } from '../providers/two-captcha.provider';
 import { AntiCaptchaProvider } from '../providers/anti-captcha.provider';
 import { ApiKeyManagerService } from './api-key-manager.service';
 import { CostTrackingService } from './cost-tracking.service';
+import { CaptchaSolverConfigService } from '../config';
 
 /**
  * Provider registry for managing captcha solver providers
@@ -20,6 +21,7 @@ export class ProviderRegistryService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly apiKeyManager: ApiKeyManagerService,
     private readonly costTracking: CostTrackingService,
+    private readonly captchaConfig: CaptchaSolverConfigService,
   ) {}
 
   async onModuleInit() {
@@ -31,6 +33,7 @@ export class ProviderRegistryService implements OnModuleInit {
         this.httpService,
         this.configService,
         this.apiKeyManager,
+        this.captchaConfig,
       );
       this.registerProvider('2captcha', twoCaptcha);
     } catch (error: any) {
@@ -43,6 +46,7 @@ export class ProviderRegistryService implements OnModuleInit {
         this.httpService,
         this.configService,
         this.apiKeyManager,
+        this.captchaConfig,
       );
       this.registerProvider('anticaptcha', antiCaptcha);
     } catch (error: any) {

@@ -13,6 +13,7 @@ import {
   ProviderException,
   NetworkException,
 } from '../exceptions';
+import { CaptchaSolverConfigService } from '../config';
 
 /**
  * Anti-Captcha provider implementation
@@ -26,8 +27,10 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
     httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly apiKeyManager: ApiKeyManagerService,
+    private readonly captchaConfig: CaptchaSolverConfigService,
   ) {
-    super(httpService, 3, 60);
+    const providerConfig = captchaConfig.getProviderConfig();
+    super(httpService, providerConfig.maxRetries, providerConfig.timeoutSeconds);
   }
 
   getName(): string {

@@ -16,6 +16,7 @@ import { DetectionRegistryService } from './detection-registry.service';
 import { DetectionServiceAdapter } from './detection-service-adapter';
 import { IDetectionStrategy } from './detection-strategy.interface';
 import { CaptchaLoggingService } from './captcha-logging.service';
+import { InternalException } from '../exceptions';
 
 /**
  * Service for detecting various anti-bot systems on web pages
