@@ -96,6 +96,35 @@ services:
       - sg-network
     restart: unless-stopped
 
+  # Test Service - for running tests in Docker
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    container_name: browsers-api-test
+    environment:
+      NODE_ENV: test
+      # Database connection for E2E tests (if needed)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: automation_user
+      DB_PASSWORD: secure_password
+      DB_DATABASE: browser_automation
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - browsers-api-network
+    profiles:
+      - test
+    # Override CMD to run specific test command
+    # Usage: docker-compose --profile test run --rm test npm test
+    # Or: docker-compose --profile test run --rm test npm run test:e2e
+
 volumes:
   postgres_data:
 

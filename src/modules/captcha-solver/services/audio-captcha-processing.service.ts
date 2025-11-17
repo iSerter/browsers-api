@@ -69,7 +69,7 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
   private readonly logger = new Logger(
     AudioCaptchaProcessingService.name,
   );
-  private config: AudioProcessingConfig;
+  private config: Required<AudioProcessingConfig>;
   private cache: Map<string, CacheEntry> = new Map();
   private rateLimiters: Map<SpeechToTextProvider, RateLimitEntry> = new Map();
   private requestQueue: Map<SpeechToTextProvider, Array<() => Promise<void>>> =
@@ -154,6 +154,13 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
         'AUDIO_CAPTCHA_TEMP_DIR',
         DEFAULT_CONFIG.tempDirectory,
       ) ?? DEFAULT_CONFIG.tempDirectory;
+    
+    // Ensure all required properties are set
+    this.config.minConfidenceThreshold = this.config.minConfidenceThreshold ?? DEFAULT_CONFIG.minConfidenceThreshold;
+    this.config.maxRetries = this.config.maxRetries ?? DEFAULT_CONFIG.maxRetries;
+    this.config.cacheTtlHours = this.config.cacheTtlHours ?? DEFAULT_CONFIG.cacheTtlHours;
+    this.config.rateLimitPerMinute = this.config.rateLimitPerMinute ?? DEFAULT_CONFIG.rateLimitPerMinute;
+    this.config.tempDirectory = this.config.tempDirectory ?? DEFAULT_CONFIG.tempDirectory;
 
     this.config.transcriptionTimeout =
       this.configService.get<number>(
@@ -204,6 +211,10 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
    * Ensure temporary directory exists
    */
   private async ensureTempDirectory(): Promise<void> {
+    if (!this.config.tempDirectory) {
+      this.logger.warn('Temp directory not configured, using default');
+      this.config.tempDirectory = DEFAULT_CONFIG.tempDirectory;
+    }
     try {
       await fs.mkdir(this.config.tempDirectory, { recursive: true });
     } catch (error) {

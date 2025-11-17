@@ -218,7 +218,9 @@ export class DetectionService implements OnModuleInit {
         detected: false,
         type: null,
         confidence: 0,
-        details: {},
+        details: {
+          signals: [],
+        },
         detectedAt: new Date(),
         durationMs: result.totalDurationMs,
       };

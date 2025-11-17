@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Page, Frame } from 'playwright';
+import type { Page, Frame } from 'playwright';
 import {
   ICaptchaSolver,
   CaptchaParams,
@@ -10,12 +10,14 @@ import { CaptchaWidgetType } from '../services/interfaces/widget-interaction.int
 import { SolverPerformanceTracker } from '../factories/solver-performance-tracker.service';
 import { AudioCaptchaProcessingService } from '../services/audio-captcha-processing.service';
 import { HumanBehaviorSimulationService } from '../services/human-behavior-simulation.service';
+import type {
+  RecaptchaSolverConfig,
+} from './interfaces/recaptcha-solver.interface';
 import {
   RecaptchaVersion,
   RecaptchaV2ChallengeType,
   RecaptchaDetectionResult,
   RecaptchaChallengeResponse,
-  RecaptchaSolverConfig,
   RecaptchaSolverMetrics,
   ImageChallengeTile,
   ImageChallengeResult,
@@ -280,7 +282,7 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         anchorIframe: null,
         challengeIframe: null,
         confidence: 0,
-        details: { error: error.message },
+        details: {},
       };
     }
   }
@@ -430,7 +432,7 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
   private async findIframes(): Promise<{
     anchorIframe: Frame | null;
     challengeIframe: Frame | null;
-  } {
+  }> {
     try {
       const frames = this.page.frames();
       let anchorIframe: Frame | null = null;

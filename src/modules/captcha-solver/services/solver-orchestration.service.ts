@@ -215,7 +215,9 @@ export class SolverOrchestrationService {
       detected: false,
       type: null,
       confidence: 0,
-      details: {},
+      details: {
+        signals: [],
+      },
       detectedAt: new Date(),
       durationMs: detectionResult.totalDurationMs,
     };
@@ -621,11 +623,11 @@ export class SolverOrchestrationService {
   ): CaptchaParams {
     const url = page.url();
 
-    // Extract sitekey from detection details if available
+    // Extract sitekey from detection details metadata if available
     const sitekey =
-      detection.details?.sitekey ||
-      detection.details?.siteKey ||
-      detection.details?.dataSitekey;
+      detection.details?.metadata?.sitekey ||
+      detection.details?.metadata?.siteKey ||
+      detection.details?.metadata?.dataSitekey;
 
     const params: CaptchaParams = {
       type: challengeType,
@@ -638,7 +640,7 @@ export class SolverOrchestrationService {
       const version = detection.details?.version || 'v2';
       params.version = version as 'v2' | 'v3';
       if (version === 'v3') {
-        params.action = detection.details?.action || 'verify';
+        params.action = detection.details?.metadata?.action || 'verify';
       }
     }
 
@@ -715,8 +717,9 @@ export class SolverOrchestrationService {
         // Convert seconds to milliseconds if needed
         const converted: Record<string, number> = {};
         for (const [key, value] of Object.entries(parsed)) {
+          const numValue = typeof value === 'number' ? value : Number(value);
           converted[key] =
-            typeof value === 'number' && value < 1000 ? value * 1000 : value;
+            !isNaN(numValue) && numValue < 1000 ? numValue * 1000 : numValue;
         }
         return { ...defaults, ...converted };
       } catch (error) {

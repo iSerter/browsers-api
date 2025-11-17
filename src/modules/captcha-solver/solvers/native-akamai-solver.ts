@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Page, Frame, CDPSession } from 'playwright';
+import type { Page, Frame, CDPSession } from 'playwright';
 import * as crypto from 'crypto';
 import {
   ICaptchaSolver,
@@ -9,11 +9,13 @@ import {
 import { CaptchaWidgetInteractionService } from '../services/captcha-widget-interaction.service';
 import { SolverPerformanceTracker } from '../factories/solver-performance-tracker.service';
 import { HumanBehaviorSimulationService } from '../services/human-behavior-simulation.service';
+import type {
+  AkamaiSolverConfig,
+} from './interfaces/akamai-solver.interface';
 import {
   AkamaiChallengeLevel,
   AkamaiDetectionResult,
   AkamaiChallengeResponse,
-  AkamaiSolverConfig,
   AkamaiSolverMetrics,
   AkamaiBrowserFingerprint,
   AkamaiBehavioralTelemetry,

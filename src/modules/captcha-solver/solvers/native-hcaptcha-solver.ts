@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Page, Frame } from 'playwright';
+import type { Page, Frame } from 'playwright';
 import {
   ICaptchaSolver,
   CaptchaParams,
@@ -9,12 +9,14 @@ import { CaptchaWidgetInteractionService } from '../services/captcha-widget-inte
 import { CaptchaWidgetType } from '../services/interfaces/widget-interaction.interface';
 import { SolverPerformanceTracker } from '../factories/solver-performance-tracker.service';
 import { AudioCaptchaProcessingService } from '../services/audio-captcha-processing.service';
+import type {
+  HcaptchaSolverConfig,
+} from './interfaces/hcaptcha-solver.interface';
 import {
   HcaptchaChallengeType,
   HcaptchaDifficulty,
   HcaptchaDetectionResult,
   HcaptchaChallengeResponse,
-  HcaptchaSolverConfig,
   HcaptchaSolverMetrics,
 } from './interfaces/hcaptcha-solver.interface';
 

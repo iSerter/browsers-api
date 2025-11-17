@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Page, Frame } from 'playwright';
+import type { Page, Frame } from 'playwright';
 import {
   ICaptchaSolver,
   CaptchaParams,
@@ -8,11 +8,13 @@ import {
 import { CaptchaWidgetInteractionService } from '../services/captcha-widget-interaction.service';
 import { CaptchaWidgetType } from '../services/interfaces/widget-interaction.interface';
 import { SolverPerformanceTracker } from '../factories/solver-performance-tracker.service';
+import type {
+  TurnstileSolverConfig,
+} from './interfaces/turnstile-solver.interface';
 import {
   TurnstileWidgetMode,
   TurnstileDetectionResult,
   TurnstileChallengeResponse,
-  TurnstileSolverConfig,
   TurnstileSolverMetrics,
 } from './interfaces/turnstile-solver.interface';
 
@@ -59,6 +61,7 @@ export class TurnstileSolver implements ICaptchaSolver {
         [TurnstileWidgetMode.MANAGED]: 0,
         [TurnstileWidgetMode.NON_INTERACTIVE]: 0,
         [TurnstileWidgetMode.INVISIBLE]: 0,
+        [TurnstileWidgetMode.UNKNOWN]: 0,
       },
       failureReasons: {},
     };
@@ -244,7 +247,7 @@ export class TurnstileSolver implements ICaptchaSolver {
         mode: TurnstileWidgetMode.UNKNOWN,
         iframe: null,
         confidence: 0,
-        details: { error: error.message },
+        details: {},
       };
     }
   }

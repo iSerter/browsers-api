@@ -18,7 +18,32 @@ RUN npm ci
 # Copy source code and configuration
 COPY . .
 
-# Build the application
+# Build the application (commented out for test stage - tests run with ts-jest)
+# RUN npm run build
+
+# ============================================
+# Test Stage
+# ============================================
+FROM builder AS test
+
+# Set working directory
+WORKDIR /app
+
+# Note: Tests run with ts-jest, so no build step needed
+# This stage can be used to run tests in CI/CD
+# Usage: docker build --target test -t browsers-api-test .
+# Then: docker run --rm browsers-api-test npm test
+# Or: docker run --rm browsers-api-test npm run test:e2e
+
+# Default command runs all tests
+CMD ["npm", "test"]
+
+# ============================================
+# Builder for Production (with build step)
+# ============================================
+FROM builder AS builder-prod
+
+# Build the application for production
 RUN npm run build
 
 # ============================================
@@ -42,8 +67,8 @@ COPY tsconfig.json tsconfig.build.json ./
 # Copy production dependencies from builder
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
+# Copy built application from builder-prod
+COPY --from=builder-prod /app/dist ./dist
 
 # Install Xvfb for virtual display support
 RUN apt-get update && \

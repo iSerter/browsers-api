@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Page, Frame, CDPSession } from 'playwright';
+import type { Page, Frame, CDPSession } from 'playwright';
 import {
   ICaptchaSolver,
   CaptchaParams,
@@ -8,11 +8,13 @@ import {
 import { CaptchaWidgetInteractionService } from '../services/captcha-widget-interaction.service';
 import { SolverPerformanceTracker } from '../factories/solver-performance-tracker.service';
 import { HumanBehaviorSimulationService } from '../services/human-behavior-simulation.service';
+import type {
+  DataDomeSolverConfig,
+} from './interfaces/datadome-solver.interface';
 import {
   DataDomeChallengeType,
   DataDomeDetectionResult,
   DataDomeChallengeResponse,
-  DataDomeSolverConfig,
   DataDomeSolverMetrics,
   BrowserFingerprint,
   SensorData,
@@ -371,7 +373,7 @@ export class NativeDataDomeSolver implements ICaptchaSolver {
       // WebGL fingerprinting
       let webglRenderer = 'Unknown';
       try {
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl') as WebGLRenderingContext | null;
         if (gl) {
           const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
           if (debugInfo) {
