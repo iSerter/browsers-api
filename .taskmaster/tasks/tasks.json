@@ -653,11 +653,84 @@
         ],
         "priority": "high",
         "subtasks": []
+      },
+      {
+        "id": 49,
+        "title": "Fix CaptchaSolverController Tests - Add ConfigService Mock for SsrfProtectionGuard",
+        "description": "Resolve test failures in captcha-solver.controller.spec.ts by adding ConfigService mock to TestingModule providers to satisfy SsrfProtectionGuard's dependency requirements, ensuring all controller tests pass without dependency injection errors",
+        "details": "1. Analyze captcha-solver.controller.spec.ts to identify all failing tests:\n   - SsrfProtectionGuard dependency injection errors for ConfigService\n   - Controller initialization failures due to missing ConfigService provider\n   - Route handler tests affected by guard dependency issues\n   - CAPTCHA solving endpoint tests (POST /solve, GET /status, etc.)\n   - Request validation and SSRF protection tests\n2. Fix ConfigService dependency for SsrfProtectionGuard:\n   - Add ConfigService mock to TestingModule providers array\n   - Mock ConfigService.get() method to return appropriate values for SSRF protection configuration\n   - Example mock setup:\n     const mockConfigService = {\n       get: jest.fn((key: string) => {\n         const config = {\n           'ssrf.enabled': true,\n           'ssrf.allowedDomains': ['example.com', 'trusted-api.com'],\n           'ssrf.blockedIpRanges': ['127.0.0.0/8', '10.0.0.0/8'],\n           'ssrf.timeout': 5000\n         };\n         return config[key];\n       })\n     };\n3. Update TestingModule configuration:\n   - Add ConfigService to providers: { provide: ConfigService, useValue: mockConfigService }\n   - Ensure SsrfProtectionGuard can be instantiated with mocked ConfigService\n   - Verify guard is properly applied to controller routes in test context\n4. Review CaptchaSolverController implementation:\n   - Confirm SsrfProtectionGuard is applied via @UseGuards() decorator\n   - Check which routes require SSRF protection\n   - Verify guard configuration requirements\n5. Fix any related test assertions:\n   - Update tests that verify SSRF protection behavior\n   - Mock HTTP requests to test allowed/blocked domains\n   - Test timeout scenarios and IP range blocking\n6. Ensure proper test isolation:\n   - Clear mocks between tests using beforeEach/afterEach\n   - Reset ConfigService mock return values for different test scenarios\n   - Verify no test pollution from shared mock state",
+        "testStrategy": "Run 'npm test captcha-solver.controller.spec.ts' to verify all tests pass without ConfigService dependency injection errors. Confirm TestingModule successfully creates CaptchaSolverController instance with SsrfProtectionGuard properly configured. Verify ConfigService mock is called with expected configuration keys during guard initialization. Test SSRF protection behavior by mocking requests to allowed and blocked domains, confirming guard correctly permits/denies based on configuration. Verify timeout handling and IP range blocking work as expected. Run full captcha-solver module test suite to ensure no regressions in related services or providers. Check test coverage remains above threshold for controller and guard integration.",
+        "status": "done",
+        "dependencies": [
+          1,
+          6
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 50,
+        "title": "Fix ProviderRegistryService Tests - Add CaptchaSolverConfigService Mock Dependency",
+        "description": "Resolve test failures in provider-registry.service.spec.ts by adding CaptchaSolverConfigService mock to TestingModule providers at the correct dependency injection index [4], ensuring all provider registry tests pass without dependency injection errors",
+        "details": "1. Analyze provider-registry.service.spec.ts to identify the exact dependency injection failure:\n   - Verify CaptchaSolverConfigService is missing at index [4] in constructor\n   - Check error messages for dependency injection context\n   - Review ProviderRegistryService constructor signature to confirm dependency order\n2. Create comprehensive CaptchaSolverConfigService mock:\n   - Mock all configuration methods used by ProviderRegistryService\n   - Include methods like getProviderConfig(), getDefaultProvider(), getProviderTimeout(), etc.\n   - Return appropriate mock values for each configuration method\n   - Example: { getProviderConfig: jest.fn().mockReturnValue({ apiKey: 'test-key', timeout: 30000 }), getDefaultProvider: jest.fn().mockReturnValue('anti-captcha') }\n3. Update TestingModule configuration in beforeEach block:\n   - Add CaptchaSolverConfigService mock to providers array\n   - Ensure proper injection order matches constructor dependencies\n   - Verify all other existing mocks remain intact\n   - Example: providers: [ProviderRegistryService, { provide: LoggerService, useValue: mockLogger }, { provide: HttpService, useValue: mockHttp }, { provide: ConfigService, useValue: mockConfig }, { provide: CaptchaSolverConfigService, useValue: mockCaptchaSolverConfig }]\n4. Review and update test cases:\n   - Verify provider registration tests use mocked configuration\n   - Update assertions to match mocked configuration values\n   - Ensure error handling tests properly simulate configuration failures\n   - Add tests for configuration-dependent provider selection logic\n5. Verify mock interactions:\n   - Add expect() calls to verify CaptchaSolverConfigService methods are called with correct parameters\n   - Test that provider registry correctly uses configuration to initialize providers\n   - Ensure configuration changes properly affect provider behavior",
+        "testStrategy": "Run 'npm test provider-registry.service.spec.ts' to verify all tests pass without CaptchaSolverConfigService dependency injection errors. Confirm TestingModule successfully creates ProviderRegistryService instance with all dependencies properly injected at correct indices. Verify CaptchaSolverConfigService mock methods are called with expected parameters during provider registration and retrieval operations. Check that provider selection logic correctly uses mocked configuration values. Run full test suite with 'npm test' to ensure no regressions in other test files. Verify test coverage remains above threshold for provider-registry.service.ts",
+        "status": "done",
+        "dependencies": [
+          1,
+          39
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 51,
+        "title": "Fix SolverRegistry Tests - Add SolverCircuitBreakerService Mock Dependency",
+        "description": "Resolve test failures in solver-registry.service.spec.ts by adding SolverCircuitBreakerService mock to TestingModule providers, implementing proper mocks for circuit breaker methods (isAvailable, recordSuccess, recordFailure), and fixing the afterEach hook that attempts to call clear() on undefined registry",
+        "details": "1. Analyze solver-registry.service.spec.ts to identify all failing tests:\n   - Dependency injection errors for SolverCircuitBreakerService\n   - Tests failing due to missing circuit breaker service mock\n   - afterEach hook errors calling clear() on undefined registry\n   - Solver registration and retrieval tests\n   - Circuit breaker integration tests\n2. Review SolverRegistryService implementation:\n   - Identify constructor dependencies and their injection order\n   - Verify SolverCircuitBreakerService is required and its position in dependency array\n   - Map all methods that interact with circuit breaker service\n3. Create comprehensive SolverCircuitBreakerService mock:\n   - Mock isAvailable(solverType: string): boolean method to return true by default\n   - Mock recordSuccess(solverType: string): void method as jest.fn()\n   - Mock recordFailure(solverType: string): void method as jest.fn()\n   - Add mock implementation that can be configured per test case\n   - Example: const mockCircuitBreaker = { isAvailable: jest.fn().mockReturnValue(true), recordSuccess: jest.fn(), recordFailure: jest.fn() }\n4. Update TestingModule configuration in beforeEach:\n   - Add SolverCircuitBreakerService to providers array at correct index\n   - Use useValue to provide the mock implementation\n   - Ensure all other dependencies are properly mocked\n5. Fix afterEach hook:\n   - Add null check before calling registry.clear()\n   - Example: if (registry) { registry.clear(); }\n   - Or initialize registry in beforeEach to ensure it's always defined\n6. Update individual test cases:\n   - Configure circuit breaker mock behavior for specific test scenarios\n   - Test solver filtering when circuit breaker returns false for isAvailable\n   - Verify recordSuccess and recordFailure are called appropriately\n   - Test edge cases where all solvers are unavailable due to circuit breaker\n7. Verify integration with circuit breaker:\n   - Test that getAvailableSolvers() filters based on circuit breaker state\n   - Test that selectBestSolver() skips unavailable solvers\n   - Verify proper error handling when no solvers are available",
+        "testStrategy": "Run 'npm test solver-registry.service.spec.ts' to verify all tests pass without dependency injection errors. Confirm SolverCircuitBreakerService mock is properly injected and all methods (isAvailable, recordSuccess, recordFailure) are available. Verify afterEach hook executes without errors and properly cleans up registry state. Test that circuit breaker integration tests correctly simulate solver availability filtering. Verify mock methods are called with correct solver type parameters. Run full captcha-solver module test suite to ensure no regressions. Check test coverage remains above threshold for solver-registry.service.ts",
+        "status": "done",
+        "dependencies": [
+          1,
+          6,
+          7,
+          42
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 52,
+        "title": "Fix BaseCaptchaProvider Tests - Update Error Expectations to Match ProviderException Wrapping",
+        "description": "Update BaseCaptchaProvider test expectations to check for ProviderException wrapping instead of raw errors, ensuring tests align with the implementation's error handling behavior",
+        "details": "1. Analyze BaseCaptchaProvider implementation to understand error wrapping behavior:\n   - Review how errors are caught and wrapped in ProviderException\n   - Identify all error scenarios that trigger ProviderException wrapping\n   - Document the error message format and structure used in wrapping\n2. Locate all test files for BaseCaptchaProvider:\n   - Find base-captcha-provider.spec.ts or similar test files\n   - Identify all test cases that assert on error types or messages\n   - List tests expecting raw Error, TypeError, or other base error types\n3. Update test expectations for wrapped errors:\n   - Replace expect(error).toBeInstanceOf(Error) with expect(error).toBeInstanceOf(ProviderException)\n   - Update error message assertions to check ProviderException.message\n   - Verify error cause chain: expect(error.cause).toBeInstanceOf(OriginalErrorType)\n   - Update error.message checks to match wrapped format\n4. Handle nested error information:\n   - If tests check error.stack, update to check error.cause.stack\n   - If tests verify specific error properties, access via error.cause\n   - Ensure correlation IDs and error context are preserved in ProviderException\n5. Add type guards for error assertions:\n   - Use isProviderException(error) type guard from Task 16 patterns\n   - Implement proper unknown error handling in test helpers\n6. Update mock error scenarios:\n   - Ensure mocked provider methods throw appropriate errors\n   - Verify error wrapping occurs in all failure paths\n   - Test both synchronous and asynchronous error scenarios\n7. Review error context enrichment integration:\n   - Verify ProviderException includes correlation IDs from Task 12\n   - Check that timing information is preserved\n   - Ensure solver metadata is included in wrapped errors",
+        "testStrategy": "Run 'npm test base-captcha-provider.spec.ts' to verify all tests pass with updated ProviderException expectations. Confirm each test correctly asserts on ProviderException type rather than raw errors. Verify error.cause chain is properly tested for original error information. Test that error messages match the wrapped format with provider context. Ensure no tests are checking for raw Error types that should be wrapped. Verify error context (correlation IDs, timing, metadata) is accessible through ProviderException. Run full test suite to ensure no regression in other provider tests. Validate that both sync and async error paths are covered by updated tests.",
+        "status": "done",
+        "dependencies": [
+          1,
+          4,
+          12,
+          16
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 53,
+        "title": "Fix retry.util.spec.ts timeout test",
+        "description": "Resolve the timeout issue in the 'should cap backoff at maxBackoffMs' test by either increasing the test timeout threshold or optimizing the test implementation to complete within the 5000ms limit.",
+        "details": "1. Analyze the failing test in src/captcha-solver/utils/retry.util.spec.ts:\n   - Identify why 'should cap backoff at maxBackoffMs' exceeds 5000ms\n   - Review the test's retry attempts and backoff calculations\n   - Check if the test is actually waiting for real timeouts\n2. Implement one of two solutions:\n   Option A - Optimize the test:\n   - Mock timers using jest.useFakeTimers() to avoid real delays\n   - Use jest.advanceTimersByTime() to simulate time passage\n   - Example: jest.useFakeTimers(); await jest.advanceTimersByTime(maxBackoffMs);\n   - Ensure test validates backoff cap logic without actual waiting\n   Option B - Increase timeout:\n   - Add jest.setTimeout(10000) before the specific test\n   - Document why longer timeout is necessary\n3. Verify the test still validates correct behavior:\n   - Backoff is properly capped at maxBackoffMs\n   - Multiple retry attempts respect the cap\n   - Test assertions remain comprehensive\n4. Check for similar timeout issues in other retry.util.spec.ts tests\n5. Update test documentation if fake timers are introduced",
+        "testStrategy": "Run 'npm test retry.util.spec.ts' to verify the specific test passes within timeout. Confirm test completes in under 5000ms (or new threshold). Verify the test still properly validates backoff capping behavior with multiple scenarios. Run full test suite to ensure no regressions. Check that fake timers (if used) are properly cleaned up with jest.clearAllTimers() or jest.useRealTimers().",
+        "status": "done",
+        "dependencies": [
+          22
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-11-17T01:03:11.457Z",
-      "updated": "2025-11-17T21:02:20.707Z",
+      "updated": "2025-11-17T21:20:23.499Z",
       "description": "Tasks for master context"
     }
   }

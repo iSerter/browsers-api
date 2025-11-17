@@ -127,26 +127,35 @@ describe('retryWithBackoff', () => {
     expect(delays[1]).toBe(200); // 100 * 2^1
   });
 
-  it('should cap backoff at maxBackoffMs', async () => {
-    const delays: number[] = [];
-    const fn = jest.fn().mockRejectedValue(new Error('Always fails'));
+  it(
+    'should cap backoff at maxBackoffMs',
+    async () => {
+      const delays: number[] = [];
+      const fn = jest.fn().mockRejectedValue(new Error('Always fails'));
 
-    await expect(
-      retryWithBackoff(fn, {
-        maxAttempts: 5,
-        backoffMs: 1000,
-        maxBackoffMs: 2000,
-        onRetry: (attempt, error, delay) => {
-          delays.push(delay);
-        },
-      }),
-    ).rejects.toThrow();
+      await expect(
+        retryWithBackoff(fn, {
+          maxAttempts: 5,
+          backoffMs: 1000,
+          maxBackoffMs: 2000,
+          onRetry: (attempt, error, delay) => {
+            delays.push(delay);
+          },
+        }),
+      ).rejects.toThrow('Always fails');
 
-    // All delays should be capped at 2000ms
-    delays.forEach((delay) => {
-      expect(delay).toBeLessThanOrEqual(2000);
-    });
-  });
+      // All delays should be capped at 2000ms
+      // With 5 attempts, we have 4 retries (attempts 2-5)
+      // Delays: 1000ms (attempt 1->2), 2000ms (attempt 2->3), 
+      //        2000ms (attempt 3->4), 2000ms (attempt 4->5)
+      // Total: 7000ms, which exceeds default 5000ms timeout
+      expect(delays.length).toBe(4);
+      delays.forEach((delay) => {
+        expect(delay).toBeLessThanOrEqual(2000);
+      });
+    },
+    10000, // Increase timeout to 10s to accommodate total delays of ~7000ms
+  );
 });
 
 describe('createRetryFunction', () => {

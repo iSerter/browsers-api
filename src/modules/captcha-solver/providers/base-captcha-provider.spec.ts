@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { BaseCaptchaProvider } from './base-captcha-provider';
 import { CaptchaParams } from '../interfaces/captcha-solver.interface';
+import { ProviderException } from '../exceptions/provider.exception';
+import { NetworkException } from '../exceptions/network.exception';
 import { of, throwError, NEVER } from 'rxjs';
 
 class TestProvider extends BaseCaptchaProvider {
@@ -94,9 +96,15 @@ describe('BaseCaptchaProvider', () => {
         url: 'https://example.com',
       };
 
-      await expect(provider.solve(params)).rejects.toMatchObject({
-        response: { status: 401 },
-        message: 'Unauthorized',
+      const errorPromise = provider.solve(params);
+      
+      await expect(errorPromise).rejects.toBeInstanceOf(ProviderException);
+      await expect(errorPromise).rejects.toMatchObject({
+        providerName: 'test',
+        message: expect.stringContaining('Failed to solve captcha'),
+        context: expect.objectContaining({
+          captchaType: 'recaptcha',
+        }),
       });
       expect(mockSolve).toHaveBeenCalledTimes(1);
     });
@@ -115,10 +123,67 @@ describe('BaseCaptchaProvider', () => {
         url: 'https://example.com',
       };
 
-      await expect(provider.solve(params)).rejects.toMatchObject({
-        message: 'Invalid parameter',
+      const errorPromise = provider.solve(params);
+      
+      await expect(errorPromise).rejects.toBeInstanceOf(ProviderException);
+      await expect(errorPromise).rejects.toMatchObject({
+        providerName: 'test',
+        message: expect.stringContaining('Failed to solve captcha'),
+        context: expect.objectContaining({
+          captchaType: 'recaptcha',
+        }),
       });
       expect(mockSolve).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not double-wrap ProviderException', async () => {
+      const providerException = new ProviderException(
+        'Provider API error',
+        'test',
+      );
+      const mockSolve = jest.fn().mockRejectedValue(providerException);
+
+      provider['solveCaptcha'] = mockSolve;
+
+      const params: CaptchaParams = {
+        type: 'recaptcha',
+        sitekey: 'test-key',
+        url: 'https://example.com',
+      };
+
+      const errorPromise = provider.solve(params);
+      
+      await expect(errorPromise).rejects.toBeInstanceOf(ProviderException);
+      await expect(errorPromise).rejects.toBe(providerException);
+      await expect(errorPromise).rejects.toMatchObject({
+        message: 'Provider API error',
+        providerName: 'test',
+      });
+    });
+
+    it('should not double-wrap NetworkException', async () => {
+      const networkException = new NetworkException(
+        'Network error occurred',
+        new Error('Connection failed'),
+      );
+      const mockSolve = jest.fn().mockRejectedValue(networkException);
+
+      provider['solveCaptcha'] = mockSolve;
+
+      const params: CaptchaParams = {
+        type: 'recaptcha',
+        sitekey: 'test-key',
+        url: 'https://example.com',
+      };
+
+      const errorPromise = provider.solve(params);
+      
+      await expect(errorPromise).rejects.toBeInstanceOf(NetworkException);
+      await expect(errorPromise).rejects.toBe(networkException);
+      await expect(errorPromise).rejects.toMatchObject({
+        message: 'Network error occurred',
+        code: 'NETWORK_ERROR',
+      });
     });
   });
 
@@ -156,9 +221,56 @@ describe('BaseCaptchaProvider', () => {
         throwError(() => ({ response: { status: 500 } })),
       );
 
-      await expect(
-        provider['makeRequest']('GET', 'https://api.example.com'),
-      ).rejects.toBeDefined();
+      const errorPromise = provider['makeRequest']('GET', 'https://api.example.com');
+      
+      await expect(errorPromise).rejects.toBeInstanceOf(NetworkException);
+      await expect(errorPromise).rejects.toMatchObject({
+        message: expect.stringContaining('Network error'),
+        code: 'NETWORK_ERROR',
+        context: expect.objectContaining({
+          url: 'https://api.example.com',
+          method: 'GET',
+          statusCode: 500,
+        }),
+      });
+    });
+
+    it('should not double-wrap ProviderException in makeRequest', async () => {
+      const providerException = new ProviderException(
+        'Provider request failed',
+        'test',
+      );
+      httpService.request.mockReturnValue(
+        throwError(() => providerException),
+      );
+
+      const errorPromise = provider['makeRequest']('GET', 'https://api.example.com');
+      
+      await expect(errorPromise).rejects.toBeInstanceOf(ProviderException);
+      await expect(errorPromise).rejects.toBe(providerException);
+      await expect(errorPromise).rejects.toMatchObject({
+        message: 'Provider request failed',
+        providerName: 'test',
+      });
+    });
+
+    it('should not double-wrap NetworkException in makeRequest', async () => {
+      const networkException = new NetworkException(
+        'Network timeout',
+        new Error('Timeout'),
+      );
+      httpService.request.mockReturnValue(
+        throwError(() => networkException),
+      );
+
+      const errorPromise = provider['makeRequest']('GET', 'https://api.example.com');
+      
+      await expect(errorPromise).rejects.toBeInstanceOf(NetworkException);
+      await expect(errorPromise).rejects.toBe(networkException);
+      await expect(errorPromise).rejects.toMatchObject({
+        message: 'Network timeout',
+        code: 'NETWORK_ERROR',
+      });
     });
   });
 

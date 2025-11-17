@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CaptchaSolverController } from './captcha-solver.controller';
 import { CaptchaSolverService } from './captcha-solver.service';
 import { ProviderRegistryService } from './services/provider-registry.service';
@@ -29,6 +30,15 @@ describe('CaptchaSolverController', () => {
     getProvider: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn((key: string, defaultValue?: any) => {
+      const config: Record<string, any> = {
+        SSRF_ALLOWED_DOMAINS: '',
+      };
+      return config[key] !== undefined ? config[key] : defaultValue;
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CaptchaSolverController],
@@ -41,6 +51,10 @@ describe('CaptchaSolverController', () => {
           provide: ProviderRegistryService,
           useValue: mockProviderRegistry,
         },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
@@ -51,6 +65,13 @@ describe('CaptchaSolverController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Reset ConfigService mock to default behavior
+    mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
+      const config: Record<string, any> = {
+        SSRF_ALLOWED_DOMAINS: '',
+      };
+      return config[key] !== undefined ? config[key] : defaultValue;
+    });
   });
 
   describe('getProviders', () => {

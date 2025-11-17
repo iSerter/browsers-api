@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { ProviderRegistryService } from './provider-registry.service';
 import { ApiKeyManagerService } from './api-key-manager.service';
 import { CostTrackingService } from './cost-tracking.service';
+import { CaptchaSolverConfigService } from '../config';
 import { ICaptchaSolver } from '../interfaces/captcha-solver.interface';
 
 describe('ProviderRegistryService', () => {
@@ -12,6 +13,7 @@ describe('ProviderRegistryService', () => {
   let configService: jest.Mocked<ConfigService>;
   let apiKeyManager: jest.Mocked<ApiKeyManagerService>;
   let costTracking: jest.Mocked<CostTrackingService>;
+  let captchaConfig: jest.Mocked<CaptchaSolverConfigService>;
 
   // Mock captcha solver
   class MockCaptchaSolver implements ICaptchaSolver {
@@ -60,6 +62,97 @@ describe('ProviderRegistryService', () => {
       getTotalCost: jest.fn(),
     };
 
+    const mockCaptchaSolverConfig = {
+      getConfig: jest.fn().mockReturnValue({
+        circuitBreaker: {
+          failureThreshold: 3,
+          timeoutPeriod: 60000,
+        },
+        cache: {
+          ttl: 300000,
+        },
+        retry: {
+          maxAttempts: 3,
+          backoffMs: 1000,
+          maxBackoffMs: 10000,
+        },
+        timeouts: {
+          solveTimeout: 30000,
+          detectionTimeout: 5000,
+          widgetInteractionTimeout: 5000,
+          audioTranscriptionTimeout: 30000,
+        },
+        solverTimeouts: {
+          recaptchaV2Checkbox: 30000,
+          recaptchaV2Invisible: 10000,
+          recaptchaV2Audio: 30000,
+          recaptchaV2Image: 30000,
+          recaptchaV3: 10000,
+          hcaptchaCheckbox: 30000,
+          hcaptchaInvisible: 10000,
+          hcaptchaAudio: 30000,
+          hcaptchaAccessibility: 30000,
+          datadomeSensor: 5000,
+          datadomeCaptcha: 60000,
+          datadomeSlider: 30000,
+          akamaiLevel2: 5000,
+          akamaiLevel3: 10000,
+        },
+        provider: {
+          maxRetries: 3,
+          timeoutSeconds: 60,
+          rateLimitPerMinute: 60,
+        },
+        detection: {
+          minConfidenceThreshold: 0.5,
+          minStrongConfidence: 0.7,
+        },
+      }),
+      getCircuitBreakerConfig: jest.fn().mockReturnValue({
+        failureThreshold: 3,
+        timeoutPeriod: 60000,
+      }),
+      getCacheConfig: jest.fn().mockReturnValue({
+        ttl: 300000,
+      }),
+      getRetryConfig: jest.fn().mockReturnValue({
+        maxAttempts: 3,
+        backoffMs: 1000,
+        maxBackoffMs: 10000,
+      }),
+      getTimeoutConfig: jest.fn().mockReturnValue({
+        solveTimeout: 30000,
+        detectionTimeout: 5000,
+        widgetInteractionTimeout: 5000,
+        audioTranscriptionTimeout: 30000,
+      }),
+      getSolverTimeoutConfig: jest.fn().mockReturnValue({
+        recaptchaV2Checkbox: 30000,
+        recaptchaV2Invisible: 10000,
+        recaptchaV2Audio: 30000,
+        recaptchaV2Image: 30000,
+        recaptchaV3: 10000,
+        hcaptchaCheckbox: 30000,
+        hcaptchaInvisible: 10000,
+        hcaptchaAudio: 30000,
+        hcaptchaAccessibility: 30000,
+        datadomeSensor: 5000,
+        datadomeCaptcha: 60000,
+        datadomeSlider: 30000,
+        akamaiLevel2: 5000,
+        akamaiLevel3: 10000,
+      }),
+      getProviderConfig: jest.fn().mockReturnValue({
+        maxRetries: 3,
+        timeoutSeconds: 60,
+        rateLimitPerMinute: 60,
+      }),
+      getDetectionConfig: jest.fn().mockReturnValue({
+        minConfidenceThreshold: 0.5,
+        minStrongConfidence: 0.7,
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProviderRegistryService,
@@ -79,6 +172,10 @@ describe('ProviderRegistryService', () => {
           provide: CostTrackingService,
           useValue: mockCostTracking,
         },
+        {
+          provide: CaptchaSolverConfigService,
+          useValue: mockCaptchaSolverConfig,
+        },
       ],
     }).compile();
 
@@ -87,6 +184,7 @@ describe('ProviderRegistryService', () => {
     configService = module.get(ConfigService);
     apiKeyManager = module.get(ApiKeyManagerService);
     costTracking = module.get(CostTrackingService);
+    captchaConfig = module.get(CaptchaSolverConfigService);
   });
 
   afterEach(() => {
@@ -99,6 +197,13 @@ describe('ProviderRegistryService', () => {
 
       const providerNames = service.getProviderNames();
       expect(providerNames.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should use CaptchaSolverConfigService when initializing providers', async () => {
+      await service.onModuleInit();
+
+      // Verify that getProviderConfig was called during provider initialization
+      expect(captchaConfig.getProviderConfig).toHaveBeenCalled();
     });
 
     it('should handle provider registration failures gracefully', async () => {

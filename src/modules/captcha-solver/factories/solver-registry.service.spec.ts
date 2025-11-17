@@ -2,9 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SolverRegistry } from './solver-registry.service';
 import { ICaptchaSolver, CaptchaParams, CaptchaSolution } from '../interfaces/captcha-solver.interface';
 import { SolverCapability } from './interfaces/solver-capability.interface';
+import {
+  SolverCircuitBreakerService,
+  CircuitState,
+} from '../services/solver-circuit-breaker.service';
 
 describe('SolverRegistry', () => {
   let registry: SolverRegistry;
+  let mockCircuitBreaker: jest.Mocked<SolverCircuitBreakerService>;
 
   class MockSolver implements ICaptchaSolver {
     constructor(public name: string) {}
@@ -36,15 +41,49 @@ describe('SolverRegistry', () => {
   };
 
   beforeEach(async () => {
+    // Create comprehensive mock for SolverCircuitBreakerService
+    mockCircuitBreaker = {
+      isAvailable: jest.fn().mockReturnValue(true),
+      recordSuccess: jest.fn(),
+      recordFailure: jest.fn(),
+      getState: jest.fn().mockReturnValue(null),
+      getStateDetails: jest.fn().mockReturnValue(null),
+      reset: jest.fn(),
+      getAllStates: jest.fn().mockReturnValue(new Map()),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SolverRegistry],
+      providers: [
+        SolverRegistry,
+        {
+          provide: SolverCircuitBreakerService,
+          useValue: mockCircuitBreaker,
+        },
+      ],
     }).compile();
 
     registry = module.get<SolverRegistry>(SolverRegistry);
   });
 
   afterEach(() => {
-    registry.clear();
+    if (registry) {
+      registry.clear();
+    }
+    // Clear mock call history but keep implementations
+    if (mockCircuitBreaker) {
+      mockCircuitBreaker.isAvailable.mockClear();
+      mockCircuitBreaker.getState.mockClear();
+      mockCircuitBreaker.getStateDetails.mockClear();
+      mockCircuitBreaker.recordSuccess.mockClear();
+      mockCircuitBreaker.recordFailure.mockClear();
+      mockCircuitBreaker.reset.mockClear();
+      mockCircuitBreaker.getAllStates.mockClear();
+      // Ensure default return values are set
+      mockCircuitBreaker.isAvailable.mockReturnValue(true);
+      mockCircuitBreaker.getState.mockReturnValue(null);
+      mockCircuitBreaker.getStateDetails.mockReturnValue(null);
+      mockCircuitBreaker.getAllStates.mockReturnValue(new Map());
+    }
   });
 
   describe('register', () => {
@@ -226,6 +265,135 @@ describe('SolverRegistry', () => {
       registry.clear();
 
       expect(registry.getCount()).toBe(0);
+    });
+  });
+
+  describe('circuit breaker integration', () => {
+    beforeEach(() => {
+      // Clear previous mock calls and ensure default return values
+      mockCircuitBreaker.isAvailable.mockClear().mockReturnValue(true);
+      mockCircuitBreaker.getState.mockClear().mockReturnValue(null);
+      mockCircuitBreaker.getStateDetails.mockClear().mockReturnValue(null);
+    });
+
+    it('should return all solvers when circuit breaker allows all', () => {
+      registry.register('solver1', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+      });
+      registry.register('solver2', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+      });
+
+      // Mock circuit breaker: all solvers available
+      mockCircuitBreaker.isAvailable.mockReturnValue(true);
+
+      const availableSolvers = registry.getAvailableSolvers('recaptcha');
+      expect(availableSolvers).toHaveLength(2);
+      expect(mockCircuitBreaker.isAvailable).toHaveBeenCalledWith('solver1');
+      expect(mockCircuitBreaker.isAvailable).toHaveBeenCalledWith('solver2');
+    });
+
+    it('should filter solvers by circuit breaker availability in getAvailableSolvers', () => {
+      registry.register('solver1', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+      });
+      registry.register('solver2', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+      });
+
+      // Mock circuit breaker: solver1 available, solver2 unavailable
+      mockCircuitBreaker.isAvailable.mockImplementation((solverType: string) => {
+        return solverType === 'solver1';
+      });
+
+      const availableSolvers = registry.getAvailableSolvers('recaptcha');
+      expect(availableSolvers).toHaveLength(1);
+      expect(availableSolvers[0].solverType).toBe('solver1');
+      expect(mockCircuitBreaker.isAvailable).toHaveBeenCalledWith('solver1');
+      expect(mockCircuitBreaker.isAvailable).toHaveBeenCalledWith('solver2');
+    });
+
+    it('should return empty array when all solvers are circuit-broken', () => {
+      registry.register('solver1', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+      });
+      registry.register('solver2', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+      });
+
+      // Mock circuit breaker: all solvers unavailable
+      mockCircuitBreaker.isAvailable.mockReturnValue(false);
+
+      const availableSolvers = registry.getAvailableSolvers('recaptcha');
+      expect(availableSolvers).toHaveLength(0);
+    });
+
+    it('should skip unavailable solvers in getSolversByPriority', () => {
+      registry.register('solver1', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+        priority: 1,
+        healthStatus: 'healthy',
+      });
+      registry.register('solver2', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+        priority: 2,
+        healthStatus: 'healthy',
+      });
+
+      // Mock circuit breaker: solver1 available, solver2 unavailable
+      mockCircuitBreaker.isAvailable.mockImplementation((solverType: string) => {
+        return solverType === 'solver1';
+      });
+
+      const solvers = registry.getSolversByPriority('recaptcha');
+      expect(solvers).toHaveLength(1);
+      expect(solvers[0].solverType).toBe('solver1');
+    });
+
+    it('should include circuit breaker state in getAllSolversForChallengeType', () => {
+      registry.register('solver1', MockSolver, {
+        ...mockCapabilities,
+        supportedChallengeTypes: ['recaptcha'],
+      });
+
+      mockCircuitBreaker.isAvailable.mockReturnValue(true);
+      mockCircuitBreaker.getState.mockReturnValue(CircuitState.CLOSED);
+
+      const allSolvers = registry.getAllSolversForChallengeType('recaptcha');
+      expect(allSolvers).toHaveLength(1);
+      expect(allSolvers[0].circuitBreakerState).toBe(CircuitState.CLOSED);
+      expect(allSolvers[0].isCircuitBreakerAvailable).toBe(true);
+      expect(mockCircuitBreaker.getState).toHaveBeenCalledWith('solver1');
+      expect(mockCircuitBreaker.isAvailable).toHaveBeenCalledWith('solver1');
+    });
+
+    it('should return circuit breaker states in getCircuitBreakerStates', () => {
+      registry.register('solver1', MockSolver, mockCapabilities);
+
+      mockCircuitBreaker.getState.mockReturnValue(CircuitState.CLOSED);
+      mockCircuitBreaker.isAvailable.mockReturnValue(true);
+      mockCircuitBreaker.getStateDetails.mockReturnValue({
+        state: CircuitState.CLOSED,
+        consecutiveFailures: 0,
+        lastFailureTime: 0,
+        nextAttemptTime: 0,
+      });
+
+      const states = registry.getCircuitBreakerStates();
+      expect(states).toHaveProperty('solver1');
+      expect(states.solver1.state).toBe(CircuitState.CLOSED);
+      expect(states.solver1.isAvailable).toBe(true);
+      expect(states.solver1.details).toBeDefined();
+      expect(mockCircuitBreaker.getState).toHaveBeenCalledWith('solver1');
+      expect(mockCircuitBreaker.getStateDetails).toHaveBeenCalledWith('solver1');
     });
   });
 });

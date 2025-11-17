@@ -50,9 +50,4 @@ alwaysApply: true
   - Keep descriptions concise
   - Include both DO and DON'T examples
   - Reference actual code over theoretical examples
-  - Use consistent formatting across rules
-
-- **Project-Specific Rules:**
-  - Follow [nestjs.mdc](mdc:.cursor/rules/nestjs.mdc) for Nest.js best practices and testing requirements
-  - Always write unit tests alongside implementation
-  - Use Taskmaster for task management (see [dev_workflow.mdc](mdc:.cursor/rules/taskmaster/dev_workflow.mdc)) 
+  - Use consistent formatting across rules 
