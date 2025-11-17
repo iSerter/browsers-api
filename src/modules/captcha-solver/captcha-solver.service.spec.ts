@@ -7,6 +7,8 @@ import { CaptchaSolverService } from './captcha-solver.service';
 import { CaptchaSolverConfig } from './entities/captcha-solver-config.entity';
 import { BrowserPoolService } from '../browsers/services/browser-pool.service';
 import { ApiKeyManagerService } from './services/api-key-manager.service';
+import { ProviderRegistryService } from './services/provider-registry.service';
+import { CostTrackingService } from './services/cost-tracking.service';
 
 describe('CaptchaSolverService', () => {
   let service: CaptchaSolverService;
@@ -37,6 +39,20 @@ describe('CaptchaSolverService', () => {
     recordFailure: jest.fn(),
   };
 
+  const mockProviderRegistry = {
+    getProvider: jest.fn(),
+    getAllProviders: jest.fn().mockReturnValue([]),
+    isProviderAvailable: jest.fn(),
+    registerProvider: jest.fn(),
+  };
+
+  const mockCostTracking = {
+    recordCost: jest.fn(),
+    getTotalCost: jest.fn().mockReturnValue(0),
+    getCostByProvider: jest.fn().mockReturnValue(0),
+    getUsageStatistics: jest.fn().mockReturnValue({}),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,6 +72,14 @@ describe('CaptchaSolverService', () => {
         {
           provide: ApiKeyManagerService,
           useValue: mockApiKeyManager,
+        },
+        {
+          provide: ProviderRegistryService,
+          useValue: mockProviderRegistry,
+        },
+        {
+          provide: CostTrackingService,
+          useValue: mockCostTracking,
         },
       ],
     }).compile();

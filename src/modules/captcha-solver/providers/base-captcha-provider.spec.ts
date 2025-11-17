@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { BaseCaptchaProvider } from './base-captcha-provider';
 import { CaptchaParams } from '../interfaces/captcha-solver.interface';
-import { of, throwError } from 'rxjs';
+import { of, throwError, NEVER } from 'rxjs';
 
 class TestProvider extends BaseCaptchaProvider {
   protected async solveCaptcha(params: CaptchaParams): Promise<any> {
@@ -79,10 +79,12 @@ describe('BaseCaptchaProvider', () => {
     });
 
     it('should not retry on authentication errors', async () => {
-      const mockSolve = jest.fn().mockRejectedValue({
+      const authError = {
         response: { status: 401 },
         message: 'Unauthorized',
-      });
+        code: 401,
+      };
+      const mockSolve = jest.fn().mockRejectedValue(authError);
 
       provider['solveCaptcha'] = mockSolve;
 
@@ -92,14 +94,18 @@ describe('BaseCaptchaProvider', () => {
         url: 'https://example.com',
       };
 
-      await expect(provider.solve(params)).rejects.toThrow();
+      await expect(provider.solve(params)).rejects.toMatchObject({
+        response: { status: 401 },
+        message: 'Unauthorized',
+      });
       expect(mockSolve).toHaveBeenCalledTimes(1);
     });
 
     it('should not retry on invalid parameter errors', async () => {
-      const mockSolve = jest.fn().mockRejectedValue({
+      const invalidParamError = {
         message: 'Invalid parameter',
-      });
+      };
+      const mockSolve = jest.fn().mockRejectedValue(invalidParamError);
 
       provider['solveCaptcha'] = mockSolve;
 
@@ -109,7 +115,9 @@ describe('BaseCaptchaProvider', () => {
         url: 'https://example.com',
       };
 
-      await expect(provider.solve(params)).rejects.toThrow();
+      await expect(provider.solve(params)).rejects.toMatchObject({
+        message: 'Invalid parameter',
+      });
       expect(mockSolve).toHaveBeenCalledTimes(1);
     });
   });
@@ -127,15 +135,27 @@ describe('BaseCaptchaProvider', () => {
     });
 
     it('should handle timeout', async () => {
-      httpService.request.mockReturnValue(
-        new Promise((resolve) => {
-          setTimeout(() => resolve(of({ data: {} })), 70000);
-        }) as any,
-      );
+      jest.useFakeTimers();
+      
+      // Mock an observable that never emits to simulate timeout
+      httpService.request.mockReturnValue(NEVER);
 
-      await expect(
-        provider['makeRequest']('GET', 'https://api.example.com'),
-      ).rejects.toThrow('Request timeout');
+      // Use a shorter timeout for testing by temporarily modifying the provider
+      const originalTimeout = provider['timeoutSeconds'];
+      provider['timeoutSeconds'] = 0.1; // 100ms for testing
+
+      try {
+        const requestPromise = provider['makeRequest']('GET', 'https://api.example.com');
+        
+        // Fast-forward time to trigger timeout
+        jest.advanceTimersByTime(150);
+        
+        await expect(requestPromise).rejects.toThrow('Request timeout');
+      } finally {
+        // Restore original timeout and timers
+        provider['timeoutSeconds'] = originalTimeout;
+        jest.useRealTimers();
+      }
     });
 
     it('should handle HTTP errors', async () => {

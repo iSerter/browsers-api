@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DetectionService } from './detection.service';
 import { ConfidenceScoringService } from './confidence-scoring.service';
+import { DetectionRegistryService } from './detection-registry.service';
+import { CaptchaLoggingService } from './captcha-logging.service';
 import {
   AntiBotSystemType,
   SignalStrength,
@@ -11,9 +13,38 @@ describe('DetectionService', () => {
   let mockPage: any;
   let mockContext: any;
 
+  const mockDetectionRegistry = {
+    register: jest.fn(),
+    get: jest.fn(),
+    getAll: jest.fn().mockReturnValue([]),
+    has: jest.fn(),
+    unregister: jest.fn(),
+    clear: jest.fn(),
+  };
+
+  const mockCaptchaLogging = {
+    logDetection: jest.fn(),
+    logSolving: jest.fn(),
+    logError: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DetectionService, ConfidenceScoringService],
+      providers: [
+        DetectionService,
+        {
+          provide: ConfidenceScoringService,
+          useFactory: () => new ConfidenceScoringService(),
+        },
+        {
+          provide: DetectionRegistryService,
+          useValue: mockDetectionRegistry,
+        },
+        {
+          provide: CaptchaLoggingService,
+          useValue: mockCaptchaLogging,
+        },
+      ],
     }).compile();
 
     service = module.get<DetectionService>(DetectionService);
@@ -77,6 +108,10 @@ describe('DetectionService', () => {
       mockPage.evaluate.mockResolvedValue({
         hasChallengeForm: false,
         hasTurnstile: false,
+        hasCfRay: false,
+        hasInterstitial: false,
+        challengeTitle: '',
+        cfRayId: '',
         scripts: [],
       });
 
@@ -90,7 +125,15 @@ describe('DetectionService', () => {
     });
 
     it('should only check target systems when specified', async () => {
-      mockPage.evaluate.mockResolvedValue({});
+      mockPage.evaluate.mockResolvedValue({
+        hasChallengeForm: false,
+        hasTurnstile: false,
+        hasCfRay: false,
+        hasInterstitial: false,
+        challengeTitle: '',
+        cfRayId: '',
+        scripts: [],
+      });
 
       const config = {
         targetSystems: [AntiBotSystemType.CLOUDFLARE],
@@ -438,6 +481,7 @@ describe('DetectionService', () => {
   describe('Error Handling', () => {
     it('should handle page evaluation errors gracefully', async () => {
       mockPage.evaluate.mockRejectedValue(new Error('Evaluation failed'));
+      mockContext.cookies.mockResolvedValue([]);
 
       const result = await service.detectAll(mockPage);
 
@@ -447,7 +491,15 @@ describe('DetectionService', () => {
 
     it('should handle context.cookies() errors', async () => {
       mockContext.cookies.mockRejectedValue(new Error('Cookie access denied'));
-      mockPage.evaluate.mockResolvedValue({});
+      mockPage.evaluate.mockResolvedValue({
+        hasChallengeForm: false,
+        hasTurnstile: false,
+        hasCfRay: false,
+        hasInterstitial: false,
+        challengeTitle: '',
+        cfRayId: '',
+        scripts: [],
+      });
 
       const result = await service.detectAll(mockPage);
 
