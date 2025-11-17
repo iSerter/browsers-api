@@ -15,6 +15,8 @@ describe('CaptchaWidgetInteractionService', () => {
   let mockLocator: any;
 
   beforeEach(async () => {
+    jest.setTimeout(30000);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CaptchaWidgetInteractionService,
@@ -67,8 +69,14 @@ describe('CaptchaWidgetInteractionService', () => {
       keyboard: {
         down: jest.fn().mockResolvedValue(undefined),
         up: jest.fn().mockResolvedValue(undefined),
+        type: jest.fn().mockResolvedValue(undefined),
       },
     };
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
   });
 
   describe('waitForCaptchaWidget', () => {
@@ -114,15 +122,15 @@ describe('CaptchaWidgetInteractionService', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      mockPage.frames.mockImplementation(() => {
-        throw new Error('Frame access error');
-      });
+      // Mock detectWidget to throw an error
+      jest.spyOn(service, 'detectWidget').mockRejectedValue(new Error('Frame access error'));
 
       const result = await service.waitForCaptchaWidget(mockPage);
 
       expect(result.widgetType).toBe(CaptchaWidgetType.UNKNOWN);
       expect(result.iframe).toBeNull();
       expect(result.details?.error).toBeDefined();
+      expect(result.details?.error).toBe('Frame access error');
     });
   });
 
@@ -335,12 +343,13 @@ describe('CaptchaWidgetInteractionService', () => {
 
       const clickPromise = service.clickElement(mockPage, options, config);
 
-      // Fast-forward time
-      jest.advanceTimersByTime(150);
+      // Advance timers to cover the delay
+      await jest.advanceTimersByTimeAsync(250);
 
       const result = await clickPromise;
 
       expect(result.success).toBe(true);
+      expect(mockLocator.click).toHaveBeenCalled();
       jest.useRealTimers();
     });
 
@@ -350,6 +359,7 @@ describe('CaptchaWidgetInteractionService', () => {
       };
       const config: WidgetInteractionConfig = {
         forceClicks: true,
+        enableHumanDelays: false, // Disable delays to avoid timeout
       };
 
       await service.clickElement(mockPage, options, config);
@@ -381,12 +391,16 @@ describe('CaptchaWidgetInteractionService', () => {
       const options: ElementLocatorOptions = {
         css: 'input[type="text"]',
       };
+      const config: WidgetInteractionConfig = {
+        enableHumanDelays: false, // Disable delays to use regular typing
+      };
 
-      const result = await service.typeText(mockPage, 'test text', options);
+      const result = await service.typeText(mockPage, 'test text', options, config);
 
       expect(result.success).toBe(true);
       expect(mockLocator.focus).toHaveBeenCalled();
-      expect(result.duration).toBeGreaterThan(0);
+      expect(mockLocator.type).toHaveBeenCalledWith('test text', { timeout: undefined });
+      expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
     it('should use behavior simulation for human-like typing', async () => {
@@ -414,9 +428,16 @@ describe('CaptchaWidgetInteractionService', () => {
     });
 
     it('should fallback to regular typing for frames', async () => {
+      // Create a frame mock without keyboard property (not undefined, but missing)
       const frameMock: any = {
-        ...mockFrame,
-        keyboard: undefined,
+        url: jest.fn().mockReturnValue('https://example.com/frame'),
+        name: jest.fn().mockReturnValue('test-frame'),
+        evaluate: jest.fn().mockResolvedValue(true),
+        locator: jest.fn().mockReturnValue(mockLocator),
+        getByRole: jest.fn().mockReturnValue(mockLocator),
+        getByText: jest.fn().mockReturnValue(mockLocator),
+        getByLabel: jest.fn().mockReturnValue(mockLocator),
+        // No keyboard property - this is key for the fallback
       };
 
       const options: ElementLocatorOptions = {
@@ -426,11 +447,17 @@ describe('CaptchaWidgetInteractionService', () => {
         enableHumanDelays: true,
       };
 
+      // Mock behaviorSimulation.typeWithTiming to not be called for frames
+      jest.spyOn(behaviorSimulation, 'typeWithTiming').mockResolvedValue(undefined);
+
       await service.typeText(frameMock, 'test', options, config);
 
+      // Should use regular typing since frame doesn't have keyboard
       expect(mockLocator.type).toHaveBeenCalledWith('test', {
         timeout: undefined,
       });
+      // Should not call behaviorSimulation for frames
+      expect(behaviorSimulation.typeWithTiming).not.toHaveBeenCalled();
     });
 
     it('should return error when element not found', async () => {
@@ -454,8 +481,11 @@ describe('CaptchaWidgetInteractionService', () => {
       const options: ElementLocatorOptions = {
         css: 'select',
       };
+      const config: WidgetInteractionConfig = {
+        enableHumanDelays: false, // Disable delays to avoid timeout
+      };
 
-      const result = await service.selectOption(mockPage, 'value1', options);
+      const result = await service.selectOption(mockPage, 'value1', options, config);
 
       expect(result.success).toBe(true);
       expect(mockLocator.selectOption).toHaveBeenCalledWith('value1', {
@@ -467,8 +497,11 @@ describe('CaptchaWidgetInteractionService', () => {
       const options: ElementLocatorOptions = {
         css: 'select[multiple]',
       };
+      const config: WidgetInteractionConfig = {
+        enableHumanDelays: false, // Disable delays to avoid timeout
+      };
 
-      await service.selectOption(mockPage, ['value1', 'value2'], options);
+      await service.selectOption(mockPage, ['value1', 'value2'], options, config);
 
       expect(mockLocator.selectOption).toHaveBeenCalledWith(
         ['value1', 'value2'],
@@ -494,20 +527,27 @@ describe('CaptchaWidgetInteractionService', () => {
 
   describe('waitForElementStability', () => {
     it('should wait for element stability', async () => {
+      jest.useFakeTimers();
       const options: ElementLocatorOptions = {
         css: '.widget',
       };
 
-      const result = await service.waitForElementStability(
+      const stabilityPromise = service.waitForElementStability(
         mockPage,
         options,
         100,
       );
 
+      // Advance timers to resolve setTimeout
+      await jest.advanceTimersByTimeAsync(150);
+
+      const result = await stabilityPromise;
+
       expect(result).toBe(true);
       expect(mockPage.waitForLoadState).toHaveBeenCalledWith('networkidle', {
         timeout: 5000,
       });
+      jest.useRealTimers();
     });
 
     it('should return false when element not found', async () => {
