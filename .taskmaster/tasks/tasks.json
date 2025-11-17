@@ -22,7 +22,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -35,7 +35,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -324,11 +324,182 @@
         ],
         "status": "pending",
         "subtasks": []
+      },
+      {
+        "id": 26,
+        "title": "Fix Test Failures in detection-extensibility.spec.ts",
+        "description": "Resolve failing tests in detection-extensibility.spec.ts related to custom strategy registration, registry service functionality, and DetectionService integration by fixing dependency injection mocks and test setup",
+        "details": "1. Analyze detection-extensibility.spec.ts to identify all failing tests:\n   - Custom strategy registration tests\n   - Registry service functionality tests\n   - DetectionService integration tests\n2. Review DetectionService implementation to understand current API:\n   - Check method signatures and parameters\n   - Identify required dependencies\n   - Verify strategy registration mechanism\n3. Fix TestingModule configuration:\n   - Add missing providers for DetectionService dependencies\n   - Mock external dependencies (HTTP client, configuration service)\n   - Set up proper injection tokens\n4. Update test mocks to match current DetectionService API:\n   - Mock strategy registration methods\n   - Mock registry service methods (register, get, list)\n   - Mock detection execution methods\n5. Fix custom strategy registration tests:\n   - Verify strategy interface implementation\n   - Test registration with valid/invalid strategies\n   - Test duplicate registration handling\n6. Fix registry service tests:\n   - Test strategy retrieval by type\n   - Test listing all registered strategies\n   - Test strategy priority ordering\n7. Fix DetectionService integration tests:\n   - Mock page content and detection scenarios\n   - Test custom strategy execution flow\n   - Test fallback to built-in strategies\n8. Address timing issues with async/await or fakeAsync\n9. Run tests locally: npm test detection-extensibility.spec.ts\n10. Verify no regression in related detection tests",
+        "testStrategy": "Run 'npm test detection-extensibility.spec.ts' to verify all tests pass. Execute full detection module test suite to ensure no regressions. Check test coverage remains above threshold. Run tests multiple times to verify stability and no flaky tests. Verify mock setup correctly simulates DetectionService behavior.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          23
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 27,
+        "title": "Fix Test Failures in anti-captcha.provider.spec.ts",
+        "description": "Resolve failing tests in anti-captcha.provider.spec.ts by fixing HTTP service mocking issues, UUID ESM module import problems, and RxJS observable mocking to ensure provider tests pass",
+        "details": "1. Analyze anti-captcha.provider.spec.ts to identify all failing tests:\n   - HTTP request/response mocking failures\n   - UUID generation and ESM module import errors\n   - Observable stream mocking issues\n   - Provider initialization and configuration tests\n2. Fix HTTP service mocking:\n   - Update HttpService mock to return proper Observable responses\n   - Use rxjs 'of' and 'throwError' operators correctly\n   - Mock AxiosResponse structure with proper headers, status, data\n   - Example: httpService.post.mockReturnValue(of({ data: { taskId: '123' }, status: 200, statusText: 'OK', headers: {}, config: {} }))\n3. Resolve UUID ESM module issues:\n   - Replace 'import { v4 as uuidv4 }' with 'import * as uuid' and use uuid.v4()\n   - Or use jest.mock('uuid') with proper factory function\n   - Mock uuid in test setup: jest.mock('uuid', () => ({ v4: jest.fn(() => 'test-uuid-123') }))\n4. Fix RxJS observable mocking:\n   - Import operators from 'rxjs/operators'\n   - Use proper pipe() chains in mocks\n   - Mock timer and interval observables correctly\n   - Handle async observable subscriptions in tests with done() callback or async/await\n5. Update TestingModule configuration:\n   - Add HttpService to providers with proper mock\n   - Mock ConfigService with anti-captcha API key\n   - Add LoggerService mock if needed\n6. Fix assertion issues:\n   - Update expected values to match actual provider responses\n   - Fix timing issues with fakeAsync/tick or waitForAsync\n   - Verify error handling paths are tested correctly\n7. Apply shared utilities if available:\n   - Use retry utilities from Task 22 if implemented\n   - Use error formatting utilities for consistent error handling",
+        "testStrategy": "Run 'npm test anti-captcha.provider.spec.ts' to verify all tests pass. Check that HTTP mocking correctly simulates API responses. Verify UUID generation works in test environment. Confirm observable streams complete properly. Run tests multiple times to ensure no flaky behavior. Execute full captcha-solver test suite to verify no regressions. Check test coverage for the provider remains above 80%. Verify mock setup doesn't leak between tests by running tests in random order.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          22
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 28,
+        "title": "Fix Test Failures in audio-captcha-processing.service.spec.ts",
+        "description": "Resolve failing tests in audio-captcha-processing.service.spec.ts for downloadAudio and processAudioCaptcha methods by implementing proper mocks for HTTP requests, audio processing libraries, and cache management",
+        "details": "1. Analyze audio-captcha-processing.service.spec.ts to identify all failing tests:\n   - downloadAudio method tests (HTTP download failures)\n   - processAudioCaptcha method tests (audio processing mock issues)\n   - Cache management integration tests\n   - Error handling and retry logic tests\n2. Fix HTTP service mocking for downloadAudio:\n   - Mock HttpService to return proper Observable<AxiosResponse> for audio file downloads\n   - Example: httpService.get.mockReturnValue(of({ data: Buffer.from('mock-audio'), status: 200, statusText: 'OK', headers: {}, config: {} }))\n   - Mock different response scenarios: success, 404, timeout, network errors\n   - Use rxjs operators (of, throwError) correctly for async flows\n3. Mock audio processing libraries:\n   - If using fluent-ffmpeg or similar, create mock implementations\n   - Mock audio format conversion methods\n   - Mock audio analysis/processing functions\n   - Example: jest.mock('fluent-ffmpeg', () => ({ ffprobe: jest.fn(), command: jest.fn() }))\n4. Fix cache management mocking:\n   - Mock cache service methods (get, set, delete)\n   - Simulate cache hits and misses\n   - Mock cache expiration behavior\n   - Example: cacheManager.get.mockResolvedValue(null) for cache miss\n5. Update TestingModule configuration:\n   - Add all required providers for AudioCaptchaProcessingService\n   - Include mocked HttpService, CacheManager, ConfigService\n   - Provide proper injection tokens\n6. Fix async test handling:\n   - Use async/await or done callbacks correctly\n   - Ensure observables complete in tests\n   - Add proper timeout configurations for long-running operations\n7. Add test data fixtures:\n   - Create mock audio file buffers\n   - Define expected processing results\n   - Create sample error responses\n8. Verify error handling tests:\n   - Test network failures during download\n   - Test invalid audio format scenarios\n   - Test cache write failures\n   - Test timeout scenarios",
+        "testStrategy": "Run 'npm test audio-captcha-processing.service.spec.ts' to verify all tests pass. Specifically verify downloadAudio tests handle HTTP mocking correctly with success and error cases. Confirm processAudioCaptcha tests properly mock audio processing libraries. Verify cache management mocks simulate hits, misses, and errors correctly. Run tests multiple times to ensure no flaky behavior. Check test coverage for the audio-captcha-processing service remains above threshold. Execute full captcha-solver test suite to ensure no regressions in related services. Verify all async operations complete properly without hanging tests",
+        "status": "pending",
+        "dependencies": [
+          1,
+          24
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 29,
+        "title": "Fix Test Failures in captcha-widget-interaction.service.spec.ts",
+        "description": "Resolve timeout issues and test failures in captcha-widget-interaction.service.spec.ts by implementing proper async/await handling, mocking Playwright page interactions, and fixing element stability detection logic",
+        "details": "1. Analyze captcha-widget-interaction.service.spec.ts to identify all failing tests:\n   - Tests timing out due to async operations\n   - Playwright page interaction mock failures\n   - Element stability detection issues\n   - Widget interaction sequence tests\n2. Fix async/await handling:\n   - Ensure all async operations use proper await keywords\n   - Add timeout configurations to test suite: jest.setTimeout(30000)\n   - Use waitFor utilities for async assertions\n   - Example: await waitFor(() => expect(mockPage.click).toHaveBeenCalled(), { timeout: 5000 })\n3. Mock Playwright page interactions:\n   - Create comprehensive page mock with all required methods\n   - Mock page.waitForSelector() to return immediately: mockPage.waitForSelector.mockResolvedValue(mockElement)\n   - Mock page.click(), page.type(), page.evaluate() with proper return values\n   - Mock page.$() and page.$$() for element queries\n   - Example: const mockPage = { click: jest.fn().mockResolvedValue(undefined), waitForSelector: jest.fn().mockResolvedValue({ boundingBox: () => ({ x: 0, y: 0, width: 100, height: 100 }) }), evaluate: jest.fn().mockResolvedValue(true) }\n4. Fix element stability detection mocks:\n   - Mock element position tracking over time\n   - Simulate stable and unstable element scenarios\n   - Mock boundingBox() method with consistent coordinates\n   - Example: mockElement.boundingBox.mockResolvedValue({ x: 100, y: 100, width: 50, height: 50 })\n5. Update test setup:\n   - Configure TestingModule with all required providers\n   - Mock dependencies like ConfigService, LoggerService\n   - Set up proper beforeEach and afterEach hooks for cleanup\n6. Handle race conditions:\n   - Use jest.useFakeTimers() for time-dependent tests\n   - Implement proper cleanup in afterEach blocks\n   - Ensure all promises are resolved before test completion\n7. Add proper error handling mocks:\n   - Mock timeout scenarios\n   - Mock element not found errors\n   - Test retry logic with controlled failures",
+        "testStrategy": "Run 'npm test captcha-widget-interaction.service.spec.ts' to verify all tests pass without timeouts. Confirm tests complete within reasonable time (under 10 seconds per test). Verify Playwright page mocks are called with correct parameters. Test element stability detection logic with both stable and unstable scenarios. Run tests multiple times to ensure no flaky behavior. Check that async operations properly await completion. Verify cleanup happens in afterEach blocks. Execute full test suite to ensure no regressions in related services. Validate test coverage remains above threshold for the service.",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 30,
+        "title": "Fix Test Failures in human-behavior-simulation.service.spec.ts",
+        "description": "Resolve failing tests in human-behavior-simulation.service.spec.ts for moveMouseBezier method by fixing UUID ESM module imports, correcting timing/delay mocks, and updating Bezier curve calculation test expectations",
+        "details": "1. Analyze human-behavior-simulation.service.spec.ts to identify all failing tests:\n   - moveMouseBezier method tests failing due to UUID import issues\n   - Timing/delay mock configuration problems\n   - Bezier curve calculation assertion mismatches\n   - Mouse movement simulation tests\n2. Fix UUID ESM module import issues:\n   - Update jest.config.js to handle ESM modules: transformIgnorePatterns: ['node_modules/(?!(uuid)/)']\n   - Mock UUID in test setup: jest.mock('uuid', () => ({ v4: jest.fn(() => 'test-uuid-1234') }))\n   - Alternative: Use dynamic import: const { v4: uuidv4 } = await import('uuid')\n3. Fix timing and delay mocks:\n   - Mock setTimeout/setInterval properly: jest.useFakeTimers()\n   - Advance timers in tests: jest.advanceTimersByTime(expectedDelay)\n   - Ensure async operations complete: await jest.runAllTimersAsync()\n   - Example: beforeEach(() => { jest.useFakeTimers(); }); afterEach(() => { jest.useRealTimers(); });\n4. Update Bezier curve calculation tests:\n   - Review current implementation of moveMouseBezier to understand calculation changes\n   - Update test expectations to match new Bezier curve algorithm\n   - Verify control points generation logic\n   - Test curve smoothness and point distribution\n   - Example: expect(points).toHaveLength(expectedSteps); expect(points[0]).toEqual({ x: startX, y: startY });\n5. Fix mouse movement simulation mocks:\n   - Mock Playwright page.mouse.move() calls\n   - Verify movement coordinates are within expected ranges\n   - Test randomization and human-like behavior patterns\n6. Add proper test isolation:\n   - Clear all mocks between tests: afterEach(() => { jest.clearAllMocks(); });\n   - Reset module registry if needed: jest.resetModules();\n7. Handle async operations properly:\n   - Ensure all async methods use await\n   - Add proper error handling in tests\n   - Use waitFor for timing-dependent assertions",
+        "testStrategy": "Run 'npm test human-behavior-simulation.service.spec.ts' to verify all tests pass. Specifically verify moveMouseBezier tests handle UUID generation correctly without ESM import errors. Confirm timing mocks properly simulate delays and mouse movement intervals. Verify Bezier curve calculations produce expected point sequences with correct start/end positions. Test that mouse movement simulations generate realistic human-like patterns. Run tests multiple times to ensure no flaky behavior from timing issues. Check test execution time is reasonable (under 5 seconds per test). Verify all mocks are properly cleaned up between tests. Execute full test suite to ensure no regressions in related services.",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 31,
+        "title": "Fix Test Failures in native-solver-registry.service.spec.ts",
+        "description": "Resolve error handling test failures in native-solver-registry.service.spec.ts by implementing proper dependency mocks, fixing error scenario setup, and ensuring correct exception handling for solver registration and retrieval operations",
+        "details": "1. Analyze native-solver-registry.service.spec.ts to identify all failing tests:\n   - Error handling tests for invalid solver registration\n   - Exception scenarios for missing or unavailable solvers\n   - Registry initialization error cases\n   - Solver retrieval failure scenarios\n2. Review NativeSolverRegistryService implementation:\n   - Identify all dependencies (ConfigService, LoggerService, etc.)\n   - Map error handling paths and exception types\n   - Understand solver registration mechanism\n3. Fix TestingModule configuration:\n   - Add missing provider mocks for all dependencies\n   - Mock ConfigService with proper configuration values\n   - Mock LoggerService methods (error, warn, debug)\n   - Example: { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue({}) } }\n4. Implement proper error scenario mocks:\n   - Mock solver registration failures with specific error types\n   - Setup test cases for CaptchaSolverException scenarios\n   - Mock invalid solver configurations\n   - Example: mockSolver.register.mockRejectedValue(new CaptchaSolverException('Registration failed'))\n5. Fix error handling assertions:\n   - Use proper Jest matchers: expect().rejects.toThrow()\n   - Verify error messages and types\n   - Check logger calls for error scenarios\n   - Example: await expect(service.registerSolver(invalidConfig)).rejects.toThrow(CaptchaSolverException)\n6. Apply learnings from similar test fixes:\n   - Use proper async/await patterns from Task 29\n   - Handle ESM module imports if needed (Task 30 approach)\n   - Ensure proper mock cleanup between tests\n7. Update error type handling:\n   - Replace any types with unknown where applicable (Task 16 pattern)\n   - Implement type guards for error checking\n   - Example: if (error instanceof CaptchaSolverException) { ... }",
+        "testStrategy": "Run 'npm test native-solver-registry.service.spec.ts' to verify all tests pass, especially error handling scenarios. Verify error mocks correctly simulate registration failures, invalid configurations, and missing solver scenarios. Confirm exception types are properly caught and handled. Check that logger mocks are called with appropriate error messages. Run tests multiple times to ensure stability and no flaky behavior. Execute full captcha-solver module test suite to verify no regressions. Verify test coverage for error paths remains above threshold. Test both synchronous and asynchronous error scenarios complete correctly.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 32,
+        "title": "Fix Test Failures in solver-orchestration.service.spec.ts",
+        "description": "Resolve multiple test failures in solver-orchestration.service.spec.ts for the detectAndSolve method by implementing proper service mocks, fixing test data setup, updating orchestration service API calls, and ensuring correct handling of detection, solving, fallback, timeout, and performance tracking scenarios",
+        "details": "1. Analyze solver-orchestration.service.spec.ts to identify all failing tests:\n   - detectAndSolve method detection phase failures\n   - Solver execution and fallback scenario tests\n   - Timeout handling and cancellation tests\n   - Performance tracking and metrics collection tests\n   - Error propagation and recovery tests\n2. Review SolverOrchestrationService implementation:\n   - Verify current detectAndSolve method signature and parameters\n   - Identify all service dependencies (DetectionService, SolverCircuitBreaker, PerformanceMonitor, etc.)\n   - Map orchestration flow: detection -> solver selection -> execution -> fallback -> metrics\n3. Fix service mocking in test setup:\n   - Mock DetectionService.detectAll() to return proper DetectionResult[]\n   - Mock SolverCircuitBreaker.isAvailable() and state management methods\n   - Mock individual solver services (NativeSolverRegistry, external providers)\n   - Mock PerformanceMonitor for tracking metrics\n   - Example: detectionService.detectAll.mockResolvedValue([{ type: 'recaptcha-v2', confidence: 0.95, elements: [...] }])\n4. Fix test data setup:\n   - Create comprehensive mock DetectionResult objects with all required fields\n   - Setup mock Page objects with proper Playwright API surface\n   - Configure mock solver responses with success/failure scenarios\n   - Prepare timeout simulation data\n5. Update tests for orchestration API changes:\n   - Verify method parameters match current implementation\n   - Update assertion expectations for return values\n   - Fix async/await patterns and Promise handling\n   - Add proper error type checking\n6. Implement fallback scenario tests:\n   - Mock primary solver failure followed by fallback solver success\n   - Test circuit breaker integration during fallback\n   - Verify fallback chain execution order\n7. Fix timeout handling tests:\n   - Use jest.useFakeTimers() for timeout simulation\n   - Mock Promise.race scenarios for timeout vs completion\n   - Verify cleanup and cancellation logic\n8. Fix performance tracking tests:\n   - Mock performance metrics collection\n   - Verify timing measurements are recorded\n   - Test metrics aggregation and reporting",
+        "testStrategy": "Run 'npm test solver-orchestration.service.spec.ts' to verify all tests pass. Specifically verify detectAndSolve tests handle detection phase correctly with proper DetectionService mocks. Confirm solver execution tests properly simulate success, failure, and fallback scenarios. Verify timeout tests correctly simulate time-based cancellation using fake timers. Check performance tracking tests capture metrics at appropriate points. Run tests with --verbose flag to identify any remaining mock configuration issues. Execute full captcha-solver module test suite to ensure no regressions in dependent services. Verify test execution time is reasonable (under 30 seconds total). Test with different solver configurations to ensure orchestration handles various scenarios",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6,
+          11,
+          23
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 33,
+        "title": "Fix Test Failures in solver-factory.service.spec.ts",
+        "description": "Resolve test failures in solver-factory.service.spec.ts for selectBestSolver and solveWithFallback methods by implementing proper dependency mocks, fixing solver registry setup, updating factory service API calls, and ensuring correct handling of solver selection, fallback logic, and circuit breaker integration",
+        "details": "1. Analyze solver-factory.service.spec.ts to identify all failing tests:\n   - selectBestSolver method tests (solver selection logic failures)\n   - solveWithFallback method tests (fallback chain execution issues)\n   - Circuit breaker integration tests\n   - Solver registry interaction tests\n   - Error handling and recovery scenarios\n2. Review SolverFactory implementation:\n   - Verify current selectBestSolver method signature and selection criteria\n   - Check solveWithFallback implementation and fallback chain logic\n   - Identify all service dependencies (SolverRegistry, CircuitBreaker, ConfigService, LoggerService)\n   - Map error handling paths and exception types\n3. Fix dependency mocking:\n   - Mock SolverRegistry with proper getSolver and listAvailableSolvers methods\n   - Mock CircuitBreaker with isAvailable, recordSuccess, recordFailure methods\n   - Example: const mockRegistry = { getSolver: jest.fn(), listAvailableSolvers: jest.fn().mockReturnValue(['native', 'twocaptcha']) };\n   - Mock ConfigService for solver priority configuration\n   - Mock LoggerService for proper logging verification\n4. Fix selectBestSolver tests:\n   - Setup test data with multiple solver types and priorities\n   - Mock circuit breaker to return availability status for different solvers\n   - Test solver selection based on priority when all available\n   - Test fallback to next priority when primary solver unavailable\n   - Verify proper handling when no solvers available\n5. Fix solveWithFallback tests:\n   - Mock solver instances with solve methods that succeed/fail\n   - Test successful solve on first attempt\n   - Test fallback chain when primary solver fails\n   - Test exhaustion of all solvers and final error\n   - Verify circuit breaker recordSuccess/recordFailure calls\n   - Test timeout scenarios and cancellation\n6. Update test assertions:\n   - Verify correct solver selection logic\n   - Check fallback chain execution order\n   - Confirm circuit breaker integration calls\n   - Validate error messages and types\n7. Add missing test setup:\n   - Configure TestingModule with all required providers\n   - Setup beforeEach hooks to reset mocks\n   - Add test fixtures for captcha data and solver responses",
+        "testStrategy": "Run 'npm test solver-factory.service.spec.ts' to verify all tests pass. Specifically verify selectBestSolver tests correctly handle solver priority, availability, and circuit breaker state. Confirm solveWithFallback tests properly simulate success, failure, and fallback scenarios with correct circuit breaker integration. Verify mock setup correctly simulates SolverRegistry returning different solver instances. Check that circuit breaker mocks are called with correct parameters (recordSuccess/recordFailure). Test error handling scenarios including no available solvers and all solvers failing. Run tests multiple times to ensure stability and no flaky behavior. Execute full captcha-solver module test suite to verify no regressions in related components.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6,
+          8
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 34,
+        "title": "Fix Test Failures in native-akamai-solver.spec.ts",
+        "description": "Resolve test failures in native-akamai-solver.spec.ts by fixing UUID ESM module import issues, implementing proper Playwright page mocks for browser automation, and correcting challenge detection logic in test scenarios",
+        "details": "1. Analyze native-akamai-solver.spec.ts to identify all failing tests:\n   - UUID ESM module import errors causing test initialization failures\n   - Playwright page mock issues for browser interaction tests\n   - Challenge detection logic assertion mismatches\n   - Solver execution and response handling tests\n   - Error handling and timeout scenarios\n2. Fix UUID ESM module import issues:\n   - Update jest.config.js to handle ESM modules: transformIgnorePatterns: ['node_modules/(?!(uuid)/)'] or add 'uuid' to transformIgnorePatterns exceptions\n   - Mock UUID in test setup: jest.mock('uuid', () => ({ v4: jest.fn(() => 'test-uuid-1234') }))\n   - Alternatively use dynamic import: const { v4: uuidv4 } = await import('uuid')\n   - Ensure consistent UUID mocking across all test cases\n3. Implement proper Playwright page mocks:\n   - Mock page.goto() with proper navigation responses\n   - Mock page.evaluate() for JavaScript execution in browser context\n   - Mock page.waitForSelector() and page.waitForTimeout() for element waiting\n   - Mock page.content() to return HTML with Akamai challenge elements\n   - Example: const mockPage = { goto: jest.fn().mockResolvedValue(undefined), evaluate: jest.fn().mockResolvedValue({}), waitForSelector: jest.fn().mockResolvedValue({}), content: jest.fn().mockResolvedValue('<html>...</html>') }\n4. Fix challenge detection logic in tests:\n   - Review NativeAkamaiSolver implementation to understand current detection mechanism\n   - Update test expectations to match actual Akamai challenge patterns\n   - Mock challenge elements correctly in page content\n   - Verify sensor data generation and submission logic\n   - Test both successful detection and no-challenge scenarios\n5. Update solver execution tests:\n   - Mock browser context and page lifecycle correctly\n   - Simulate Akamai sensor data collection\n   - Test token extraction and validation\n   - Handle timeout and error scenarios properly\n6. Fix async/await handling:\n   - Ensure all async operations use proper await keywords\n   - Add timeout configurations: jest.setTimeout(30000)\n   - Use proper Promise resolution in mocks",
+        "testStrategy": "Run 'npm test native-akamai-solver.spec.ts' to verify all tests pass without UUID import errors. Confirm Playwright page mocks are called with correct parameters and return expected values. Verify challenge detection logic correctly identifies Akamai challenges in mocked page content. Test solver execution handles success, failure, and timeout scenarios properly. Ensure no ESM module errors appear in test output. Run tests multiple times to verify stability and no flaky behavior. Check that all async operations complete within timeout limits. Verify mock setup correctly simulates browser automation without actual Playwright dependency",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 35,
+        "title": "Fix Test Failures in native-datadome-solver.spec.ts",
+        "description": "Resolve test failures in native-datadome-solver.spec.ts for determineChallengeType method by implementing proper Playwright page mocks for slider challenge detection, fixing challenge type detection logic, and ensuring correct handling of DataDome challenge scenarios",
+        "details": "1. Analyze native-datadome-solver.spec.ts to identify all failing tests:\n   - determineChallengeType method tests for slider challenge detection\n   - Playwright page mock configuration issues\n   - Challenge detection logic assertion failures\n   - DOM element selector and content verification tests\n   - Other DataDome challenge type detection scenarios (CAPTCHA, device check, etc.)\n2. Review NativeDataDomeSolver implementation:\n   - Examine determineChallengeType method signature and detection logic\n   - Identify DOM selectors used for slider challenge detection\n   - Understand DataDome challenge page structure and indicators\n   - Map all challenge types supported by DataDome solver\n3. Fix Playwright page mocks for slider challenge:\n   - Mock page.$ and page.$$ methods to return proper element handles\n   - Mock page.evaluate to return slider challenge indicators\n   - Example: page.$.mockResolvedValue({ evaluate: jest.fn().mockResolvedValue('slider-captcha-class') })\n   - Mock page content with DataDome slider HTML structure\n   - Set up proper element visibility and attribute mocks\n4. Update challenge detection logic tests:\n   - Create comprehensive mock page content for each DataDome challenge type\n   - Mock slider-specific DOM elements: '.datadome-slider', '[data-dd-slider]', etc.\n   - Verify detection logic checks correct attributes and classes\n   - Test edge cases: missing elements, ambiguous indicators, multiple challenge types\n5. Fix test assertions:\n   - Update expected challenge type values to match implementation\n   - Ensure mock data structure matches actual DataDome page format\n   - Add proper async/await handling for page interaction mocks\n   - Verify error handling for unrecognized challenge types\n6. Handle UUID ESM module imports if present:\n   - Apply same UUID mock strategy as other solver tests\n   - Update jest.config.js transformIgnorePatterns if needed\n7. Add comprehensive test coverage:\n   - Test all DataDome challenge types (slider, CAPTCHA, device check)\n   - Test detection with partial/incomplete page content\n   - Test timeout and error scenarios\n   - Verify solver initialization and configuration",
+        "testStrategy": "Run 'npm test native-datadome-solver.spec.ts' to verify all tests pass without page mock errors. Specifically verify determineChallengeType tests correctly identify slider challenges from mocked page content. Confirm Playwright page mocks are called with correct selectors and return expected element structures. Test detection logic handles all DataDome challenge types correctly. Verify edge cases like missing elements or ambiguous indicators are handled gracefully. Run tests multiple times to ensure stability. Execute full native solver test suite to check for regressions. Verify test coverage for DataDome solver remains above threshold.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 36,
+        "title": "Fix Test Failures in native-hcaptcha-solver.spec.ts",
+        "description": "Resolve test failures in native-hcaptcha-solver.spec.ts by fixing UUID ESM module import issues, implementing proper Playwright page mocks for hCaptcha widget interactions, and correcting challenge detection and solving logic in test scenarios",
+        "details": "1. Analyze native-hcaptcha-solver.spec.ts to identify all failing tests:\n   - UUID ESM module import errors causing test initialization failures\n   - Playwright page mock issues for hCaptcha widget interaction tests\n   - Challenge detection logic assertion mismatches\n   - Widget frame navigation and element selection tests\n   - Solver execution and response handling tests\n   - Error handling and timeout scenarios\n2. Fix UUID ESM module import issues:\n   - Update jest.config.js to handle ESM modules: transformIgnorePatterns: ['node_modules/(?!(uuid)/)'] or add moduleNameMapper: {'^uuid$': require.resolve('uuid')}\n   - Mock UUID in test setup: jest.mock('uuid', () => ({ v4: jest.fn(() => 'test-uuid-1234') }))\n   - Ensure consistent UUID mocking across all test cases\n3. Implement proper Playwright page mocks for hCaptcha widget interactions:\n   - Mock page.frame() to return hCaptcha iframe mock with proper selectors\n   - Mock page.waitForSelector() for hCaptcha widget elements: page.waitForSelector.mockResolvedValue(mockElement)\n   - Mock page.click() for checkbox and challenge interactions\n   - Mock page.evaluate() for extracting hCaptcha tokens and challenge data\n   - Example: const frameMock = { $: jest.fn().mockResolvedValue(mockElement), click: jest.fn().mockResolvedValue(undefined) }; page.frame.mockReturnValue(frameMock)\n4. Fix hCaptcha challenge detection logic:\n   - Update test expectations to match NativeHCaptchaSolver.detectChallenge() implementation\n   - Mock page content with proper hCaptcha widget HTML structure\n   - Verify iframe detection: page.$('iframe[src*=\"hcaptcha.com\"]')\n   - Test checkbox detection and click simulation\n5. Correct widget interaction mocks:\n   - Mock frame switching for hCaptcha challenge iframe\n   - Mock image grid selection for image challenges\n   - Mock audio challenge interactions if supported\n   - Ensure proper async/await handling in all interaction sequences\n6. Update solver execution tests:\n   - Mock successful token extraction from hCaptcha response\n   - Test error scenarios: widget not found, timeout, network errors\n   - Verify retry logic and fallback mechanisms\n   - Mock page.waitForFunction() for token availability checks\n7. Add comprehensive error handling tests:\n   - Test invalid page state scenarios\n   - Verify timeout handling with proper jest.setTimeout() configuration\n   - Test network failure recovery\n   - Ensure proper cleanup in afterEach hooks",
+        "testStrategy": "Run 'npm test native-hcaptcha-solver.spec.ts' to verify all tests pass without UUID import errors. Confirm Playwright page mocks are called with correct parameters for hCaptcha widget detection and interaction. Verify challenge detection logic correctly identifies hCaptcha widgets in mocked page content with iframe selectors. Test solver execution properly simulates checkbox clicks, challenge solving, and token extraction. Verify error handling tests cover timeout scenarios, missing widgets, and network failures. Run tests multiple times to ensure no flaky behavior. Check that all async operations complete within configured timeouts. Verify mock cleanup in afterEach prevents test pollution. Execute full native solver test suite to ensure no regressions in related solvers.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6,
+          29
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 37,
+        "title": "Fix Test Failures in native-recaptcha-solver.spec.ts",
+        "description": "Resolve test failures in native-recaptcha-solver.spec.ts by fixing UUID ESM module import issues, implementing proper Playwright page mocks for reCAPTCHA widget interactions, and correcting challenge detection and solving logic in test scenarios",
+        "details": "1. Analyze native-recaptcha-solver.spec.ts to identify all failing tests:\n   - UUID ESM module import errors causing test initialization failures\n   - Playwright page mock issues for reCAPTCHA widget interaction tests\n   - Challenge detection logic assertion mismatches\n   - reCAPTCHA iframe navigation and element selection tests\n   - Solver execution and response handling tests\n   - Error handling and timeout scenarios\n2. Fix UUID ESM module import issues:\n   - Update jest.config.js to handle ESM modules: transformIgnorePatterns: ['node_modules/(?!(uuid)/)'] or add moduleNameMapper: {'^uuid$': require.resolve('uuid')}\n   - Mock UUID in test setup: jest.mock('uuid', () => ({ v4: jest.fn(() => 'test-uuid-1234') }))\n   - Ensure consistent UUID mocking across all test cases\n3. Implement proper Playwright page mocks:\n   - Mock page.frame() for reCAPTCHA iframe access: page.frame.mockReturnValue(mockFrame)\n   - Mock page.waitForSelector() for widget detection: page.waitForSelector.mockResolvedValue(mockElement)\n   - Mock page.evaluate() for reCAPTCHA token extraction: page.evaluate.mockResolvedValue('recaptcha-token-value')\n   - Mock page.click() for checkbox interaction: page.click.mockResolvedValue(undefined)\n   - Create comprehensive mockFrame object with querySelector, evaluate, and waitForFunction methods\n4. Review NativeRecaptchaSolver implementation:\n   - Verify detectChallenge method logic for reCAPTCHA v2/v3 detection\n   - Check solve method implementation for widget interaction flow\n   - Identify reCAPTCHA-specific selectors: '.g-recaptcha', '#recaptcha-anchor', '.recaptcha-checkbox'\n   - Understand token extraction and response callback mechanism\n5. Fix challenge detection logic tests:\n   - Update test expectations to match actual reCAPTCHA detection patterns\n   - Mock page content with proper reCAPTCHA HTML structure\n   - Test both v2 (checkbox) and v3 (invisible) reCAPTCHA scenarios\n   - Verify sitekey extraction from data-sitekey attribute\n6. Correct solving logic mocks:\n   - Mock captcha-widget-interaction.service methods for widget interaction\n   - Mock human-behavior-simulation.service for realistic interaction timing\n   - Simulate successful token retrieval: mockFrame.evaluate.mockResolvedValue('03AGdBq...')\n   - Test error scenarios: expired tokens, network failures, timeout conditions\n7. Update test assertions:\n   - Verify correct Playwright API calls with expected parameters\n   - Check solver response format matches SolverResponse interface\n   - Validate error handling returns appropriate error messages\n   - Ensure async operations complete within test timeout limits",
+        "testStrategy": "Run 'npm test native-recaptcha-solver.spec.ts' to verify all tests pass without UUID import errors. Confirm Playwright page mocks are called with correct parameters for reCAPTCHA widget detection and interaction. Verify challenge detection logic correctly identifies reCAPTCHA v2 and v3 widgets in mocked page content with proper sitekey extraction. Test solver execution properly simulates iframe navigation, checkbox clicking, and token extraction. Verify error handling tests correctly simulate timeout, network failure, and expired token scenarios. Run tests multiple times to ensure stability and no flaky behavior. Check that all async operations complete within test timeout limits. Verify mock setup correctly simulates reCAPTCHA widget structure and interaction flow. Execute full native solver test suite to ensure no regressions in related tests.",
+        "status": "pending",
+        "dependencies": [
+          1,
+          6,
+          29
+        ],
+        "priority": "high",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-11-17T01:03:11.457Z",
-      "updated": "2025-11-17T01:07:22.554Z",
+      "updated": "2025-11-17T02:04:47.598Z",
       "description": "Tasks for master context"
     }
   }
