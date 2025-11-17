@@ -22,6 +22,11 @@ import {
   OpenAIWhisperProvider,
   AzureSpeechProvider,
 } from './providers';
+import {
+  NetworkException,
+  InternalException,
+  SolverUnavailableException,
+} from '../exceptions';
 
 /**
  * Default audio processing configuration
@@ -304,7 +309,15 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
         // Download from URL
         const response = await fetch(audioUrl);
         if (!response.ok) {
-          throw new Error(`Failed to download audio: ${response.statusText}`);
+          throw new NetworkException(
+            `Failed to download audio: ${response.statusText}`,
+            undefined,
+            {
+              url: audioUrl,
+              statusCode: response.status,
+              statusText: response.statusText,
+            },
+          );
         }
         const arrayBuffer = await response.arrayBuffer();
         audioBuffer = Buffer.from(arrayBuffer);
@@ -414,7 +427,11 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
         // Extract audio URL from page
         const audioUrl = await this.extractAudioUrl(page);
         if (!audioUrl) {
-          throw new Error('Could not extract audio URL from page');
+          throw new InternalException(
+            'Could not extract audio URL from page',
+            undefined,
+            { method: 'processAudioCaptcha' },
+          );
         }
         request.audioUrl = audioUrl;
       }
@@ -656,8 +673,14 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
       }
     }
 
-    throw new Error(
+    throw new SolverUnavailableException(
       `All transcription providers failed after ${attempt} attempts`,
+      'speech-to-text',
+      'all_providers_failed',
+      {
+        attemptedProviders: this.config.providerPriority,
+        attempts,
+      },
     );
   }
 

@@ -1129,7 +1129,11 @@ export class DetectionService implements OnModuleInit {
   private async getDetectionContext(page: Page): Promise<DetectionContext> {
     try {
       if (!page) {
-        throw new Error('Page object is null or undefined');
+        throw new InternalException(
+          'Page object is null or undefined',
+          undefined,
+          { method: 'getDetectionContext' },
+        );
       }
 
       const url = page.url();

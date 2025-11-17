@@ -43,13 +43,19 @@ export class NativeSolverRegistryService implements OnModuleInit {
       },
     };
 
-    this.solverRegistry.register(
-      'turnstile-native',
-      TurnstileSolver,
-      turnstileCapabilities,
-    );
-
-    this.logger.log('Registered TurnstileSolver as native solver');
+    try {
+      this.solverRegistry.register(
+        'turnstile-native',
+        TurnstileSolver,
+        turnstileCapabilities,
+      );
+      this.logger.log('Registered TurnstileSolver as native solver');
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to register TurnstileSolver: ${error.message}`,
+        error.stack,
+      );
+    }
 
     // Register NativeRecaptchaSolver
     const recaptchaCapabilities: SolverCapability = {
@@ -68,13 +74,19 @@ export class NativeSolverRegistryService implements OnModuleInit {
       },
     };
 
-    this.solverRegistry.register(
-      'recaptcha-native',
-      NativeRecaptchaSolver,
-      recaptchaCapabilities,
-    );
-
-    this.logger.log('Registered NativeRecaptchaSolver as native solver');
+    try {
+      this.solverRegistry.register(
+        'recaptcha-native',
+        NativeRecaptchaSolver,
+        recaptchaCapabilities,
+      );
+      this.logger.log('Registered NativeRecaptchaSolver as native solver');
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to register NativeRecaptchaSolver: ${error.message}`,
+        error.stack,
+      );
+    }
 
     // Register NativeHcaptchaSolver
     const hcaptchaCapabilities: SolverCapability = {
@@ -92,13 +104,19 @@ export class NativeSolverRegistryService implements OnModuleInit {
       },
     };
 
-    this.solverRegistry.register(
-      'hcaptcha-native',
-      NativeHcaptchaSolver,
-      hcaptchaCapabilities,
-    );
-
-    this.logger.log('Registered NativeHcaptchaSolver as native solver');
+    try {
+      this.solverRegistry.register(
+        'hcaptcha-native',
+        NativeHcaptchaSolver,
+        hcaptchaCapabilities,
+      );
+      this.logger.log('Registered NativeHcaptchaSolver as native solver');
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to register NativeHcaptchaSolver: ${error.message}`,
+        error.stack,
+      );
+    }
 
     // Register NativeDataDomeSolver
     const datadomeCapabilities: SolverCapability = {
@@ -116,13 +134,19 @@ export class NativeSolverRegistryService implements OnModuleInit {
       },
     };
 
-    this.solverRegistry.register(
-      'datadome-native',
-      NativeDataDomeSolver,
-      datadomeCapabilities,
-    );
-
-    this.logger.log('Registered NativeDataDomeSolver as native solver');
+    try {
+      this.solverRegistry.register(
+        'datadome-native',
+        NativeDataDomeSolver,
+        datadomeCapabilities,
+      );
+      this.logger.log('Registered NativeDataDomeSolver as native solver');
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to register NativeDataDomeSolver: ${error.message}`,
+        error.stack,
+      );
+    }
 
     // Register NativeAkamaiSolver
     const akamaiCapabilities: SolverCapability = {
@@ -140,13 +164,19 @@ export class NativeSolverRegistryService implements OnModuleInit {
       },
     };
 
-    this.solverRegistry.register(
-      'akamai-native',
-      NativeAkamaiSolver,
-      akamaiCapabilities,
-    );
-
-    this.logger.log('Registered NativeAkamaiSolver as native solver');
+    try {
+      this.solverRegistry.register(
+        'akamai-native',
+        NativeAkamaiSolver,
+        akamaiCapabilities,
+      );
+      this.logger.log('Registered NativeAkamaiSolver as native solver');
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to register NativeAkamaiSolver: ${error.message}`,
+        error.stack,
+      );
+    }
   }
 }
 

@@ -6,6 +6,10 @@ import {
   CaptchaParams,
   CaptchaSolution,
 } from '../interfaces/captcha-solver.interface';
+import {
+  NetworkException,
+  ProviderException,
+} from '../exceptions';
 
 /**
  * Base class for captcha solver providers
@@ -65,8 +69,23 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
       }
     }
 
-    throw new Error(
-      `Failed to solve captcha after ${this.maxRetries} attempts: ${lastError?.message}`,
+    // If last error is already a custom exception, rethrow it
+    if (lastError instanceof ProviderException || 
+        lastError instanceof NetworkException) {
+      throw lastError;
+    }
+
+    // Wrap in provider exception with context
+    throw new ProviderException(
+      `Failed to solve captcha after ${this.maxRetries} attempts: ${lastError?.message || 'Unknown error'}`,
+      this.getName(),
+      undefined,
+      {
+        maxRetries: this.maxRetries,
+        attempts: this.maxRetries,
+        originalError: lastError?.message,
+        captchaType: params.type,
+      },
     );
   }
 
@@ -150,10 +169,54 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
       return response.data;
     } catch (error: any) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        throw new Error(`Request timeout after ${this.timeoutSeconds} seconds`);
+      if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+        throw new NetworkException(
+          `Request timeout after ${this.timeoutSeconds} seconds`,
+          error,
+          {
+            url,
+            method,
+            timeoutSeconds: this.timeoutSeconds,
+            provider: this.getName(),
+          },
+        );
       }
-      throw error;
+      
+      // If it's a network-related error, wrap in NetworkException
+      if (error.code === 'ECONNREFUSED' || 
+          error.code === 'ENOTFOUND' || 
+          error.code === 'ETIMEDOUT' ||
+          error.response?.status >= 500) {
+        throw new NetworkException(
+          `Network error during request: ${error.message}`,
+          error,
+          {
+            url,
+            method,
+            statusCode: error.response?.status,
+            provider: this.getName(),
+          },
+        );
+      }
+      
+      // If it's already a custom exception, rethrow it
+      if (error instanceof ProviderException || 
+          error instanceof NetworkException) {
+        throw error;
+      }
+      
+      // Otherwise, wrap in ProviderException
+      throw new ProviderException(
+        `Provider request failed: ${error.message}`,
+        this.getName(),
+        error.response?.data,
+        {
+          url,
+          method,
+          statusCode: error.response?.status,
+          originalError: error.message,
+        },
+      );
     }
   }
 

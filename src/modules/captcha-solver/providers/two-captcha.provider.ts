@@ -7,6 +7,12 @@ import {
   CaptchaSolution,
 } from '../interfaces/captcha-solver.interface';
 import { ApiKeyManagerService } from '../services/api-key-manager.service';
+import {
+  SolverUnavailableException,
+  ValidationException,
+  ProviderException,
+  NetworkException,
+} from '../exceptions';
 
 /**
  * 2Captcha provider implementation
@@ -35,7 +41,12 @@ export class TwoCaptchaProvider extends BaseCaptchaProvider {
   protected async solveCaptcha(params: CaptchaParams): Promise<CaptchaSolution> {
     const apiKey = this.apiKeyManager.getApiKey('2captcha');
     if (!apiKey) {
-      throw new Error('2Captcha API key not available');
+      throw new SolverUnavailableException(
+        '2Captcha API key not available',
+        '2captcha',
+        'api_key_not_configured',
+        { provider: '2captcha' },
+      );
     }
 
     // Submit captcha task
@@ -98,7 +109,11 @@ export class TwoCaptchaProvider extends BaseCaptchaProvider {
         break;
 
       default:
-        throw new Error(`Unsupported captcha type: ${params.type}`);
+        throw new ValidationException(
+          `Unsupported captcha type: ${params.type}`,
+          [{ field: 'type', message: `Unsupported captcha type: ${params.type}`, code: 'UNSUPPORTED_TYPE' }],
+          { captchaType: params.type, provider: '2captcha' },
+        );
     }
 
     // Add proxy if provided
@@ -119,7 +134,15 @@ export class TwoCaptchaProvider extends BaseCaptchaProvider {
       );
 
       if (response.status !== 1) {
-        throw new Error(`2Captcha error: ${response.request || response.error_text || 'Unknown error'}`);
+        throw new ProviderException(
+          `2Captcha error: ${response.request || response.error_text || 'Unknown error'}`,
+          '2captcha',
+          response,
+          {
+            captchaType: params.type,
+            taskId: response.request,
+          },
+        );
       }
 
       return response.request;
@@ -154,17 +177,39 @@ export class TwoCaptchaProvider extends BaseCaptchaProvider {
           continue;
         }
 
-        throw new Error(`2Captcha error: ${response.request || response.error_text || 'Unknown error'}`);
+        throw new ProviderException(
+          `2Captcha error: ${response.request || response.error_text || 'Unknown error'}`,
+          '2captcha',
+          response,
+          { taskId },
+        );
       } catch (error: any) {
         if (attempt === maxAttempts - 1) {
           await this.apiKeyManager.recordFailure('2captcha', apiKey, error.message);
-          throw new Error(`Failed to get result from 2Captcha: ${error.message}`);
+          if (error instanceof ProviderException || error instanceof NetworkException) {
+            throw error;
+          }
+          throw new ProviderException(
+            `Failed to get result from 2Captcha: ${error.message}`,
+            '2captcha',
+            undefined,
+            { taskId, originalError: error.message },
+          );
         }
         // Continue polling on transient errors
       }
     }
 
-    throw new Error('Timeout waiting for 2Captcha result');
+    throw new NetworkException(
+      'Timeout waiting for 2Captcha result',
+      undefined,
+      {
+        taskId,
+        maxAttempts,
+        pollInterval,
+        provider: '2captcha',
+      },
+    );
   }
 
   /**
@@ -181,7 +226,11 @@ export class TwoCaptchaProvider extends BaseCaptchaProvider {
       case 'funcaptcha':
         return 'funcaptcha';
       default:
-        throw new Error(`Unsupported captcha type: ${type}`);
+        throw new ValidationException(
+          `Unsupported captcha type: ${type}`,
+          [{ field: 'type', message: `Unsupported captcha type: ${type}`, code: 'UNSUPPORTED_TYPE' }],
+          { captchaType: type, provider: '2captcha' },
+        );
     }
   }
 }

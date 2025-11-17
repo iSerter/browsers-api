@@ -14,6 +14,12 @@ import type {
   RecaptchaSolverConfig,
 } from './interfaces/recaptcha-solver.interface';
 import {
+  SolverUnavailableException,
+  ValidationException,
+  InternalException,
+  ProviderException,
+} from '../exceptions';
+import {
   RecaptchaVersion,
   RecaptchaV2ChallengeType,
   RecaptchaDetectionResult,
@@ -116,7 +122,15 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         // Detect reCAPTCHA widget
         const detection = await this.detectRecaptchaWidget(params);
         if (!detection.anchorIframe || detection.confidence < 0.5) {
-          throw new Error('reCAPTCHA widget not detected');
+          throw new SolverUnavailableException(
+            'reCAPTCHA widget not detected',
+            'recaptcha-native',
+            'widget_not_detected',
+            {
+              confidence: detection.confidence,
+              url: params.url,
+            },
+          );
         }
 
         this.metrics.versionDistribution[detection.version]++;
@@ -191,8 +205,22 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
       }
     }
 
-    throw new Error(
-      `Failed to solve reCAPTCHA challenge after ${this.config.maxRetries} attempts: ${lastError?.message}`,
+    // If last error is already a custom exception, rethrow it
+    if (lastError instanceof SolverUnavailableException ||
+        lastError instanceof ValidationException ||
+        lastError instanceof InternalException ||
+        lastError instanceof ProviderException) {
+      throw lastError;
+    }
+
+    throw new InternalException(
+      `Failed to solve reCAPTCHA challenge after ${this.config.maxRetries} attempts: ${lastError?.message || 'Unknown error'}`,
+      lastError || undefined,
+      {
+        maxRetries: this.config.maxRetries,
+        attempts: this.config.maxRetries,
+        originalError: lastError?.message,
+      },
     );
   }
 
@@ -244,7 +272,7 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
           version: RecaptchaVersion.V2, // Default to v2
           anchorIframe: null,
           challengeIframe: null,
-          confidence: 0,
+          confidence: widgetResult.confidence, // Preserve original confidence
         };
       }
 
@@ -277,11 +305,22 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
       };
     } catch (error: any) {
       this.logger.warn(`Error detecting reCAPTCHA widget: ${error.message}`);
+      // Try to preserve confidence from widget detection if available
+      let confidence = 0;
+      try {
+        const widgetResult = await this.widgetInteraction.detectWidget(
+          this.page,
+          CaptchaWidgetType.RECAPTCHA,
+        );
+        confidence = widgetResult.confidence;
+      } catch {
+        // If detection fails, use 0
+      }
       return {
         version: RecaptchaVersion.V2,
         anchorIframe: null,
         challengeIframe: null,
-        confidence: 0,
+        confidence,
         details: {},
       };
     }
@@ -504,7 +543,11 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
     params: CaptchaParams,
   ): Promise<RecaptchaChallengeResponse> {
     if (!detection.anchorIframe) {
-      throw new Error('reCAPTCHA anchor iframe not found');
+      throw new InternalException(
+        'reCAPTCHA anchor iframe not found',
+        undefined,
+        { method: 'solveV2CheckboxChallenge', detection },
+      );
     }
 
     const timeout = this.config.v2CheckboxTimeout;
@@ -557,8 +600,16 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
       };
     } catch (error: any) {
-      throw new Error(
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
+      }
+      throw new InternalException(
         `Failed to solve v2 checkbox challenge: ${error.message}`,
+        error,
+        { method: 'solveV2CheckboxChallenge' },
       );
     }
   }
@@ -571,7 +622,11 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
     params: CaptchaParams,
   ): Promise<RecaptchaChallengeResponse> {
     if (!detection.anchorIframe) {
-      throw new Error('reCAPTCHA anchor iframe not found');
+      throw new InternalException(
+        'reCAPTCHA anchor iframe not found',
+        undefined,
+        { method: 'solveV2CheckboxChallenge', detection },
+      );
     }
 
     const timeout = this.config.v2InvisibleTimeout;
@@ -594,8 +649,16 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
       };
     } catch (error: any) {
-      throw new Error(
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
+      }
+      throw new InternalException(
         `Failed to solve v2 invisible challenge: ${error.message}`,
+        error,
+        { method: 'solveV2InvisibleChallenge' },
       );
     }
   }
@@ -608,11 +671,19 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
     params: CaptchaParams,
   ): Promise<RecaptchaChallengeResponse> {
     if (!detection.challengeIframe) {
-      throw new Error('reCAPTCHA challenge iframe not found');
+      throw new InternalException(
+        'reCAPTCHA challenge iframe not found',
+        undefined,
+        { method: 'solveV2AudioChallenge', detection },
+      );
     }
 
     if (!this.config.enableAudioChallenges) {
-      throw new Error('Audio challenges are disabled');
+      throw new ValidationException(
+        'Audio challenges are disabled',
+        [{ field: 'enableAudioChallenges', message: 'Audio challenges are disabled', code: 'FEATURE_DISABLED' }],
+        { method: 'solveV2AudioChallenge' },
+      );
     }
 
     const timeout = this.config.v2AudioTimeout;
@@ -637,7 +708,11 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
       // Extract audio URL
       const audioUrl = await this.extractAudioUrl(detection.challengeIframe);
       if (!audioUrl) {
-        throw new Error('Could not extract audio URL');
+        throw new InternalException(
+          'Could not extract audio URL',
+          undefined,
+          { method: 'solveV2AudioChallenge' },
+        );
       }
 
       // Download and transcribe audio
@@ -664,7 +739,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
       };
     } catch (error: any) {
-      throw new Error(`Failed to solve v2 audio challenge: ${error.message}`);
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
+      }
+      throw new InternalException(
+        `Failed to solve v2 audio challenge: ${error.message}`,
+        error,
+        { method: 'solveV2AudioChallenge' },
+      );
     }
   }
 
@@ -676,11 +761,19 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
     params: CaptchaParams,
   ): Promise<RecaptchaChallengeResponse> {
     if (!detection.challengeIframe) {
-      throw new Error('reCAPTCHA challenge iframe not found');
+      throw new InternalException(
+        'reCAPTCHA challenge iframe not found',
+        undefined,
+        { method: 'solveV2ImageChallenge', detection },
+      );
     }
 
     if (!this.config.enableImageChallenges) {
-      throw new Error('Image challenges are disabled');
+      throw new ValidationException(
+        'Image challenges are disabled',
+        [{ field: 'enableImageChallenges', message: 'Image challenges are disabled', code: 'FEATURE_DISABLED' }],
+        { method: 'solveV2ImageChallenge' },
+      );
     }
 
     const timeout = this.config.v2ImageTimeout;
@@ -725,7 +818,8 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
 
       if (!token) {
         // Might be a multi-step challenge, try again
-        throw new Error('Multi-step image challenge detected, retrying...');
+        // This is not an error, it's a retry condition - log and continue
+        this.logger.debug('Multi-step image challenge detected, retrying...');
       }
 
       return {
@@ -736,7 +830,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
       };
     } catch (error: any) {
-      throw new Error(`Failed to solve v2 image challenge: ${error.message}`);
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
+      }
+      throw new InternalException(
+        `Failed to solve v2 image challenge: ${error.message}`,
+        error,
+        { method: 'solveV2ImageChallenge' },
+      );
     }
   }
 
@@ -773,7 +877,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
       };
     } catch (error: any) {
-      throw new Error(`Failed to solve v3 challenge: ${error.message}`);
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
+      }
+      throw new InternalException(
+        `Failed to solve v3 challenge: ${error.message}`,
+        error,
+        { method: 'solveV3Challenge' },
+      );
     }
   }
 
@@ -843,7 +957,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
       await input.press('Enter');
       this.logger.debug(`Submitted audio transcription: ${transcription}`);
     } catch (error) {
-      throw new Error(`Failed to submit audio transcription: ${error.message}`);
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
+      }
+      throw new InternalException(
+        `Failed to submit audio transcription: ${error.message}`,
+        error,
+        { method: 'submitAudioTranscription' },
+      );
     }
   }
 
@@ -932,7 +1056,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         await this.sleep(500); // Small delay between clicks
       }
     } catch (error) {
-      throw new Error(`Failed to select image tiles: ${error.message}`);
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
+      }
+      throw new InternalException(
+        `Failed to select image tiles: ${error.message}`,
+        error,
+        { method: 'selectImageTiles' },
+      );
     }
   }
 

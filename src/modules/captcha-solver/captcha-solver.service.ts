@@ -12,6 +12,12 @@ import {
   CaptchaParams,
   CaptchaSolution,
 } from './interfaces/captcha-solver.interface';
+import {
+  SolverUnavailableException,
+  ValidationException,
+  ProviderException,
+  InternalException,
+} from './exceptions';
 
 @Injectable()
 export class CaptchaSolverService implements OnModuleInit {
@@ -173,11 +179,14 @@ export class CaptchaSolverService implements OnModuleInit {
     // Ensure at least one provider is available
     const availableProviders = this.apiKeyManager.getAvailableProviders();
     if (availableProviders.length === 0) {
-      const error = new Error(
+      throw new SolverUnavailableException(
         'No captcha solver providers are available. Please configure at least one API key.',
+        'provider',
+        'no_providers_configured',
+        {
+          preferredProvider: this.configuration.preferredProvider,
+        },
       );
-      this.logger.error(error.message);
-      throw error;
     }
 
     this.logger.log(
@@ -265,15 +274,22 @@ export class CaptchaSolverService implements OnModuleInit {
       this.configuration.fallbackEnabled?.[challengeType] !== false;
 
     if (!fallbackEnabled) {
-      throw new Error(
+      throw new ValidationException(
         `Fallback is disabled for ${challengeType} challenge type`,
+        [{ field: 'fallbackEnabled', message: `Fallback is disabled for ${challengeType}`, code: 'FALLBACK_DISABLED' }],
+        { challengeType },
       );
     }
 
     // Get available providers
     const availableProviders = await this.providerRegistry.getAvailableProviders();
     if (availableProviders.length === 0) {
-      throw new Error('No captcha solver providers are available');
+      throw new SolverUnavailableException(
+        'No captcha solver providers are available',
+        'provider',
+        'no_providers_available',
+        { challengeType },
+      );
     }
 
     // Try preferred provider first, then others
@@ -321,8 +337,37 @@ export class CaptchaSolverService implements OnModuleInit {
       }
     }
 
-    throw new Error(
+    // Determine if last error is a provider exception
+    if (lastError instanceof ProviderException) {
+      throw new ProviderException(
+        `All providers failed to solve captcha: ${lastError.message}`,
+        'all_providers',
+        lastError.apiResponse,
+        {
+          challengeType,
+          attemptedProviders: providersToTry.map(p => p.getName()),
+          lastProviderError: lastError.providerName,
+        },
+      );
+    }
+
+    // If last error is a custom exception, rethrow it
+    if (lastError instanceof SolverUnavailableException || 
+        lastError instanceof ValidationException ||
+        lastError instanceof InternalException) {
+      throw lastError;
+    }
+
+    // Otherwise, wrap in provider exception
+    throw new ProviderException(
       `All providers failed to solve captcha: ${lastError?.message || 'Unknown error'}`,
+      'all_providers',
+      undefined,
+      {
+        challengeType,
+        attemptedProviders: providersToTry.map(p => p.getName()),
+        originalError: lastError?.message,
+      },
     );
   }
 

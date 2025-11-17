@@ -10,6 +10,7 @@ import {
   RecaptchaV2ChallengeType,
 } from './interfaces/recaptcha-solver.interface';
 import { CaptchaWidgetType } from '../services/interfaces/widget-interaction.interface';
+import { SolverUnavailableException } from '../exceptions';
 
 describe('NativeRecaptchaSolver', () => {
   let solver: NativeRecaptchaSolver;
@@ -316,13 +317,26 @@ describe('NativeRecaptchaSolver', () => {
       };
 
       const mockCheckbox = {
-        waitFor: jest.fn(),
-        click: jest.fn(),
+        waitFor: jest.fn().mockResolvedValue(undefined),
+        click: jest.fn().mockResolvedValue(undefined),
       };
 
       mockAnchorFrame.waitForLoadState.mockResolvedValue(undefined);
       mockAnchorFrame.locator.mockReturnValue(mockCheckbox as any);
       mockPage.frames.mockReturnValue([mockAnchorFrame, mockChallengeFrame]);
+
+      // Mock findIframes to return challenge iframe
+      const findIframesSpy = jest
+        .spyOn(solver as any, 'findIframes')
+        .mockResolvedValue({
+          anchorIframe: mockAnchorFrame,
+          challengeIframe: mockChallengeFrame,
+        });
+
+      // Mock sleep to resolve immediately
+      const sleepSpy = jest
+        .spyOn(solver as any, 'sleep')
+        .mockResolvedValue(undefined);
 
       // Mock challenge type detection
       const detectChallengeTypeSpy = jest
@@ -348,6 +362,8 @@ describe('NativeRecaptchaSolver', () => {
       expect(result.token).toBe('audio-token');
       expect(solveAudioSpy).toHaveBeenCalled();
 
+      findIframesSpy.mockRestore();
+      sleepSpy.mockRestore();
       detectChallengeTypeSpy.mockRestore();
       solveAudioSpy.mockRestore();
     });
@@ -635,17 +651,12 @@ describe('NativeRecaptchaSolver', () => {
 
   describe('solve', () => {
     it('should solve challenge with retry logic', async () => {
-      mockWidgetInteraction.detectWidget
-        .mockResolvedValueOnce({
-          widgetType: CaptchaWidgetType.RECAPTCHA,
-          iframe: null,
-          confidence: 0.2,
-        })
-        .mockResolvedValueOnce({
-          widgetType: CaptchaWidgetType.RECAPTCHA,
-          iframe: mockFrame,
-          confidence: 0.9,
-        });
+      // Widget detection succeeds on first attempt
+      mockWidgetInteraction.detectWidget.mockResolvedValue({
+        widgetType: CaptchaWidgetType.RECAPTCHA,
+        iframe: mockFrame,
+        confidence: 0.9,
+      });
 
       mockPage.evaluate.mockResolvedValue({
         version: 'v2',
@@ -687,7 +698,7 @@ describe('NativeRecaptchaSolver', () => {
           type: 'recaptcha',
           url: 'https://example.com',
         }),
-      ).rejects.toThrow('reCAPTCHA widget not detected');
+      ).rejects.toThrow(SolverUnavailableException);
     });
   });
 

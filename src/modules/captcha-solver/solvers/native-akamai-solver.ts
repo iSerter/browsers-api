@@ -13,6 +13,11 @@ import type {
   AkamaiSolverConfig,
 } from './interfaces/akamai-solver.interface';
 import {
+  SolverUnavailableException,
+  ValidationException,
+  InternalException,
+} from '../exceptions';
+import {
   AkamaiChallengeLevel,
   AkamaiDetectionResult,
   AkamaiChallengeResponse,
@@ -135,7 +140,15 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
         // Detect Akamai Bot Manager
         detection = await this.detectAkamai(params);
         if (!detection || detection.confidence < 0.5) {
-          throw new Error('Akamai Bot Manager not detected');
+          throw new SolverUnavailableException(
+            'Akamai Bot Manager not detected',
+            'akamai-native',
+            'widget_not_detected',
+            {
+              confidence: detection?.confidence || 0,
+              url: params.url,
+            },
+          );
         }
 
         // Determine challenge level
@@ -238,8 +251,21 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
       }
     }
 
-    throw new Error(
-      `Failed to solve Akamai challenge after ${this.config.maxRetries} attempts: ${lastError?.message}`,
+    // If last error is already a custom exception, rethrow it
+    if (lastError instanceof SolverUnavailableException ||
+        lastError instanceof ValidationException ||
+        lastError instanceof InternalException) {
+      throw lastError;
+    }
+
+    throw new InternalException(
+      `Failed to solve Akamai challenge after ${this.config.maxRetries} attempts: ${lastError?.message || 'Unknown error'}`,
+      lastError || undefined,
+      {
+        maxRetries: this.config.maxRetries,
+        attempts: this.config.maxRetries,
+        originalError: lastError?.message,
+      },
     );
   }
 
@@ -847,7 +873,11 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
       case AkamaiChallengeLevel.LEVEL_3:
         return this.solveLevel3(detection, solveStartTime, sensorData, bmakCookie);
       default:
-        throw new Error(`Unknown challenge level: ${challengeLevel}`);
+        throw new ValidationException(
+          `Unknown challenge level: ${challengeLevel}`,
+          [{ field: 'challengeLevel', message: `Unknown challenge level: ${challengeLevel}`, code: 'UNKNOWN_CHALLENGE_LEVEL' }],
+          { challengeLevel },
+        );
     }
   }
 
@@ -886,7 +916,11 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
       };
     }
 
-    throw new Error('Level 1 challenge not bypassed');
+    throw new InternalException(
+      'Level 1 challenge not bypassed',
+      undefined,
+      { method: 'solveLevel1', detection },
+    );
   }
 
   /**
@@ -899,7 +933,11 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
     bmakCookie?: BmakCookie,
   ): Promise<AkamaiChallengeResponse> {
     if (!this.config.enableLevel2) {
-      throw new Error('Level 2 challenge solving is disabled');
+      throw new ValidationException(
+        'Level 2 challenge solving is disabled',
+        [{ field: 'enableLevel2', message: 'Level 2 challenge solving is disabled', code: 'FEATURE_DISABLED' }],
+        { method: 'solveLevel2' },
+      );
     }
 
     // Level 2: Solve JavaScript challenges and proof-of-work
@@ -942,7 +980,11 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
       };
     }
 
-    throw new Error('Level 2 challenge not solved');
+    throw new InternalException(
+      'Level 2 challenge not solved',
+      undefined,
+      { method: 'solveLevel2', detection },
+    );
   }
 
   /**
@@ -955,7 +997,11 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
     bmakCookie?: BmakCookie,
   ): Promise<AkamaiChallengeResponse> {
     if (!this.config.enableLevel3) {
-      throw new Error('Level 3 challenge solving is disabled');
+      throw new ValidationException(
+        'Level 3 challenge solving is disabled',
+        [{ field: 'enableLevel3', message: 'Level 3 challenge solving is disabled', code: 'FEATURE_DISABLED' }],
+        { method: 'solveLevel3' },
+      );
     }
 
     // Level 3: Handle dynamic script obfuscation and anti-debugging
@@ -1012,7 +1058,11 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
       };
     }
 
-    throw new Error('Level 3 challenge not solved');
+    throw new InternalException(
+      'Level 3 challenge not solved',
+      undefined,
+      { method: 'solveLevel3', detection },
+    );
   }
 
   /**

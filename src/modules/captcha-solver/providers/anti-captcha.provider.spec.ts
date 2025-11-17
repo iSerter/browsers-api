@@ -14,7 +14,7 @@ describe('AntiCaptchaProvider', () => {
 
   beforeEach(async () => {
     const mockHttpService = {
-      request: jest.fn(),
+      request: jest.fn().mockReturnValue(of({ data: {} })),
     };
 
     const mockConfigService = {
@@ -54,6 +54,9 @@ describe('AntiCaptchaProvider', () => {
       configService,
       apiKeyManager,
     );
+
+    // Reset mocks before each test (but keep mock implementations)
+    httpService.request.mockReset();
   });
 
   describe('getName', () => {
@@ -98,7 +101,8 @@ describe('AntiCaptchaProvider', () => {
       httpService.request
         .mockReturnValueOnce(of({ data: createTaskResponse }))
         .mockReturnValueOnce(of({ data: { errorId: 0, status: 'processing' } }))
-        .mockReturnValueOnce(of({ data: getTaskResponse }));
+        .mockReturnValueOnce(of({ data: getTaskResponse }))
+        .mockReturnValueOnce(of({ data: getTaskResponse })); // For final getTaskResult call
 
       const params: CaptchaParams = {
         type: 'recaptcha',
@@ -131,7 +135,8 @@ describe('AntiCaptchaProvider', () => {
 
       httpService.request
         .mockReturnValueOnce(of({ data: createTaskResponse }))
-        .mockReturnValueOnce(of({ data: getTaskResponse }));
+        .mockReturnValueOnce(of({ data: getTaskResponse }))
+        .mockReturnValueOnce(of({ data: getTaskResponse })); // For getTaskResult call
 
       const params: CaptchaParams = {
         type: 'recaptcha',
@@ -164,7 +169,8 @@ describe('AntiCaptchaProvider', () => {
 
       httpService.request
         .mockReturnValueOnce(of({ data: createTaskResponse }))
-        .mockReturnValueOnce(of({ data: getTaskResponse }));
+        .mockReturnValueOnce(of({ data: getTaskResponse }))
+        .mockReturnValueOnce(of({ data: getTaskResponse })); // For getTaskResult call
 
       const params: CaptchaParams = {
         type: 'hcaptcha',

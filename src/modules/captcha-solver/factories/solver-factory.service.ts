@@ -3,6 +3,11 @@ import { ICaptchaSolver, CaptchaParams, CaptchaSolution } from '../interfaces/ca
 import { SolverRegistry } from './solver-registry.service';
 import { SolverPerformanceTracker } from './solver-performance-tracker.service';
 import { CaptchaWidgetInteractionService } from '../services/captcha-widget-interaction.service';
+import {
+  SolverUnavailableException,
+  InternalException,
+  ProviderException,
+} from '../exceptions';
 
 /**
  * Factory service for creating and selecting solvers
@@ -179,8 +184,11 @@ export class SolverFactory {
     const candidates = this.registry.getSolversByPriority(challengeType);
 
     if (candidates.length === 0) {
-      throw new Error(
+      throw new SolverUnavailableException(
         `No enabled solvers found for challenge type: ${challengeType}`,
+        'native',
+        'no_solvers_enabled',
+        { challengeType },
       );
     }
 
@@ -238,8 +246,23 @@ export class SolverFactory {
       }
     }
 
-    throw new Error(
+    // If last error is already a custom exception, rethrow it
+    if (lastError instanceof SolverUnavailableException ||
+        lastError instanceof ProviderException ||
+        lastError instanceof InternalException) {
+      throw lastError;
+    }
+
+    // Wrap in SolverUnavailableException
+    throw new SolverUnavailableException(
       `All solvers failed to solve ${challengeType}: ${lastError?.message || 'Unknown error'}`,
+      'native',
+      'all_solvers_failed',
+      {
+        challengeType,
+        attemptedSolvers: candidates.map(m => m.solverType),
+        originalError: lastError?.message,
+      },
     );
   }
 

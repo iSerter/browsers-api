@@ -7,6 +7,12 @@ import {
   CaptchaSolution,
 } from '../interfaces/captcha-solver.interface';
 import { ApiKeyManagerService } from '../services/api-key-manager.service';
+import {
+  SolverUnavailableException,
+  ValidationException,
+  ProviderException,
+  NetworkException,
+} from '../exceptions';
 
 /**
  * Anti-Captcha provider implementation
@@ -35,7 +41,12 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
   protected async solveCaptcha(params: CaptchaParams): Promise<CaptchaSolution> {
     const apiKey = this.apiKeyManager.getApiKey('anticaptcha');
     if (!apiKey) {
-      throw new Error('Anti-Captcha API key not available');
+      throw new SolverUnavailableException(
+        'Anti-Captcha API key not available',
+        'anticaptcha',
+        'api_key_not_configured',
+        { provider: 'anticaptcha' },
+      );
     }
 
     // Create task
@@ -97,7 +108,11 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
         break;
 
       default:
-        throw new Error(`Unsupported captcha type: ${params.type}`);
+        throw new ValidationException(
+          `Unsupported captcha type: ${params.type}`,
+          [{ field: 'type', message: `Unsupported captcha type: ${params.type}`, code: 'UNSUPPORTED_TYPE' }],
+          { captchaType: params.type, provider: 'anticaptcha' },
+        );
     }
 
     // Add proxy if provided
@@ -130,8 +145,15 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
       );
 
       if (response.errorId !== 0) {
-        throw new Error(
+        throw new ProviderException(
           `Anti-Captcha error: ${response.errorCode} - ${response.errorDescription}`,
+          'anticaptcha',
+          response,
+          {
+            errorCode: response.errorCode,
+            errorDescription: response.errorDescription,
+            captchaType: params.type,
+          },
         );
       }
 
@@ -180,17 +202,39 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
           continue;
         }
 
-        throw new Error(`Unexpected task status: ${response.status}`);
+        throw new ProviderException(
+          `Unexpected task status: ${response.status}`,
+          'anticaptcha',
+          response,
+          { taskId },
+        );
       } catch (error: any) {
         if (attempt === maxAttempts - 1) {
           await this.apiKeyManager.recordFailure('anticaptcha', apiKey, error.message);
-          throw new Error(`Failed to wait for Anti-Captcha task: ${error.message}`);
+          if (error instanceof ProviderException || error instanceof NetworkException) {
+            throw error;
+          }
+          throw new ProviderException(
+            `Failed to wait for Anti-Captcha task: ${error.message}`,
+            'anticaptcha',
+            undefined,
+            { taskId, originalError: error.message },
+          );
         }
         // Continue polling on transient errors
       }
     }
 
-    throw new Error('Timeout waiting for Anti-Captcha task');
+    throw new NetworkException(
+      'Timeout waiting for Anti-Captcha task',
+      undefined,
+      {
+        taskId,
+        maxAttempts,
+        pollInterval,
+        provider: 'anticaptcha',
+      },
+    );
   }
 
   /**
@@ -210,13 +254,25 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
     );
 
     if (response.errorId !== 0) {
-      throw new Error(
+      throw new ProviderException(
         `Anti-Captcha error: ${response.errorCode} - ${response.errorDescription}`,
+        'anticaptcha',
+        response,
+        {
+          errorCode: response.errorCode,
+          errorDescription: response.errorDescription,
+          taskId,
+        },
       );
     }
 
     if (response.status !== 'ready') {
-      throw new Error(`Task not ready: ${response.status}`);
+      throw new ProviderException(
+        `Task not ready: ${response.status}`,
+        'anticaptcha',
+        response,
+        { taskId },
+      );
     }
 
     // Extract token based on task type
@@ -231,7 +287,12 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
       return solution.cookie;
     }
 
-    throw new Error('Unable to extract token from Anti-Captcha response');
+    throw new ProviderException(
+      'Unable to extract token from Anti-Captcha response',
+      'anticaptcha',
+      response,
+      { taskId, solution },
+    );
   }
 
   /**
@@ -248,7 +309,11 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
       case 'funcaptcha':
         return 'FunCaptchaTaskProxyless';
       default:
-        throw new Error(`Unsupported captcha type: ${type}`);
+        throw new ValidationException(
+          `Unsupported captcha type: ${type}`,
+          [{ field: 'type', message: `Unsupported captcha type: ${type}`, code: 'UNSUPPORTED_TYPE' }],
+          { captchaType: type, provider: 'anticaptcha' },
+        );
     }
   }
 }
