@@ -6,7 +6,9 @@ import {
   IsNumber,
   Min,
   Max,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum GetTargetBy {
   GET_BY_LABEL = 'getByLabel',
@@ -25,6 +27,7 @@ export enum ActionType {
   VISIT = 'visit',
   EXTRACT = 'extract',
   PDF = 'pdf',
+  SNAPSHOT = 'snapshot',
 }
 
 export enum ScreenshotType {
@@ -36,6 +39,36 @@ export enum MouseButton {
   LEFT = 'left',
   RIGHT = 'right',
   MIDDLE = 'middle',
+}
+
+/**
+ * Configuration options for snapshot actions.
+ * Controls which browser state data should be captured when taking a snapshot.
+ */
+export class SnapshotConfigDto {
+  /**
+   * Whether to capture cookies in the snapshot.
+   * Defaults to true if not specified.
+   */
+  @IsOptional()
+  @IsBoolean()
+  cookies?: boolean;
+
+  /**
+   * Whether to capture localStorage data in the snapshot.
+   * Defaults to true if not specified.
+   */
+  @IsOptional()
+  @IsBoolean()
+  localStorage?: boolean;
+
+  /**
+   * Whether to capture sessionStorage data in the snapshot.
+   * Defaults to true if not specified.
+   */
+  @IsOptional()
+  @IsBoolean()
+  sessionStorage?: boolean;
 }
 
 export class ActionConfigDto {
@@ -205,5 +238,16 @@ export class ActionConfigDto {
 
   @IsOptional()
   margin?: any; // Can be object or string, validate as needed
+
+  // Snapshot action fields
+  /**
+   * Configuration for snapshot actions (only relevant when action is SNAPSHOT).
+   * Controls which browser state data (cookies, localStorage, sessionStorage) to capture.
+   * If not specified, all state data will be captured by default.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SnapshotConfigDto)
+  snapshotConfig?: SnapshotConfigDto;
 }
 

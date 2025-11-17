@@ -15,6 +15,7 @@ export enum ArtifactType {
   VIDEO = 'video',
   TRACE = 'trace',
   DATA = 'data',
+  SNAPSHOT = 'snapshot',
 }
 
 @Entity('job_artifacts')
