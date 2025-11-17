@@ -270,6 +270,8 @@ describe('SolverRegistry', () => {
 
   describe('circuit breaker integration', () => {
     beforeEach(() => {
+      // Clear registry to ensure clean state
+      registry.clear();
       // Clear previous mock calls and ensure default return values
       mockCircuitBreaker.isAvailable.mockClear().mockReturnValue(true);
       mockCircuitBreaker.getState.mockClear().mockReturnValue(null);

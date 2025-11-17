@@ -80,7 +80,7 @@ describe('FillActionHandler', () => {
       expect(result.success).toBe(true);
       expect(result.data.humanLike).toBe(true);
       expect(mockPage.getByLabel).toHaveBeenCalledWith('Email');
-      expect(mockLocator.waitFor).toHaveBeenCalledWith({ state: 'visible' });
+      expect(mockLocator.waitFor).toHaveBeenCalledWith({ state: 'visible', timeout: 2000 });
       expect(mockLocator.elementHandle).toHaveBeenCalled();
       expect(humanMouse.moveMouseHuman).toHaveBeenCalled();
       expect(mockMouse.down).toHaveBeenCalled();

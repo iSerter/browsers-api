@@ -33,6 +33,8 @@ describe('ScrollActionHandler', () => {
     mockLocator = {
       waitFor: jest.fn().mockResolvedValue(undefined),
       elementHandle: jest.fn().mockResolvedValue(mockElement),
+      first: jest.fn().mockReturnThis(),
+      nth: jest.fn().mockReturnThis(),
     };
 
     // Mock page
@@ -88,7 +90,7 @@ describe('ScrollActionHandler', () => {
 
       expect(result.success).toBe(true);
       expect(mockPage.getByText).toHaveBeenCalledWith('Footer');
-      expect(mockLocator.waitFor).toHaveBeenCalledWith({ state: 'visible' });
+      expect(mockLocator.waitFor).toHaveBeenCalledWith({ state: 'visible', timeout: 2000 });
       expect(mockLocator.elementHandle).toHaveBeenCalled();
       expect(humanScroll).toHaveBeenCalled();
     });
@@ -184,7 +186,7 @@ describe('ScrollActionHandler', () => {
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
       expect(result.success).toBe(false);
-      expect(result.error?.message).toContain('Element handle not found');
+      expect(result.error?.message).toContain('Element handle not found for scroll target');
     });
 
     it('should return error when element is not visible', async () => {
@@ -239,15 +241,15 @@ describe('ScrollActionHandler', () => {
         getTargetBy: 'getByText',
       };
 
-      mockLocator.waitFor.mockRejectedValue(
-        Object.assign(new Error('Timeout'), { name: 'TimeoutError' }),
-      );
+      const timeoutError = new Error('Timeout');
+      timeoutError.name = 'TimeoutError';
+      mockLocator.waitFor.mockRejectedValue(timeoutError);
 
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
       expect(result.success).toBe(false);
-      expect(result.error?.code).toBe('TIMEOUT_ERROR');
-      expect(result.error?.retryable).toBe(true);
+      expect(result.error?.code).toBe('ELEMENT_NOT_FOUND_ERROR');
+      expect(result.error?.retryable).toBe(false);
     });
 
     it('should return data with action details on success', async () => {

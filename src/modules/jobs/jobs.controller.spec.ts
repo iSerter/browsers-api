@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, ExecutionContext } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 import { ApiKeysService } from '../api-keys/api-keys.service';
@@ -37,7 +38,14 @@ describe('JobsController', () => {
           useValue: mockApiKeysService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({
+        canActivate: jest.fn((context: ExecutionContext) => {
+          return true;
+        }),
+      })
+      .compile();
 
     controller = module.get<JobsController>(JobsController);
     jobsService = module.get(JobsService);

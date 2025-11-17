@@ -55,7 +55,6 @@ describe('ScreenshotActionHandler', () => {
       expect(mockPage.screenshot).toHaveBeenCalledWith({
         fullPage: false,
         type: 'png',
-        quality: 80,
       });
       expect(artifactService.saveArtifact).toHaveBeenCalled();
     });

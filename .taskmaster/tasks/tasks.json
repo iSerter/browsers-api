@@ -726,11 +726,29 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 54,
+        "title": "Comprehensive Unit Test Audit and Remediation",
+        "description": "Conduct a systematic audit of all remaining unit test failures across the codebase, identify root causes, and implement fixes to achieve 100% test pass rate. This includes fixing mock configurations, updating assertions to match current implementations, and ensuring test isolation.",
+        "details": "1. Run full test suite to identify all failing tests:\n   - Execute 'npm test -- --verbose' to get detailed failure reports\n   - Document each failing test file, test name, and error message\n   - Categorize failures by type (mock issues, assertion mismatches, timing issues, import errors)\n2. Prioritize test fixes based on:\n   - Critical path functionality (detection, solving, core services)\n   - Number of failures per file\n   - Complexity of fixes required\n3. Common fix patterns to apply:\n   - Mock configuration: Ensure all external dependencies (HTTP, file system, third-party APIs) are properly mocked\n   - Observable mocking: Use rxjs 'of()' and 'throwError()' correctly for async operations\n   - Timing issues: Implement jest.useFakeTimers() for tests with delays or timeouts\n   - ESM imports: Configure jest.config.js transformIgnorePatterns for problematic modules\n   - Assertion updates: Align expectations with current implementation behavior\n4. Fix test isolation issues:\n   - Ensure proper beforeEach/afterEach cleanup\n   - Reset all mocks between tests: jest.clearAllMocks()\n   - Avoid shared state between test cases\n5. Update test setup for dependency injection:\n   - Verify all NestJS providers are included in TestingModule\n   - Mock configuration service with realistic values\n   - Ensure proper provider overrides for external services\n6. Address specific failure categories:\n   - HTTP mocking: Mock AxiosResponse structure with proper data, status, headers\n   - Cache service: Mock get/set/delete operations with appropriate return values\n   - Logger: Mock all logging methods to avoid console noise\n   - File operations: Mock fs module for file read/write tests\n7. Document fixes and patterns:\n   - Create TESTING.md with common mock patterns\n   - Add inline comments explaining complex test setups\n   - Update test utilities for reusable mock factories\n<info added on 2025-11-17T21:26:41.300Z>\n8. Progress Update - Test Fixes Completed:\n   - FillActionHandler (14 tests): Fixed waitFor assertion by adding timeout parameter (2000ms) to match implementation\n   - ScreenshotActionHandler (10 tests): Removed quality parameter from PNG screenshot assertion (quality only supported for JPEG format)\n   - JobsController (3 tests): Resolved ThrottlerGuard dependency injection by using overrideGuard() to provide mock guard returning true\n   - ScrollActionHandler (12 tests): \n     * Added first() and nth() methods to mock locator for getLocator() helper compatibility\n     * Added timeout parameter (2000ms) to waitFor assertion\n     * Updated error message expectations to \"Element handle not found for scroll target\"\n     * Fixed timeout error handling to use ELEMENT_NOT_FOUND_ERROR with retryable: false\n   - Total: 39 tests fixed and passing\n9. Known Remaining Issues:\n   - SolverRegistry tests exhibit test isolation problems (pass individually but fail when run as suite)\n   - Additional test files have failures outside original audit scope\n</info added on 2025-11-17T21:26:41.300Z>",
+        "testStrategy": "Run 'npm test' to verify all unit tests pass with 0 failures. Execute 'npm test -- --coverage' to ensure code coverage meets or exceeds project thresholds (aim for >80%). Run tests multiple times to identify and fix any flaky tests. Verify test execution time is reasonable (full suite under 2 minutes). Check that no tests are skipped (.skip) or focused (.only). Run 'npm test -- --detectOpenHandles' to ensure no hanging promises or timers. Execute tests in CI environment to verify consistency across different systems. Review test output for any warnings or deprecation notices. Validate that all test files follow consistent naming conventions (*.spec.ts). Confirm that integration between fixed tests and related functionality works correctly.",
+        "status": "in-progress",
+        "dependencies": [
+          1,
+          26,
+          27,
+          28,
+          30,
+          53
+        ],
+        "priority": "high",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-11-17T01:03:11.457Z",
-      "updated": "2025-11-17T21:20:23.499Z",
+      "updated": "2025-11-17T21:22:55.553Z",
       "description": "Tasks for master context"
     }
   }
