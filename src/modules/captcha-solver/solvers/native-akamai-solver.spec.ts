@@ -181,7 +181,10 @@ describe('NativeAkamaiSolver', () => {
         challengeIframe: null,
       };
 
-      (mockPage.evaluate as jest.Mock).mockResolvedValue(true);
+      // Mock Level 3 check (false) then Level 2 check (true)
+      (mockPage.evaluate as jest.Mock)
+        .mockResolvedValueOnce(false) // hasLevel3Indicators
+        .mockResolvedValueOnce(true); // hasLevel2Indicators
 
       const level = await (solver as any).determineChallengeLevel(detection);
 
@@ -286,21 +289,42 @@ describe('NativeAkamaiSolver', () => {
         hardware: { hardwareConcurrency: 8 },
       };
 
-      (mockPage.evaluate as jest.Mock)
-        .mockResolvedValueOnce('session-id-123')
-        .mockResolvedValueOnce('https://example.com')
-        .mockResolvedValueOnce({
-          pageLoadTime: 1000,
-          scriptExecutionTime: 500,
-          domContentLoadedTime: 800,
-          firstPaintTime: 600,
-        });
+      // Mock for first call - need to mock in the exact order they're called
+      let callCount = 0;
+      (mockPage.evaluate as jest.Mock).mockImplementation(async (fn?: () => any) => {
+        callCount++;
+        if (callCount === 1) {
+          // getSessionId call
+          return 'session-id-123';
+        } else if (callCount === 2) {
+          // referrer call
+          return 'https://example.com';
+        } else if (callCount === 3) {
+          // timing call
+          return {
+            pageLoadTime: 1000,
+            scriptExecutionTime: 500,
+            domContentLoadedTime: 800,
+            firstPaintTime: 600,
+          };
+        }
+        return undefined;
+      });
 
       const sensorData1 = await (solver as any).generateSensorData(fingerprint);
+      
+      // Reset mock for second call - only getSessionId will be called (returns same session ID)
+      (mockPage.evaluate as jest.Mock).mockClear();
+      (mockPage.evaluate as jest.Mock).mockResolvedValue('session-id-123');
+      
+      // Second call should use cache after getSessionId call
       const sensorData2 = await (solver as any).generateSensorData(fingerprint);
 
       // Should return cached data on second call
       expect(sensorData1).toEqual(sensorData2);
+      // Verify that page.evaluate was only called once (for getSessionId) on second invocation
+      // The cache check happens after getSessionId, so getSessionId will always be called
+      expect(mockPage.evaluate).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -369,15 +393,18 @@ describe('NativeAkamaiSolver', () => {
       // Mock sensor submission
       (mockPage.evaluate as jest.Mock).mockResolvedValueOnce(undefined);
 
-      // Mock cookies after submission
+      // Mock cookies after submission (value must be > 50 characters)
       (mockContext.cookies as jest.Mock).mockResolvedValue([
-        { name: '_abck', value: 'valid-abck-cookie-value-12345678901234567890' },
+        { name: '_abck', value: 'valid-abck-cookie-value-123456789012345678901234567890' },
       ]);
+
+      // Mock sleep to avoid actual delays in tests
+      jest.spyOn(solver as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await (solver as any).solveLevel1(detection, Date.now(), sensorData, bmakCookie);
 
       expect(result).toBeDefined();
-      expect(result.token).toBe('valid-abck-cookie-value-12345678901234567890');
+      expect(result.token).toBe('valid-abck-cookie-value-123456789012345678901234567890');
       expect(result.challengeLevel).toBe(AkamaiChallengeLevel.LEVEL_1);
     });
 
@@ -430,13 +457,16 @@ describe('NativeAkamaiSolver', () => {
         .mockResolvedValueOnce(undefined); // sensor submission
 
       (mockContext.cookies as jest.Mock).mockResolvedValue([
-        { name: '_abck', value: 'valid-abck-cookie-value-12345678901234567890' },
+        { name: '_abck', value: 'valid-abck-cookie-value-123456789012345678901234567890' },
       ]);
+
+      // Mock sleep to avoid actual delays in tests
+      jest.spyOn(solver as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await (solver as any).solveLevel2(detection, Date.now(), sensorData);
 
       expect(result).toBeDefined();
-      expect(result.token).toBe('valid-abck-cookie-value-12345678901234567890');
+      expect(result.token).toBe('valid-abck-cookie-value-123456789012345678901234567890');
       expect(result.challengeLevel).toBe(AkamaiChallengeLevel.LEVEL_2);
     });
   });
@@ -466,13 +496,16 @@ describe('NativeAkamaiSolver', () => {
         .mockResolvedValueOnce(undefined); // sensor submission
 
       (mockContext.cookies as jest.Mock).mockResolvedValue([
-        { name: '_abck', value: 'valid-abck-cookie-value-12345678901234567890' },
+        { name: '_abck', value: 'valid-abck-cookie-value-123456789012345678901234567890' },
       ]);
+
+      // Mock sleep to avoid actual delays in tests
+      jest.spyOn(solver as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await (solver as any).solveLevel3(detection, Date.now(), sensorData);
 
       expect(result).toBeDefined();
-      expect(result.token).toBe('valid-abck-cookie-value-12345678901234567890');
+      expect(result.token).toBe('valid-abck-cookie-value-123456789012345678901234567890');
       expect(result.challengeLevel).toBe(AkamaiChallengeLevel.LEVEL_3);
     });
   });
@@ -493,8 +526,9 @@ describe('NativeAkamaiSolver', () => {
           cookieNames: ['_abck'],
           sensorVersion: '1.0',
         })
-        .mockResolvedValueOnce(false) // determineChallengeLevel - Level 1
-        .mockResolvedValueOnce('session-id') // getSessionId
+        .mockResolvedValueOnce(false) // determineChallengeLevel - Level 3 check (false)
+        .mockResolvedValueOnce(false) // determineChallengeLevel - Level 2 check (false) -> defaults to Level 1
+        .mockResolvedValueOnce('session-id') // getSessionId for fingerprint
         .mockResolvedValueOnce({
           screen: { width: 1920, height: 1080, availWidth: 1920, availHeight: 1040, colorDepth: 24, pixelDepth: 24 },
           timezoneOffset: -480,
@@ -520,31 +554,24 @@ describe('NativeAkamaiSolver', () => {
           { name: '_abck', value: 'test-abck' },
         ])
         .mockResolvedValueOnce([
-          { name: '_abck', value: 'valid-abck-cookie-value-12345678901234567890' },
+          { name: '_abck', value: 'valid-abck-cookie-value-123456789012345678901234567890' },
         ]);
+
+      // Mock sleep to avoid actual delays in tests
+      jest.spyOn(solver as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await solver.solve(params);
 
       expect(result).toBeDefined();
-      expect(result.token).toBe('valid-abck-cookie-value-12345678901234567890');
+      expect(result.token).toBe('valid-abck-cookie-value-123456789012345678901234567890');
       expect(result.solverId).toBe('akamai-native');
     });
 
     it('should retry on failure', async () => {
       const params = { type: 'akamai' as const, url: 'https://example.com' };
 
-      // Mock detection failure first time, success second time
+      // Mock detection success both times, but first solve attempt fails (no cookie), second succeeds
       (mockPage.evaluate as jest.Mock)
-        .mockResolvedValueOnce({
-          hasAkamaiScript: false,
-          hasBmScript: false,
-          hasBmpScript: false,
-          hasWindowCf: false,
-          hasWindowBmak: false,
-          scripts: [],
-          cookieNames: [],
-          sensorVersion: null,
-        })
         .mockResolvedValueOnce({
           hasAkamaiScript: true,
           hasBmScript: true,
@@ -555,8 +582,42 @@ describe('NativeAkamaiSolver', () => {
           cookieNames: ['_abck'],
           sensorVersion: '1.0',
         })
-        .mockResolvedValueOnce(false) // determineChallengeLevel
-        .mockResolvedValueOnce('session-id')
+        .mockResolvedValueOnce(false) // determineChallengeLevel - Level 3 check (false)
+        .mockResolvedValueOnce(false) // determineChallengeLevel - Level 2 check (false) -> defaults to Level 1
+        .mockResolvedValueOnce('session-id') // getSessionId for fingerprint
+        .mockResolvedValueOnce({
+          screen: { width: 1920, height: 1080, availWidth: 1920, availHeight: 1040, colorDepth: 24, pixelDepth: 24 },
+          timezoneOffset: -480,
+          language: 'en-US',
+          platform: 'Win32',
+          userAgent: 'Mozilla/5.0...',
+          capabilities: { plugins: [], mimeTypes: [] },
+          hardware: { hardwareConcurrency: 8 },
+        })
+        .mockResolvedValueOnce('session-id') // getSessionId for sensor data
+        .mockResolvedValueOnce('https://example.com') // referrer
+        .mockResolvedValueOnce({
+          pageLoadTime: 1000,
+          scriptExecutionTime: 500,
+          domContentLoadedTime: 800,
+          firstPaintTime: 600,
+        })
+        .mockResolvedValueOnce('https://akam.net/sensor') // findSensorEndpoint - first attempt
+        .mockResolvedValueOnce(undefined) // submitSensorData - first attempt
+        // Second attempt mocks
+        .mockResolvedValueOnce({
+          hasAkamaiScript: true,
+          hasBmScript: true,
+          hasBmpScript: false,
+          hasWindowCf: true,
+          hasWindowBmak: true,
+          scripts: ['https://akam.net/sensor_data.js'],
+          cookieNames: ['_abck'],
+          sensorVersion: '1.0',
+        })
+        .mockResolvedValueOnce(false) // determineChallengeLevel - Level 3 check (false)
+        .mockResolvedValueOnce(false) // determineChallengeLevel - Level 2 check (false) -> defaults to Level 1
+        .mockResolvedValueOnce('session-id') // getSessionId for fingerprint
         .mockResolvedValueOnce({
           screen: { width: 1920, height: 1080, availWidth: 1920, availHeight: 1040, colorDepth: 24, pixelDepth: 24 },
           timezoneOffset: -480,
@@ -578,13 +639,16 @@ describe('NativeAkamaiSolver', () => {
         .mockResolvedValueOnce(undefined);
 
       (mockContext.cookies as jest.Mock)
-        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { name: '_abck', value: 'test-abck' },
+        ])
+        .mockResolvedValueOnce([]) // First attempt: no valid cookie after submission
         .mockResolvedValueOnce([
           { name: '_abck', value: 'test-abck' },
         ])
         .mockResolvedValueOnce([
-          { name: '_abck', value: 'valid-abck-cookie-value-12345678901234567890' },
-        ]);
+          { name: '_abck', value: 'valid-abck-cookie-value-123456789012345678901234567890' },
+        ]); // Second attempt: valid cookie after submission
 
       // Mock sleep to avoid actual delays in tests
       jest.spyOn(solver as any, 'sleep').mockResolvedValue(undefined);
@@ -592,7 +656,7 @@ describe('NativeAkamaiSolver', () => {
       const result = await solver.solve(params);
 
       expect(result).toBeDefined();
-      expect(result.token).toBe('valid-abck-cookie-value-12345678901234567890');
+      expect(result.token).toBe('valid-abck-cookie-value-123456789012345678901234567890');
     });
   });
 

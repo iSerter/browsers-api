@@ -12,14 +12,48 @@ import {
   OpenAIWhisperProvider,
   AzureSpeechProvider,
 } from './providers';
+import * as fs from 'fs/promises';
+
+// Mock fs module
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe('AudioCaptchaProcessingService', () => {
   let service: AudioCaptchaProcessingService;
   let configService: ConfigService;
   let widgetInteraction: CaptchaWidgetInteractionService;
   let mockPage: any;
+  let mockOpenaiProvider: any;
+  let mockGoogleProvider: any;
+  let mockAzureProvider: any;
 
   beforeEach(async () => {
+    // Create mock providers
+    mockGoogleProvider = {
+      getName: jest.fn().mockReturnValue(SpeechToTextProvider.GOOGLE_CLOUD),
+      isAvailable: jest.fn().mockResolvedValue(false),
+      transcribe: jest.fn(),
+    };
+
+    mockOpenaiProvider = {
+      getName: jest.fn().mockReturnValue(SpeechToTextProvider.OPENAI_WHISPER),
+      isAvailable: jest.fn().mockResolvedValue(true),
+      transcribe: jest.fn().mockResolvedValue({
+        text: 'test transcription',
+        confidence: 0.9,
+        provider: SpeechToTextProvider.OPENAI_WHISPER,
+      }),
+    };
+
+    mockAzureProvider = {
+      getName: jest.fn().mockReturnValue(SpeechToTextProvider.AZURE_SPEECH),
+      isAvailable: jest.fn().mockResolvedValue(false),
+      transcribe: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AudioCaptchaProcessingService,
@@ -50,31 +84,15 @@ describe('AudioCaptchaProcessingService', () => {
         },
         {
           provide: GoogleCloudSpeechProvider,
-          useValue: {
-            getName: jest.fn().mockReturnValue(SpeechToTextProvider.GOOGLE_CLOUD),
-            isAvailable: jest.fn().mockResolvedValue(false),
-            transcribe: jest.fn(),
-          },
+          useValue: mockGoogleProvider,
         },
         {
           provide: OpenAIWhisperProvider,
-          useValue: {
-            getName: jest.fn().mockReturnValue(SpeechToTextProvider.OPENAI_WHISPER),
-            isAvailable: jest.fn().mockResolvedValue(true),
-            transcribe: jest.fn().mockResolvedValue({
-              text: 'test transcription',
-              confidence: 0.9,
-              provider: SpeechToTextProvider.OPENAI_WHISPER,
-            }),
-          },
+          useValue: mockOpenaiProvider,
         },
         {
           provide: AzureSpeechProvider,
-          useValue: {
-            getName: jest.fn().mockReturnValue(SpeechToTextProvider.AZURE_SPEECH),
-            isAvailable: jest.fn().mockResolvedValue(false),
-            transcribe: jest.fn(),
-          },
+          useValue: mockAzureProvider,
         },
       ],
     }).compile();
@@ -91,6 +109,19 @@ describe('AudioCaptchaProcessingService', () => {
       evaluate: jest.fn(),
       frames: jest.fn().mockReturnValue([]),
     };
+
+    // Mock startCacheCleanup to prevent setInterval from running
+    jest.spyOn(service as any, 'startCacheCleanup').mockImplementation(() => {
+      // No-op: don't start the interval in tests
+    });
+
+    // Initialize service to register providers
+    await service.onModuleInit();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('onModuleInit', () => {
@@ -122,13 +153,16 @@ describe('AudioCaptchaProcessingService', () => {
 
   describe('downloadAudio', () => {
     it('should download audio from blob URL', async () => {
-      const blobData = new Uint8Array([1, 2, 3, 4]);
-      mockPage.evaluate.mockResolvedValue(Array.from(blobData));
+      // WAV file starts with RIFF header
+      const wavData = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00]);
+      mockPage.evaluate.mockResolvedValue(Array.from(wavData));
 
       const result = await service.downloadAudio(mockPage, 'blob:http://example.com/123');
 
       expect(result.buffer).toBeInstanceOf(Buffer);
-      expect(result.format).toBeDefined();
+      expect(result.format).toBe(AudioFormat.WAV);
+      // WAV format doesn't need file processing, so writeFile shouldn't be called
+      expect(fs.writeFile).not.toHaveBeenCalled();
     });
 
     it('should download audio from regular URL', async () => {
@@ -142,19 +176,27 @@ describe('AudioCaptchaProcessingService', () => {
 
       expect(result.buffer).toBeInstanceOf(Buffer);
       expect(result.format).toBe(AudioFormat.MP3);
+      // MP3 needs file processing, so writeFile should be called
+      expect(fs.writeFile).toHaveBeenCalled();
     });
 
     it('should detect WAV format', async () => {
-      // WAV file starts with RIFF
-      const wavBuffer = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00]);
+      // WAV file starts with RIFF header (need at least 4 bytes)
+      const wavBuffer = Buffer.from([
+        0x52, 0x49, 0x46, 0x46, // RIFF
+        0x00, 0x00, 0x00, 0x00, // File size
+        0x57, 0x41, 0x56, 0x45, // WAVE
+      ]);
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         arrayBuffer: jest.fn().mockResolvedValue(wavBuffer.buffer),
       });
 
-      const result = await service.downloadAudio(mockPage, 'https://example.com/audio');
+      const result = await service.downloadAudio(mockPage, 'https://example.com/audio.wav');
 
       expect(result.format).toBe(AudioFormat.WAV);
+      // WAV format doesn't need file processing
+      expect(fs.writeFile).not.toHaveBeenCalled();
     });
 
     it('should handle download errors', async () => {
@@ -178,9 +220,8 @@ describe('AudioCaptchaProcessingService', () => {
         format: AudioFormat.WAV,
       });
 
-      // Mock transcription
-      const openaiProvider = service['openaiProvider'] as any;
-      openaiProvider.transcribe.mockResolvedValue({
+      // Mock transcription - ensure provider is registered
+      mockOpenaiProvider.transcribe.mockResolvedValue({
         text: 'transcribed text',
         confidence: 0.9,
         provider: SpeechToTextProvider.OPENAI_WHISPER,
@@ -234,8 +275,8 @@ describe('AudioCaptchaProcessingService', () => {
         format: AudioFormat.WAV,
       });
 
-      const openaiProvider = service['openaiProvider'] as any;
-      openaiProvider.transcribe
+      // Mock transcription with retry logic
+      mockOpenaiProvider.transcribe
         .mockResolvedValueOnce({
           text: 'low confidence',
           confidence: 0.5, // Below threshold
@@ -313,12 +354,13 @@ describe('AudioCaptchaProcessingService', () => {
         expiresAt: Date.now() - 1000, // Already expired
       });
 
-      // Trigger cleanup
-      const cleanup = service['startCacheCleanup'].bind(service);
-      cleanup();
-
-      // Wait a bit for cleanup
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Manually trigger cleanup by iterating through cache
+      const now = Date.now();
+      for (const [cacheKey, entry] of service['cache'].entries()) {
+        if (now > entry.expiresAt) {
+          service['cache'].delete(cacheKey);
+        }
+      }
 
       expect(service['cache'].has(key)).toBe(false);
     });

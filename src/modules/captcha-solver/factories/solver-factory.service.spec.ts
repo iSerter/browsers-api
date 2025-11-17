@@ -15,7 +15,11 @@ describe('SolverFactory', () => {
 
   // Mock solver class
   class MockSolver implements ICaptchaSolver {
-    constructor(public name: string) {}
+    private name: string;
+
+    constructor(name?: string) {
+      this.name = name || 'mock-solver';
+    }
 
     async solve(params: CaptchaParams): Promise<CaptchaSolution> {
       return {
@@ -27,6 +31,25 @@ describe('SolverFactory', () => {
 
     getName(): string {
       return this.name;
+    }
+
+    async isAvailable(): Promise<boolean> {
+      return true;
+    }
+  }
+
+  // Working solver that always returns 'working-solver' as solverId
+  class WorkingSolver implements ICaptchaSolver {
+    async solve(params: CaptchaParams): Promise<CaptchaSolution> {
+      return {
+        token: 'test-token',
+        solvedAt: new Date(),
+        solverId: 'working-solver',
+      };
+    }
+
+    getName(): string {
+      return 'working-solver';
     }
 
     async isAvailable(): Promise<boolean> {
@@ -327,12 +350,17 @@ describe('SolverFactory', () => {
 
       solverRegistry.getSolversByPriority.mockReturnValue([metadata]);
       solverRegistry.get.mockReturnValue(metadata);
+      circuitBreaker.isAvailable.mockReturnValue(true);
+      circuitBreaker.getState.mockReturnValue('CLOSED');
+      circuitBreaker.getStateDetails.mockReturnValue({});
 
+      // Pass the solver name as constructor arg so MockSolver uses it
       const solution = await factory.solveWithFallback(params, ['test-solver']);
 
       expect(solution.token).toBe('test-token');
       expect(solution.solverId).toBe('test-solver');
       expect(solverRegistry.recordSuccess).toHaveBeenCalledWith('test-solver');
+      expect(circuitBreaker.recordSuccess).toHaveBeenCalledWith('test-solver');
       expect(performanceTracker.recordAttempt).toHaveBeenCalled();
     });
 
@@ -374,7 +402,7 @@ describe('SolverFactory', () => {
 
       const workingMetadata = {
         solverType: 'working-solver',
-        constructor: MockSolver,
+        constructor: WorkingSolver,
         capabilities: {
           supportedChallengeTypes: ['recaptcha'],
           maxConcurrency: 10,
@@ -400,8 +428,9 @@ describe('SolverFactory', () => {
       // Ensure circuit breaker allows both solvers
       circuitBreaker.isAvailable.mockReturnValue(true);
       circuitBreaker.getState.mockReturnValue('CLOSED');
+      circuitBreaker.getStateDetails.mockReturnValue({});
 
-      const solution = await factory.solveWithFallback(params, ['working-solver']);
+      const solution = await factory.solveWithFallback(params);
 
       expect(solution.solverId).toBe('working-solver');
       expect(solution.token).toBe('test-token');
@@ -411,6 +440,8 @@ describe('SolverFactory', () => {
       expect(solverRegistry.recordSuccess).toHaveBeenCalledWith(
         'working-solver',
       );
+      expect(circuitBreaker.recordFailure).toHaveBeenCalledWith('failing-solver');
+      expect(circuitBreaker.recordSuccess).toHaveBeenCalledWith('working-solver');
     });
 
     it('should throw error when all solvers fail', async () => {
@@ -451,10 +482,16 @@ describe('SolverFactory', () => {
 
       solverRegistry.getSolversByPriority.mockReturnValue([metadata]);
       solverRegistry.get.mockReturnValue(metadata);
+      circuitBreaker.isAvailable.mockReturnValue(true);
+      circuitBreaker.getState.mockReturnValue('CLOSED');
+      circuitBreaker.getStateDetails.mockReturnValue({});
 
       await expect(factory.solveWithFallback(params)).rejects.toThrow(
         'All solvers failed',
       );
+      
+      expect(circuitBreaker.recordFailure).toHaveBeenCalledWith('failing-solver');
+      expect(solverRegistry.recordFailure).toHaveBeenCalledWith('failing-solver');
     });
 
     it('should throw error when no solvers available', async () => {
@@ -470,6 +507,105 @@ describe('SolverFactory', () => {
       await expect(factory.solveWithFallback(params)).rejects.toThrow(
         'No enabled solvers found',
       );
+    });
+
+    it('should throw error when all solvers are circuit-broken', async () => {
+      const params: CaptchaParams = {
+        type: 'recaptcha',
+        url: 'https://example.com',
+        sitekey: 'test-sitekey',
+      };
+
+      const metadata = {
+        solverType: 'circuit-broken-solver',
+        constructor: MockSolver,
+        capabilities: {
+          supportedChallengeTypes: ['recaptcha'],
+          maxConcurrency: 10,
+          averageResponseTime: 5000,
+          successRate: 0.8,
+          isEnabled: true,
+          priority: 100,
+        },
+        healthStatus: 'healthy' as const,
+        consecutiveFailures: 0,
+        totalUses: 0,
+        totalFailures: 0,
+      };
+
+      solverRegistry.getSolversByPriority.mockReturnValue([]);
+      solverRegistry.getSolversForChallengeType.mockReturnValue([metadata]);
+      circuitBreaker.isAvailable.mockReturnValue(false);
+      circuitBreaker.getState.mockReturnValue('OPEN');
+
+      await expect(factory.solveWithFallback(params)).rejects.toThrow(
+        /all.*solvers.*are.*circuit-broken.*or.*unavailable/i,
+      );
+    });
+
+    it('should skip circuit-broken solvers in fallback chain', async () => {
+      const params: CaptchaParams = {
+        type: 'recaptcha',
+        url: 'https://example.com',
+        sitekey: 'test-sitekey',
+      };
+
+      const brokenMetadata = {
+        solverType: 'broken-solver',
+        constructor: MockSolver,
+        capabilities: {
+          supportedChallengeTypes: ['recaptcha'],
+          maxConcurrency: 10,
+          averageResponseTime: 5000,
+          successRate: 0.8,
+          isEnabled: true,
+          priority: 100,
+        },
+        healthStatus: 'healthy' as const,
+        consecutiveFailures: 0,
+        totalUses: 0,
+        totalFailures: 0,
+      };
+
+      const workingMetadata = {
+        solverType: 'working-solver',
+        constructor: WorkingSolver,
+        capabilities: {
+          supportedChallengeTypes: ['recaptcha'],
+          maxConcurrency: 10,
+          averageResponseTime: 5000,
+          successRate: 0.8,
+          isEnabled: true,
+          priority: 90,
+        },
+        healthStatus: 'healthy' as const,
+        consecutiveFailures: 0,
+        totalUses: 0,
+        totalFailures: 0,
+      };
+
+      solverRegistry.getSolversByPriority.mockReturnValue([
+        brokenMetadata,
+        workingMetadata,
+      ]);
+      solverRegistry.get.mockReturnValue(workingMetadata);
+      circuitBreaker.isAvailable
+        .mockReturnValueOnce(false) // broken-solver is unavailable
+        .mockReturnValueOnce(true);  // working-solver is available
+      circuitBreaker.getState
+        .mockReturnValueOnce('OPEN')
+        .mockReturnValueOnce('CLOSED');
+      circuitBreaker.getStateDetails.mockReturnValue({});
+
+      const solution = await factory.solveWithFallback(params);
+
+      expect(solution.solverId).toBe('working-solver');
+      expect(circuitBreaker.isAvailable).toHaveBeenCalledWith('broken-solver');
+      expect(circuitBreaker.isAvailable).toHaveBeenCalledWith('working-solver');
+      expect(circuitBreaker.recordSuccess).toHaveBeenCalledWith('working-solver');
+      // Should not attempt to use broken-solver - verify get was only called for working-solver
+      expect(solverRegistry.get).toHaveBeenCalledTimes(1);
+      expect(solverRegistry.get).toHaveBeenCalledWith('working-solver');
     });
   });
 

@@ -1,3 +1,5 @@
+import { ErrorContext } from '../interfaces/error-context.interface';
+
 /**
  * Error categories for captcha solver exceptions
  */
@@ -15,6 +17,11 @@ export enum ErrorCategory {
  */
 export class CaptchaSolverException extends Error {
   /**
+   * Error context with correlation ID, timing, and metadata
+   */
+  public readonly errorContext?: ErrorContext;
+
+  /**
    * Creates a new CaptchaSolverException instance.
    *
    * @param message - Human-readable error message
@@ -22,6 +29,7 @@ export class CaptchaSolverException extends Error {
    * @param category - Error category indicating the type of error
    * @param isRecoverable - Whether the error is recoverable (can be retried)
    * @param context - Additional context information (provider name, request details, etc.)
+   * @param errorContext - Error context with correlation ID, timing, and metadata
    */
   constructor(
     message: string,
@@ -29,9 +37,11 @@ export class CaptchaSolverException extends Error {
     public readonly category: ErrorCategory,
     public readonly isRecoverable: boolean = false,
     public readonly context?: Record<string, any>,
+    errorContext?: ErrorContext,
   ) {
     super(message);
     this.name = this.constructor.name;
+    this.errorContext = errorContext;
 
     // Capture stack trace if available (Node.js)
     if (Error.captureStackTrace) {
@@ -56,6 +66,7 @@ export class CaptchaSolverException extends Error {
       category: this.category,
       isRecoverable: this.isRecoverable,
       context: this.context,
+      errorContext: this.errorContext,
       stack: this.stack,
     };
   }
@@ -72,6 +83,16 @@ export class CaptchaSolverException extends Error {
       `Recoverable: ${this.isRecoverable}`,
       `Message: ${this.message}`,
     ];
+
+    if (this.errorContext?.correlationId) {
+      parts.push(`Correlation ID: ${this.errorContext.correlationId}`);
+    }
+
+    if (this.errorContext?.timings) {
+      parts.push(
+        `Duration: ${this.errorContext.timings.duration}ms`,
+      );
+    }
 
     if (this.context && Object.keys(this.context).length > 0) {
       parts.push(`Context: ${JSON.stringify(this.context)}`);

@@ -50,10 +50,13 @@ export class NativeSolverRegistryService implements OnModuleInit {
         turnstileCapabilities,
       );
       this.logger.log('Registered TurnstileSolver as native solver');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
-        `Failed to register TurnstileSolver: ${error.message}`,
-        error.stack,
+        `Failed to register TurnstileSolver: ${errorMessage}`,
+        errorStack,
       );
     }
 
@@ -81,10 +84,13 @@ export class NativeSolverRegistryService implements OnModuleInit {
         recaptchaCapabilities,
       );
       this.logger.log('Registered NativeRecaptchaSolver as native solver');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
-        `Failed to register NativeRecaptchaSolver: ${error.message}`,
-        error.stack,
+        `Failed to register NativeRecaptchaSolver: ${errorMessage}`,
+        errorStack,
       );
     }
 
@@ -111,10 +117,13 @@ export class NativeSolverRegistryService implements OnModuleInit {
         hcaptchaCapabilities,
       );
       this.logger.log('Registered NativeHcaptchaSolver as native solver');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
-        `Failed to register NativeHcaptchaSolver: ${error.message}`,
-        error.stack,
+        `Failed to register NativeHcaptchaSolver: ${errorMessage}`,
+        errorStack,
       );
     }
 
@@ -141,10 +150,13 @@ export class NativeSolverRegistryService implements OnModuleInit {
         datadomeCapabilities,
       );
       this.logger.log('Registered NativeDataDomeSolver as native solver');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
-        `Failed to register NativeDataDomeSolver: ${error.message}`,
-        error.stack,
+        `Failed to register NativeDataDomeSolver: ${errorMessage}`,
+        errorStack,
       );
     }
 
@@ -171,10 +183,13 @@ export class NativeSolverRegistryService implements OnModuleInit {
         akamaiCapabilities,
       );
       this.logger.log('Registered NativeAkamaiSolver as native solver');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
-        `Failed to register NativeAkamaiSolver: ${error.message}`,
-        error.stack,
+        `Failed to register NativeAkamaiSolver: ${errorMessage}`,
+        errorStack,
       );
     }
   }

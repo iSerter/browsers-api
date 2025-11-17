@@ -35,6 +35,10 @@ import { CaptchaLoggingService } from './services/captcha-logging.service';
 import { CaptchaSolverConfigService } from './config';
 import { SolverCircuitBreakerService } from './services/solver-circuit-breaker.service';
 import { DetectionCacheService } from './services/detection-cache.service';
+import { ErrorContextService } from './services/error-context.service';
+import { ErrorAggregationService } from './services/error-aggregation.service';
+import { SsrfProtectionGuard } from './guards/ssrf-protection.guard';
+import { SsrfUrlValidationPipe } from './pipes/ssrf-url-validation.pipe';
 
 @Module({
   imports: [
@@ -70,6 +74,10 @@ import { DetectionCacheService } from './services/detection-cache.service';
     CaptchaSolverConfigService,
     SolverCircuitBreakerService,
     DetectionCacheService,
+    ErrorContextService,
+    ErrorAggregationService,
+    SsrfProtectionGuard,
+    SsrfUrlValidationPipe,
   ],
   exports: [
     CaptchaSolverService,
@@ -91,6 +99,8 @@ import { DetectionCacheService } from './services/detection-cache.service';
     CaptchaSolverConfigService,
     SolverCircuitBreakerService,
     DetectionCacheService,
+    ErrorContextService,
+    ErrorAggregationService,
   ],
 })
 export class CaptchaSolverModule {}

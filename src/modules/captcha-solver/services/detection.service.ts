@@ -118,23 +118,28 @@ export class DetectionService implements OnModuleInit {
 
   /**
    * Detect all anti-bot systems on a page
+   * 
+   * Orchestrates the detection process by:
+   * 1. Validating input and retrieving context
+   * 2. Checking cache for existing results
+   * 3. Executing detection strategies
+   * 4. Processing and sorting results
+   * 5. Caching and logging results
+   * 
+   * @param page - Playwright Page object to analyze
+   * @param config - Optional detection configuration (minConfidence, targetSystems)
+   * @returns MultiDetectionResult with all detections, primary detection, and metadata
    */
   async detectAll(
     page: Page,
     config?: DetectionConfig,
   ): Promise<MultiDetectionResult> {
     const startTime = Date.now();
-    const detections: AntiBotDetectionResult[] = [];
 
     // Validate page object
     if (!page) {
       this.logger.error('Page object is null or undefined');
-      return {
-        detections: [],
-        primary: null,
-        totalDurationMs: Date.now() - startTime,
-        analyzedAt: new Date(),
-      };
+      return this.createEmptyResult(startTime);
     }
 
     // Get detection context
@@ -146,51 +151,112 @@ export class DetectionService implements OnModuleInit {
         `Failed to get detection context: ${error.message}`,
         { error: error.stack },
       );
-      return {
-        detections: [],
-        primary: null,
-        totalDurationMs: Date.now() - startTime,
-        analyzedAt: new Date(),
-      };
+      return this.createEmptyResult(startTime);
     }
 
-    // Get page content for caching (only once)
-    let pageContent: string | null = null;
+    // Check cache
+    const pageContent = await this.getPageContent(page);
+    const cachedResult = await this.checkCache(context.url, pageContent);
+    if (cachedResult) {
+      return cachedResult;
+    }
+
+    // Execute detections
+    const targetSystems = this.getTargetSystems(config);
+    const detections = await this.executeDetections(
+      page,
+      targetSystems,
+      context,
+      config,
+    );
+
+    // Process results
+    const result = this.processResults(detections, startTime);
+
+    // Cache and log results
+    await this.cacheResult(context.url, pageContent, result);
+    this.logDetectionResults(result, detections, context.url, startTime);
+
+    return result;
+  }
+
+
+  /**
+   * Get page content for caching purposes
+   * 
+   * @param page - Playwright Page object
+   * @returns Page content as string, or null if retrieval fails
+   */
+  private async getPageContent(page: Page): Promise<string | null> {
     try {
-      pageContent = await page.content();
+      return await page.content();
     } catch (error) {
       this.logger.debug(
         `Failed to get page content for caching: ${error.message}`,
       );
+      return null;
+    }
+  }
+
+  /**
+   * Check cache for existing detection results
+   * 
+   * @param url - Page URL to check cache for
+   * @param pageContent - Page HTML content for cache key
+   * @returns Cached result if found, null otherwise
+   */
+  private async checkCache(
+    url: string,
+    pageContent: string | null,
+  ): Promise<MultiDetectionResult | null> {
+    if (!pageContent) {
+      return null;
     }
 
-    // Try to get cached result
-    if (pageContent) {
-      try {
-        const cachedResult = await this.detectionCache.get(
-          context.url,
-          pageContent,
-        );
-
-        if (cachedResult) {
-          this.logger.debug(
-            `Returning cached detection result for URL: ${context.url}`,
-          );
-          return cachedResult;
-        }
-      } catch (error) {
-        // If cache check fails, continue with normal detection
-        this.logger.debug(
-          `Cache check failed, proceeding with detection: ${error.message}`,
-        );
+    try {
+      const cachedResult = await this.detectionCache.get(url, pageContent);
+      if (cachedResult) {
+        this.logger.debug(`Returning cached detection result for URL: ${url}`);
+        return cachedResult;
       }
+    } catch (error) {
+      this.logger.debug(
+        `Cache check failed, proceeding with detection: ${error.message}`,
+      );
     }
 
-    // Determine which systems to check
-    const targetSystems =
-      config?.targetSystems || Object.values(AntiBotSystemType);
+    return null;
+  }
 
-    // Run all detections
+  /**
+   * Determine which anti-bot systems to check
+   * 
+   * @param config - Optional detection configuration
+   * @returns Array of AntiBotSystemType to check
+   */
+  private getTargetSystems(
+    config?: DetectionConfig,
+  ): AntiBotSystemType[] {
+    return config?.targetSystems || Object.values(AntiBotSystemType);
+  }
+
+  /**
+   * Execute detection strategies for all target systems
+   * 
+   * @param page - Playwright Page object
+   * @param targetSystems - Array of system types to detect
+   * @param context - Detection context with URL, cookies, etc.
+   * @param config - Optional detection configuration
+   * @returns Array of detection results
+   */
+  private async executeDetections(
+    page: Page,
+    targetSystems: AntiBotSystemType[],
+    context: DetectionContext,
+    config?: DetectionConfig,
+  ): Promise<AntiBotDetectionResult[]> {
+    const detections: AntiBotDetectionResult[] = [];
+
     for (const systemType of targetSystems) {
       if (systemType === AntiBotSystemType.UNKNOWN) continue;
 
@@ -221,34 +287,76 @@ export class DetectionService implements OnModuleInit {
       }
     }
 
+    return detections;
+  }
+
+  /**
+   * Process detection results: sort by confidence and create result object
+   * 
+   * @param detections - Array of detection results
+   * @param startTime - Start time for duration calculation
+   * @returns Processed MultiDetectionResult
+   */
+  private processResults(
+    detections: AntiBotDetectionResult[],
+    startTime: number,
+  ): MultiDetectionResult {
     // Sort by confidence (highest first)
     detections.sort((a, b) => b.confidence - a.confidence);
 
-    const result = {
+    return {
       detections,
       primary: detections.length > 0 ? detections[0] : null,
       totalDurationMs: Date.now() - startTime,
       analyzedAt: new Date(),
     };
+  }
 
-    // Cache the result (reuse pageContent if available)
-    if (pageContent) {
-      try {
-        await this.detectionCache.set(context.url, pageContent, result);
-      } catch (error) {
-        // If caching fails, log but don't fail the detection
-        this.logger.debug(
-          `Failed to cache detection result: ${error.message}`,
-        );
-      }
+  /**
+   * Cache detection result if page content is available
+   * 
+   * @param url - Page URL
+   * @param pageContent - Page HTML content
+   * @param result - Detection result to cache
+   */
+  private async cacheResult(
+    url: string,
+    pageContent: string | null,
+    result: MultiDetectionResult,
+  ): Promise<void> {
+    if (!pageContent) {
+      return;
     }
 
-    // Log detection results
+    try {
+      await this.detectionCache.set(url, pageContent, result);
+    } catch (error) {
+      // If caching fails, log but don't fail the detection
+      this.logger.debug(
+        `Failed to cache detection result: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Log detection results to the logging service
+   * 
+   * @param result - Processed detection result
+   * @param detections - Array of all detections
+   * @param url - Page URL for logging context
+   * @param startTime - Start time for duration calculation
+   */
+  private logDetectionResults(
+    result: MultiDetectionResult,
+    detections: AntiBotDetectionResult[],
+    url: string,
+    startTime: number,
+  ): void {
     if (result.primary) {
       this.captchaLogging.logDetection(
         result.primary,
         result.totalDurationMs,
-        context.url,
+        url,
       );
     } else if (detections.length > 0) {
       // Log all detections if no primary
@@ -256,7 +364,7 @@ export class DetectionService implements OnModuleInit {
         this.captchaLogging.logDetection(
           detection,
           detection.durationMs || 0,
-          context.url,
+          url,
         );
       }
     } else {
@@ -274,11 +382,24 @@ export class DetectionService implements OnModuleInit {
       this.captchaLogging.logDetection(
         noDetectionResult,
         result.totalDurationMs,
-        context.url,
+        url,
       );
     }
+  }
 
-    return result;
+  /**
+   * Create an empty detection result
+   * 
+   * @param startTime - Start time for duration calculation
+   * @returns Empty MultiDetectionResult
+   */
+  private createEmptyResult(startTime: number): MultiDetectionResult {
+    return {
+      detections: [],
+      primary: null,
+      totalDurationMs: Date.now() - startTime,
+      analyzedAt: new Date(),
+    };
   }
 
   /**

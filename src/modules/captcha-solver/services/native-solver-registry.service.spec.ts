@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NativeSolverRegistryService } from './native-solver-registry.service';
 import { SolverRegistry } from '../factories/solver-registry.service';
+import { CaptchaSolverException } from '../exceptions/captcha-solver.exception';
 
 describe('NativeSolverRegistryService', () => {
   let service: NativeSolverRegistryService;
   let solverRegistry: jest.Mocked<SolverRegistry>;
+  let loggerErrorSpy: jest.SpyInstance;
+  let loggerLogSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     const mockSolverRegistry = {
@@ -28,6 +31,10 @@ describe('NativeSolverRegistryService', () => {
       NativeSolverRegistryService,
     );
     solverRegistry = module.get(SolverRegistry);
+
+    // Spy on logger methods
+    loggerErrorSpy = jest.spyOn(service['logger'], 'error');
+    loggerLogSpy = jest.spyOn(service['logger'], 'log');
   });
 
   afterEach(() => {
@@ -244,6 +251,85 @@ describe('NativeSolverRegistryService', () => {
 
       // Should not throw, but log error
       await expect(service.onModuleInit()).resolves.not.toThrow();
+
+      // Verify error was logged for each failed registration
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(5);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to register'),
+        expect.any(String),
+      );
+    });
+
+    it('should handle CaptchaSolverException during registration', async () => {
+      const captchaError = new CaptchaSolverException(
+        'Solver registration failed',
+        'REGISTRATION_ERROR',
+      );
+      solverRegistry.register.mockImplementation(() => {
+        throw captchaError;
+      });
+
+      await expect(service.onModuleInit()).resolves.not.toThrow();
+
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(5);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to register'),
+        expect.any(String),
+      );
+    });
+
+    it('should handle non-Error exceptions during registration', async () => {
+      solverRegistry.register.mockImplementation(() => {
+        throw 'String error';
+      });
+
+      await expect(service.onModuleInit()).resolves.not.toThrow();
+
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(5);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to register'),
+        undefined,
+      );
+    });
+
+    it('should continue registering other solvers when one fails', async () => {
+      let callCount = 0;
+      solverRegistry.register.mockImplementation(() => {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Second registration failed');
+        }
+      });
+
+      await expect(service.onModuleInit()).resolves.not.toThrow();
+
+      // Should attempt to register all 5 solvers
+      expect(solverRegistry.register).toHaveBeenCalledTimes(5);
+      // Should log error for the failed one
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to register NativeRecaptchaSolver'),
+        expect.any(String),
+      );
+      // Should log success for others
+      expect(loggerLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Registered'),
+      );
+    });
+
+    it('should handle errors with stack traces correctly', async () => {
+      const errorWithStack = new Error('Error with stack');
+      errorWithStack.stack = 'Error: Error with stack\n    at test.js:1:1';
+
+      solverRegistry.register.mockImplementation(() => {
+        throw errorWithStack;
+      });
+
+      await expect(service.onModuleInit()).resolves.not.toThrow();
+
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to register'),
+        'Error: Error with stack\n    at test.js:1:1',
+      );
     });
   });
 });

@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { DetectionService } from './detection.service';
 import { DetectionRegistryService } from './detection-registry.service';
 import { ConfidenceScoringService } from './confidence-scoring.service';
+import { CaptchaLoggingService } from './captcha-logging.service';
+import { DetectionCacheService } from './detection-cache.service';
+import { WinstonLoggerService } from '../../../common/services/winston-logger.service';
 import {
   IDetectionStrategy,
 } from './detection-strategy.interface';
@@ -78,12 +82,70 @@ describe('DetectionService Extensibility', () => {
   let mockPage: any;
   let mockContext: any;
 
+  const mockWinstonLogger = {
+    log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    verbose: jest.fn(),
+    getLogger: jest.fn(),
+  };
+
+  const mockConfigService = {
+    get: jest.fn((key: string, defaultValue?: any) => {
+      const config: Record<string, any> = {
+        CAPTCHA_LOG_RETENTION: 1000,
+        CAPTCHA_ALERT_CONSECUTIVE_FAILURES: 5,
+        CAPTCHA_ALERT_TIME_WINDOW_MS: 60000,
+        CAPTCHA_ALERT_FAILURE_COUNT: 10,
+        CAPTCHA_ALERT_COOLDOWN_MS: 300000,
+        CAPTCHA_CACHE_TTL: 300000,
+        NODE_ENV: 'test',
+      };
+      return config[key] ?? defaultValue;
+    }),
+  };
+
+  const mockCaptchaLogging = {
+    logDetection: jest.fn(),
+    logSolving: jest.fn(),
+    logError: jest.fn(),
+  };
+
+  const mockDetectionCache = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    generateContentHash: jest.fn().mockReturnValue('test-hash'),
+    invalidate: jest.fn().mockResolvedValue(undefined),
+    getStats: jest.fn().mockReturnValue({ hits: 0, misses: 0, hitRate: 0 }),
+    resetStats: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DetectionService,
         DetectionRegistryService,
-        ConfidenceScoringService,
+        {
+          provide: ConfidenceScoringService,
+          useFactory: () => new ConfidenceScoringService(),
+        },
+        {
+          provide: CaptchaLoggingService,
+          useValue: mockCaptchaLogging,
+        },
+        {
+          provide: DetectionCacheService,
+          useValue: mockDetectionCache,
+        },
+        {
+          provide: WinstonLoggerService,
+          useValue: mockWinstonLogger,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
@@ -100,8 +162,14 @@ describe('DetectionService Extensibility', () => {
       url: jest.fn().mockReturnValue('https://example.com'),
       title: jest.fn().mockResolvedValue('Test Page'),
       evaluate: jest.fn(),
+      content: jest.fn().mockResolvedValue('<html></html>'),
       context: jest.fn().mockReturnValue(mockContext),
     };
+
+    // Reset mocks
+    jest.clearAllMocks();
+    mockDetectionCache.get.mockResolvedValue(null);
+    mockDetectionCache.set.mockResolvedValue(undefined);
   });
 
   describe('Custom Strategy Registration', () => {

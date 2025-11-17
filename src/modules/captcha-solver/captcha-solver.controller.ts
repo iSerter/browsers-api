@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +21,7 @@ import { ProviderRegistryService } from './services/provider-registry.service';
 import { UpdateConfigDto } from './dto/update-config.dto';
 import { TestCaptchaDto } from './dto/test-captcha.dto';
 import { CaptchaParams } from './interfaces/captcha-solver.interface';
+import { SsrfProtectionGuard } from './guards/ssrf-protection.guard';
 
 @ApiTags('captcha-solver')
 @Controller('captcha-solver')
@@ -80,6 +82,7 @@ export class CaptchaSolverController {
   }
 
   @Post('test')
+  @UseGuards(SsrfProtectionGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Test captcha solving',

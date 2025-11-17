@@ -110,14 +110,18 @@ export class ClickActionHandler implements IActionHandler {
   }
 
   private getErrorCode(error: any): string {
-    // Timeout errors from element selection should be treated as element not found
-    if (error.name === 'TimeoutError') {
-      return 'ELEMENT_NOT_FOUND_ERROR';
+    // Timeout errors should be categorized as TIMEOUT_ERROR
+    if (error.name === 'TimeoutError' || error.message?.includes('Timeout')) {
+      return 'TIMEOUT_ERROR';
     }
     if (isStrictModeViolation(error)) {
       return 'STRICT_MODE_VIOLATION';
     }
-    if (error.message.includes('not found')) {
+    if (
+      error.message?.includes('not found') ||
+      error.message?.includes('Element not found') ||
+      error.message?.includes('No element matches')
+    ) {
       return 'ELEMENT_NOT_FOUND_ERROR';
     }
     return 'UNKNOWN_ERROR';
@@ -125,6 +129,10 @@ export class ClickActionHandler implements IActionHandler {
 
   private isRetryableError(error: any): boolean {
     const errorCode = this.getErrorCode(error);
+    // Timeout errors are retryable
+    if (errorCode === 'TIMEOUT_ERROR') {
+      return true;
+    }
     // Element not found and strict mode violations are not retryable - they require user action
     return false;
   }

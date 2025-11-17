@@ -112,6 +112,14 @@ describe('AntiCaptchaProvider', () => {
         },
       };
 
+      // Mock sleep to avoid actual delays
+      jest.spyOn(provider as any, 'sleep').mockResolvedValue(undefined);
+
+      // Mock HTTP calls:
+      // 1. createTask
+      // 2. waitForTask - first poll (processing)
+      // 3. waitForTask - second poll (ready) - this will return early
+      // 4. getTaskResult - final call to get solution
       httpService.request
         .mockReturnValueOnce(of({ data: createTaskResponse }))
         .mockReturnValueOnce(of({ data: { errorId: 0, status: 'processing' } }))
@@ -124,8 +132,6 @@ describe('AntiCaptchaProvider', () => {
         url: 'https://example.com',
         version: 'v2',
       };
-
-      jest.spyOn(provider as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await provider.solve(params);
 
@@ -147,6 +153,13 @@ describe('AntiCaptchaProvider', () => {
         },
       };
 
+      // Mock sleep to avoid actual delays
+      jest.spyOn(provider as any, 'sleep').mockResolvedValue(undefined);
+
+      // Mock HTTP calls:
+      // 1. createTask
+      // 2. waitForTask - first poll (ready) - this will return early
+      // 3. getTaskResult - final call to get solution
       httpService.request
         .mockReturnValueOnce(of({ data: createTaskResponse }))
         .mockReturnValueOnce(of({ data: getTaskResponse }))
@@ -159,8 +172,6 @@ describe('AntiCaptchaProvider', () => {
         version: 'v3',
         action: 'verify',
       };
-
-      jest.spyOn(provider as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await provider.solve(params);
 
@@ -181,6 +192,13 @@ describe('AntiCaptchaProvider', () => {
         },
       };
 
+      // Mock sleep to avoid actual delays
+      jest.spyOn(provider as any, 'sleep').mockResolvedValue(undefined);
+
+      // Mock HTTP calls:
+      // 1. createTask
+      // 2. waitForTask - first poll (ready) - this will return early
+      // 3. getTaskResult - final call to get solution
       httpService.request
         .mockReturnValueOnce(of({ data: createTaskResponse }))
         .mockReturnValueOnce(of({ data: getTaskResponse }))
@@ -191,8 +209,6 @@ describe('AntiCaptchaProvider', () => {
         sitekey: '10000000-ffff-ffff-ffff-000000000001',
         url: 'https://example.com',
       };
-
-      jest.spyOn(provider as any, 'sleep').mockResolvedValue(undefined);
 
       const result = await provider.solve(params);
 

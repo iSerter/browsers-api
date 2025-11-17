@@ -33,6 +33,8 @@ describe('MoveCursorActionHandler', () => {
     mockLocator = {
       waitFor: jest.fn().mockResolvedValue(undefined),
       elementHandle: jest.fn().mockResolvedValue(mockElement),
+      first: jest.fn().mockReturnThis(),
+      nth: jest.fn().mockReturnThis(),
     };
 
     // Mock page
@@ -72,7 +74,10 @@ describe('MoveCursorActionHandler', () => {
 
       expect(result.success).toBe(true);
       expect(mockPage.getByLabel).toHaveBeenCalledWith('Submit Button');
-      expect(mockLocator.waitFor).toHaveBeenCalledWith({ state: 'visible' });
+      expect(mockLocator.waitFor).toHaveBeenCalledWith({
+        state: 'visible',
+        timeout: 2000,
+      });
       expect(mockLocator.elementHandle).toHaveBeenCalled();
       expect(moveMouseHuman).toHaveBeenCalled();
     });

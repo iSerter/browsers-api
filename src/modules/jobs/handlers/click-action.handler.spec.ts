@@ -17,6 +17,8 @@ describe('ClickActionHandler', () => {
     // Mock locator
     mockLocator = {
       click: jest.fn().mockResolvedValue(undefined),
+      first: jest.fn().mockReturnThis(),
+      nth: jest.fn().mockReturnThis(),
     };
 
     // Mock page
@@ -50,7 +52,10 @@ describe('ClickActionHandler', () => {
 
       expect(result.success).toBe(true);
       expect(mockPage.getByLabel).toHaveBeenCalledWith('Submit');
-      expect(mockLocator.click).toHaveBeenCalledWith({ button: 'left' });
+      expect(mockLocator.click).toHaveBeenCalledWith({
+        button: 'left',
+        timeout: 2000,
+      });
     });
 
     it('should click element using getByText', async () => {
@@ -64,7 +69,10 @@ describe('ClickActionHandler', () => {
 
       expect(result.success).toBe(true);
       expect(mockPage.getByText).toHaveBeenCalledWith('Click me');
-      expect(mockLocator.click).toHaveBeenCalledWith({ button: 'left' });
+      expect(mockLocator.click).toHaveBeenCalledWith({
+        button: 'left',
+        timeout: 2000,
+      });
     });
 
     it('should click with right button', async () => {
@@ -78,7 +86,10 @@ describe('ClickActionHandler', () => {
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
       expect(result.success).toBe(true);
-      expect(mockLocator.click).toHaveBeenCalledWith({ button: 'right' });
+      expect(mockLocator.click).toHaveBeenCalledWith({
+        button: 'right',
+        timeout: 2000,
+      });
     });
 
     it('should click multiple times', async () => {
@@ -95,6 +106,7 @@ describe('ClickActionHandler', () => {
       expect(mockLocator.click).toHaveBeenCalledWith({
         button: 'left',
         clickCount: 3,
+        timeout: 2000,
       });
     });
 
@@ -123,7 +135,10 @@ describe('ClickActionHandler', () => {
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
       expect(result.success).toBe(true);
-      expect(mockLocator.click).toHaveBeenCalledWith({ button: 'left' });
+      expect(mockLocator.click).toHaveBeenCalledWith({
+        button: 'left',
+        timeout: 2000,
+      });
       expect(mockPage.waitForLoadState).toHaveBeenCalledWith('networkidle');
     });
 
@@ -162,9 +177,12 @@ describe('ClickActionHandler', () => {
         getTargetBy: 'getByText',
       };
 
-      mockPage.getByText.mockReturnValue({
+      const errorLocator = {
         click: jest.fn().mockRejectedValue(new Error('Element not found')),
-      } as any);
+        first: jest.fn().mockReturnThis(),
+        nth: jest.fn().mockReturnThis(),
+      };
+      mockPage.getByText.mockReturnValue(errorLocator as any);
 
       const result = await handler.execute(mockPage, config, 'test-job-id');
 
@@ -194,7 +212,12 @@ describe('ClickActionHandler', () => {
 
       const error = new Error('Timeout');
       error.name = 'TimeoutError';
-      mockLocator.click.mockRejectedValue(error);
+      const timeoutLocator = {
+        click: jest.fn().mockRejectedValue(error),
+        first: jest.fn().mockReturnThis(),
+        nth: jest.fn().mockReturnThis(),
+      };
+      mockPage.getByText.mockReturnValue(timeoutLocator as any);
 
       const result = await handler.execute(mockPage, config, 'test-job-id');
 

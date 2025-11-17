@@ -10,6 +10,8 @@ import {
   NetworkException,
   ProviderException,
 } from '../exceptions';
+import { retryWithBackoff } from '../utils';
+import { formatError } from '../utils/error-formatter.util';
 
 /**
  * Base class for captcha solver providers
@@ -37,60 +39,47 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
    * Solve a captcha challenge with retry logic
    */
   async solve(params: CaptchaParams): Promise<CaptchaSolution> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      try {
-        this.logger.debug(
-          `Attempt ${attempt}/${this.maxRetries} to solve ${params.type} captcha`,
-        );
-
-        const solution = await this.solveCaptcha(params);
-        this.logger.log(
-          `Successfully solved ${params.type} captcha on attempt ${attempt}`,
-        );
-        return solution;
-      } catch (error: any) {
-        lastError = error;
-        this.logger.warn(
-          `Attempt ${attempt}/${this.maxRetries} failed: ${error.message}`,
-        );
-
-        // Don't retry on certain errors (e.g., invalid API key, invalid parameters)
-        if (this.shouldNotRetry(error)) {
-          throw error;
-        }
-
-        // Wait before retrying (exponential backoff)
-        if (attempt < this.maxRetries) {
-          // Use exponential backoff: initialDelay * 2^(attempt-1), capped at maxBackoff
-          // Default: 1000ms * 2^(attempt-1), max 10000ms
-          const initialBackoff = 1000;
-          const maxBackoff = 10000;
-          const delay = Math.min(initialBackoff * Math.pow(2, attempt - 1), maxBackoff);
-          await this.sleep(delay);
-        }
+    try {
+      return await retryWithBackoff(
+        async () => {
+          const solution = await this.solveCaptcha(params);
+          this.logger.log(
+            `Successfully solved ${params.type} captcha`,
+          );
+          return solution;
+        },
+        {
+          maxAttempts: this.maxRetries,
+          backoffMs: 1000,
+          maxBackoffMs: 10000,
+          shouldRetry: (error) => !this.shouldNotRetry(error),
+          onRetry: (attempt, error, delay) => {
+            this.logger.debug(
+              `Attempt ${attempt}/${this.maxRetries} to solve ${params.type} captcha failed, retrying in ${delay}ms: ${formatError(error)}`,
+            );
+          },
+        },
+      );
+    } catch (error: any) {
+      // If last error is already a custom exception, rethrow it
+      if (error instanceof ProviderException || 
+          error instanceof NetworkException) {
+        throw error;
       }
-    }
 
-    // If last error is already a custom exception, rethrow it
-    if (lastError instanceof ProviderException || 
-        lastError instanceof NetworkException) {
-      throw lastError;
+      // Wrap in provider exception with context
+      throw new ProviderException(
+        `Failed to solve captcha after ${this.maxRetries} attempts: ${formatError(error)}`,
+        this.getName(),
+        undefined,
+        {
+          maxRetries: this.maxRetries,
+          attempts: this.maxRetries,
+          originalError: formatError(error),
+          captchaType: params.type,
+        },
+      );
     }
-
-    // Wrap in provider exception with context
-    throw new ProviderException(
-      `Failed to solve captcha after ${this.maxRetries} attempts: ${lastError?.message || 'Unknown error'}`,
-      this.getName(),
-      undefined,
-      {
-        maxRetries: this.maxRetries,
-        attempts: this.maxRetries,
-        originalError: lastError?.message,
-        captchaType: params.type,
-      },
-    );
   }
 
   /**
@@ -137,12 +126,6 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
     return false;
   }
 
-  /**
-   * Sleep for a specified number of milliseconds
-   */
-  protected sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
 
   /**
    * Make HTTP request with timeout
@@ -237,6 +220,13 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
     }
 
     return `${proxy.type}://${proxy.host}:${proxy.port}`;
+  }
+
+  /**
+   * Sleep for a specified number of milliseconds
+   */
+  protected sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 

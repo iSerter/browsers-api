@@ -19,6 +19,8 @@ import {
   InternalException,
   ProviderException,
 } from '../exceptions';
+import { retryWithBackoff } from '../utils';
+import { formatError, extractErrorMessage } from '../utils/error-formatter.util';
 import {
   RecaptchaVersion,
   RecaptchaV2ChallengeType,
@@ -108,120 +110,109 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
    * Solve a reCAPTCHA challenge with retry logic
    */
   async solve(params: CaptchaParams): Promise<CaptchaSolution> {
-    let lastError: Error | null = null;
+    try {
+      return await retryWithBackoff(
+        async () => {
+          const startTime = Date.now();
+          this.metrics.totalAttempts++;
 
-    for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
-      const startTime = Date.now();
-      this.metrics.totalAttempts++;
-
-      try {
-        this.logger.debug(
-          `Attempt ${attempt}/${this.config.maxRetries} to solve reCAPTCHA challenge`,
-        );
-
-        // Detect reCAPTCHA widget
-        const detection = await this.detectRecaptchaWidget(params);
-        if (!detection.anchorIframe || detection.confidence < 0.5) {
-          throw new SolverUnavailableException(
-            'reCAPTCHA widget not detected',
-            'recaptcha-native',
-            'widget_not_detected',
-            {
-              confidence: detection.confidence,
-              url: params.url,
-            },
+          this.logger.debug(
+            'Attempting to solve reCAPTCHA challenge',
           );
-        }
 
-        this.metrics.versionDistribution[detection.version]++;
-        if (detection.challengeType) {
-          this.metrics.challengeTypeDistribution[detection.challengeType]++;
-        }
+          // Detect reCAPTCHA widget
+          const detection = await this.detectRecaptchaWidget(params);
+          if (!detection.anchorIframe || detection.confidence < 0.5) {
+            throw new SolverUnavailableException(
+              'reCAPTCHA widget not detected',
+              'recaptcha-native',
+              'widget_not_detected',
+              {
+                confidence: detection.confidence,
+                url: params.url,
+              },
+            );
+          }
 
-        // Solve based on version and challenge type
-        const response = await this.solveChallenge(detection, params);
+          this.metrics.versionDistribution[detection.version]++;
+          if (detection.challengeType) {
+            this.metrics.challengeTypeDistribution[detection.challengeType]++;
+          }
 
-        const duration = Date.now() - startTime;
-        this.metrics.successCount++;
-        this.updateMetrics(duration);
+          // Solve based on version and challenge type
+          const response = await this.solveChallenge(detection, params);
 
-        // Record performance metrics
-        if (this.performanceTracker) {
-          this.performanceTracker.recordAttempt(
-            this.getName(),
-            'recaptcha',
-            duration,
-            true,
+          const duration = Date.now() - startTime;
+          this.metrics.successCount++;
+          this.updateMetrics(duration);
+
+          // Record performance metrics
+          if (this.performanceTracker) {
+            this.performanceTracker.recordAttempt(
+              this.getName(),
+              'recaptcha',
+              duration,
+              true,
+            );
+          }
+
+          this.logger.log(
+            `Successfully solved reCAPTCHA ${detection.version} challenge${detection.challengeType ? ` (${detection.challengeType})` : ''} in ${duration}ms`,
           );
-        }
 
-        this.logger.log(
-          `Successfully solved reCAPTCHA ${detection.version} challenge${detection.challengeType ? ` (${detection.challengeType})` : ''} in ${duration}ms on attempt ${attempt}`,
-        );
+          return {
+            token: response.token,
+            solvedAt: response.solvedAt,
+            solverId: this.getName(),
+          };
+        },
+        {
+          maxAttempts: this.config.maxRetries,
+          backoffMs: this.config.initialRetryDelay,
+          maxBackoffMs: this.config.maxRetryDelay,
+          shouldRetry: (error) => !this.shouldNotRetry(error),
+          onRetry: (attempt, error, delay) => {
+            const errorMessage = extractErrorMessage(error);
+            this.metrics.failureCount++;
+            this.metrics.failureReasons[errorMessage] =
+              (this.metrics.failureReasons[errorMessage] || 0) + 1;
 
-        return {
-          token: response.token,
-          solvedAt: response.solvedAt,
-          solverId: this.getName(),
-        };
-      } catch (error: any) {
-        lastError = error;
-        const duration = Date.now() - startTime;
-        this.metrics.failureCount++;
-        const errorMessage = error.message || 'Unknown error';
-        this.metrics.failureReasons[errorMessage] =
-          (this.metrics.failureReasons[errorMessage] || 0) + 1;
-        this.updateMetrics(duration);
+            // Record performance metrics for failed attempt
+            if (this.performanceTracker) {
+              this.performanceTracker.recordAttempt(
+                this.getName(),
+                'recaptcha',
+                0,
+                false,
+                errorMessage,
+              );
+            }
 
-        // Record performance metrics
-        if (this.performanceTracker) {
-          this.performanceTracker.recordAttempt(
-            this.getName(),
-            'recaptcha',
-            duration,
-            false,
-            errorMessage,
-          );
-        }
-
-        this.logger.warn(
-          `Attempt ${attempt}/${this.config.maxRetries} failed: ${errorMessage}`,
-        );
-
-        // Don't retry on certain errors
-        if (this.shouldNotRetry(error)) {
-          throw error;
-        }
-
-        // Exponential backoff before retry
-        if (attempt < this.config.maxRetries) {
-          const delay = Math.min(
-            this.config.initialRetryDelay * Math.pow(2, attempt - 1),
-            this.config.maxRetryDelay,
-          );
-          this.logger.debug(`Waiting ${delay}ms before retry...`);
-          await this.sleep(delay);
-        }
+            this.logger.warn(
+              `Attempt ${attempt}/${this.config.maxRetries} failed: ${errorMessage}, retrying in ${delay}ms`,
+            );
+          },
+        },
+      );
+    } catch (error: any) {
+      // If last error is already a custom exception, rethrow it
+      if (error instanceof SolverUnavailableException ||
+          error instanceof ValidationException ||
+          error instanceof InternalException ||
+          error instanceof ProviderException) {
+        throw error;
       }
-    }
 
-    // If last error is already a custom exception, rethrow it
-    if (lastError instanceof SolverUnavailableException ||
-        lastError instanceof ValidationException ||
-        lastError instanceof InternalException ||
-        lastError instanceof ProviderException) {
-      throw lastError;
+      throw new InternalException(
+        `Failed to solve reCAPTCHA challenge after ${this.config.maxRetries} attempts: ${formatError(error)}`,
+        error || undefined,
+        {
+          maxRetries: this.config.maxRetries,
+          attempts: this.config.maxRetries,
+          originalError: formatError(error),
+        },
+      );
     }
-
-    throw new InternalException(
-      `Failed to solve reCAPTCHA challenge after ${this.config.maxRetries} attempts: ${lastError?.message || 'Unknown error'}`,
-      lastError || undefined,
-      {
-        maxRetries: this.config.maxRetries,
-        attempts: this.config.maxRetries,
-        originalError: lastError?.message,
-      },
-    );
   }
 
   /**
@@ -247,12 +238,6 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
     return false;
   }
 
-  /**
-   * Sleep for a specified number of milliseconds
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
 
   /**
    * Detect reCAPTCHA widget on the page

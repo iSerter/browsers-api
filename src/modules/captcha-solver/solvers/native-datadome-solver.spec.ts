@@ -315,13 +315,17 @@ describe('NativeDataDomeSolver', () => {
     });
 
     it('should detect slider challenge type', async () => {
-      const mockSlider = {
+      const mockSliderLocator = {
         count: jest.fn().mockResolvedValue(1),
         boundingBox: jest.fn(),
       };
 
+      const mockFirstLocator = {
+        first: jest.fn().mockReturnValue(mockSliderLocator),
+      };
+
       mockPage.frames.mockReturnValue([]);
-      mockPage.locator.mockReturnValue(mockSlider);
+      mockPage.locator.mockReturnValue(mockFirstLocator);
 
       const detection: any = {
         container: null,
@@ -333,6 +337,11 @@ describe('NativeDataDomeSolver', () => {
       const challengeType = await (solver as any).determineChallengeType(detection);
 
       expect(challengeType).toBe(DataDomeChallengeType.SLIDER);
+      expect(mockPage.locator).toHaveBeenCalledWith(
+        '[class*="slider"], [id*="slider"], .datadome-slider, [data-slider]',
+      );
+      expect(mockFirstLocator.first).toHaveBeenCalled();
+      expect(mockSliderLocator.count).toHaveBeenCalled();
     });
 
     it('should detect cookie challenge type', async () => {

@@ -286,7 +286,7 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
         return {
           anchorIframe: null,
           challengeIframe: null,
-          confidence: 0,
+          confidence: widgetResult.confidence || 0,
         };
       }
 

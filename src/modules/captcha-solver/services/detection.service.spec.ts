@@ -3,6 +3,7 @@ import { DetectionService } from './detection.service';
 import { ConfidenceScoringService } from './confidence-scoring.service';
 import { DetectionRegistryService } from './detection-registry.service';
 import { CaptchaLoggingService } from './captcha-logging.service';
+import { DetectionCacheService } from './detection-cache.service';
 import {
   AntiBotSystemType,
   SignalStrength,
@@ -20,12 +21,18 @@ describe('DetectionService', () => {
     has: jest.fn(),
     unregister: jest.fn(),
     clear: jest.fn(),
+    registerAll: jest.fn(),
   };
 
   const mockCaptchaLogging = {
     logDetection: jest.fn(),
     logSolving: jest.fn(),
     logError: jest.fn(),
+  };
+
+  const mockDetectionCache = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -44,6 +51,10 @@ describe('DetectionService', () => {
           provide: CaptchaLoggingService,
           useValue: mockCaptchaLogging,
         },
+        {
+          provide: DetectionCacheService,
+          useValue: mockDetectionCache,
+        },
       ],
     }).compile();
 
@@ -59,8 +70,14 @@ describe('DetectionService', () => {
       url: jest.fn().mockReturnValue('https://example.com'),
       title: jest.fn().mockResolvedValue('Test Page'),
       evaluate: jest.fn(),
+      content: jest.fn().mockResolvedValue('<html></html>'),
       context: jest.fn().mockReturnValue(mockContext),
     };
+
+    // Reset mocks
+    jest.clearAllMocks();
+    mockDetectionCache.get.mockResolvedValue(null);
+    mockDetectionCache.set.mockResolvedValue(undefined);
   });
 
   describe('detectAll', () => {
