@@ -56,7 +56,7 @@ Create a new automation job.
     {"action": "click", "target": "Submit", "getTargetBy": "getByText", "waitForNavigation": true},
     {"action": "screenshot", "fullPage": true, "type": "png"}
   ],
-  "timeout": 30000
+  "timeoutMs": 30000
 }
 ```
 

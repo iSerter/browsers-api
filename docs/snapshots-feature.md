@@ -1,6 +1,9 @@
 I would like to add a new action type "snapshot" that will store the page content (HTML Source), cookies, localStorage, etc...  page content is stored by default, but cookies, localStorage, etc can be enabled by arguments. 
 
-The snapshot action will create artifacts to 
+The snapshot action will create artifacts. 
+The snapshot action can be called multiple times within the "actions" flow. 
+
+## Example: 
 
 #### `POST /api/v1/jobs`
 Create a new automation job.
@@ -11,11 +14,41 @@ Create a new automation job.
   "browserTypeId": 1,
   "targetUrl": "https://iserter.com",
   "actions": [
-    {"action": "fill", "target": "Your e-mail address", "getTargetBy": "getByLabel", "value": "user@example.com"},
-    {"action": "fill", "target": "#password", "getTargetBy": "getBySelector", "value": "secret123"},
-    {"action": "scroll", "target": "Submit", "getTargetBy": "getByText", "speed": 2000},
-    {"action": "moveCursor", "target": "Submit", "getTargetBy": "getByText"},
-    {"action": "click", "target": "Submit", "getTargetBy": "getByText", "waitForNavigation": true},
+    {
+      "action": "click",
+      "target": "Contact",
+      "getTargetBy": "getByText",
+      "waitForNavigation": true
+    },
+    {
+        "action": "snapshot",
+    },
+    {
+      "action": "fill",
+      "target": "Full Name",
+      "getTargetBy": "getByPlaceholder",
+      "value": "Ilyas Test"
+    },
+    {
+      "action": "fill",
+      "target": "Email Address",
+      "getTargetBy": "getByPlaceholder",
+      "value": "ilyas.serter+test@gmail.com"
+    },
+    {
+      "action": "fill",
+      "target": "Subject",
+      "getTargetBy": "getByPlaceholder",
+      "value": "lorem ipsum"
+    },
+    {
+      "action": "moveCursor",
+      "target": "Send message",
+      "getTargetBy": "getByText"
+    },
+    {
+        "action": "snapshot", "cookies": true, "localStorage": true
+    },
     {"action": "screenshot", "fullPage": true, "type": "png"}
   ],
   "timeout": 30000
