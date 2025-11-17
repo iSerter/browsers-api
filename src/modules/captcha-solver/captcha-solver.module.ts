@@ -34,6 +34,7 @@ import { WinstonLoggerService } from '../../common/services/winston-logger.servi
 import { CaptchaLoggingService } from './services/captcha-logging.service';
 import { CaptchaSolverConfigService } from './config';
 import { SolverCircuitBreakerService } from './services/solver-circuit-breaker.service';
+import { DetectionCacheService } from './services/detection-cache.service';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { SolverCircuitBreakerService } from './services/solver-circuit-breaker.s
     CaptchaLoggingService,
     CaptchaSolverConfigService,
     SolverCircuitBreakerService,
+    DetectionCacheService,
   ],
   exports: [
     CaptchaSolverService,
@@ -88,6 +90,7 @@ import { SolverCircuitBreakerService } from './services/solver-circuit-breaker.s
     CaptchaLoggingService,
     CaptchaSolverConfigService,
     SolverCircuitBreakerService,
+    DetectionCacheService,
   ],
 })
 export class CaptchaSolverModule {}

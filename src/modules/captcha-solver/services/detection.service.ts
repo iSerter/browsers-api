@@ -16,6 +16,7 @@ import { DetectionRegistryService } from './detection-registry.service';
 import { DetectionServiceAdapter } from './detection-service-adapter';
 import { IDetectionStrategy } from './detection-strategy.interface';
 import { CaptchaLoggingService } from './captcha-logging.service';
+import { DetectionCacheService } from './detection-cache.service';
 import { InternalException } from '../exceptions';
 
 /**
@@ -33,6 +34,7 @@ export class DetectionService implements OnModuleInit {
     private readonly confidenceScoring: ConfidenceScoringService,
     private readonly registry: DetectionRegistryService,
     private readonly captchaLogging: CaptchaLoggingService,
+    private readonly detectionCache: DetectionCacheService,
   ) {}
 
   /**
@@ -152,6 +154,38 @@ export class DetectionService implements OnModuleInit {
       };
     }
 
+    // Get page content for caching (only once)
+    let pageContent: string | null = null;
+    try {
+      pageContent = await page.content();
+    } catch (error) {
+      this.logger.debug(
+        `Failed to get page content for caching: ${error.message}`,
+      );
+    }
+
+    // Try to get cached result
+    if (pageContent) {
+      try {
+        const cachedResult = await this.detectionCache.get(
+          context.url,
+          pageContent,
+        );
+
+        if (cachedResult) {
+          this.logger.debug(
+            `Returning cached detection result for URL: ${context.url}`,
+          );
+          return cachedResult;
+        }
+      } catch (error) {
+        // If cache check fails, continue with normal detection
+        this.logger.debug(
+          `Cache check failed, proceeding with detection: ${error.message}`,
+        );
+      }
+    }
+
     // Determine which systems to check
     const targetSystems =
       config?.targetSystems || Object.values(AntiBotSystemType);
@@ -196,6 +230,18 @@ export class DetectionService implements OnModuleInit {
       totalDurationMs: Date.now() - startTime,
       analyzedAt: new Date(),
     };
+
+    // Cache the result (reuse pageContent if available)
+    if (pageContent) {
+      try {
+        await this.detectionCache.set(context.url, pageContent, result);
+      } catch (error) {
+        // If caching fails, log but don't fail the detection
+        this.logger.debug(
+          `Failed to cache detection result: ${error.message}`,
+        );
+      }
+    }
 
     // Log detection results
     if (result.primary) {
