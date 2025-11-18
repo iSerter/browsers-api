@@ -29,9 +29,21 @@ export class ApiKeyManagerService implements OnModuleInit {
    */
   async onModuleInit() {
     this.logger.log('Initializing API Key Manager...');
-    await this.loadApiKeys();
-    await this.validateAllApiKeys();
-    this.logger.log('API Key Manager initialized');
+    try {
+      await this.loadApiKeys();
+      await this.validateAllApiKeys();
+      this.logger.log('API Key Manager initialized');
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to initialize API Key Manager: ${error.message}`,
+      );
+      // Don't throw - allow app to start but log the error
+      // Database tables may not exist yet (migrations not run)
+      // The service will work with environment variables only
+      this.logger.warn(
+        'API Key Manager will use environment variables only until database is initialized',
+      );
+    }
   }
 
   /**

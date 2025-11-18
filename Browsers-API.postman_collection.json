@@ -39,9 +39,9 @@
 								"type": "text"
 							}
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"browserTypeId\": 1,\n  \"targetUrl\": \"https://iserter.com\",\n  \"actions\": [\n    {\n      \"action\": \"fill\",\n      \"target\": \"Your e-mail address\",\n      \"getTargetBy\": \"getByLabel\",\n      \"value\": \"user@example.com\"\n    },\n    {\n      \"action\": \"fill\",\n      \"target\": \"#password\",\n      \"getTargetBy\": \"getBySelector\",\n      \"value\": \"secret123\"\n    },\n    {\n      \"action\": \"scroll\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\",\n      \"speed\": 2000\n    },\n    {\n      \"action\": \"moveCursor\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\"\n    },\n    {\n      \"action\": \"click\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\",\n      \"waitForNavigation\": true\n    },\n    {\n      \"action\": \"screenshot\",\n      \"fullPage\": true,\n      \"type\": \"png\"\n    }\n  ],\n  \"timeoutMs\": 30000\n}",
+					"body": {
+						"mode": "raw",
+						"raw": "{\n  \"browserTypeId\": 1,\n  \"targetUrl\": \"https://example.com\",\n  \"actions\": [\n    {\n      \"action\": \"fill\",\n      \"target\": \"Email address\",\n      \"getTargetBy\": \"getByLabel\",\n      \"value\": \"user@example.com\"\n    },\n    {\n      \"action\": \"click\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\",\n      \"waitForNavigation\": true\n    },\n    {\n      \"action\": \"screenshot\",\n      \"fullPage\": true,\n      \"type\": \"png\"\n    }\n  ],\n  \"waitUntil\": \"networkidle\",\n  \"priority\": 10,\n  \"timeoutMs\": 30000,\n  \"maxRetries\": 3\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -59,7 +59,60 @@
 								"jobs"
 							]
 						},
-						"description": "Create a new automation job. Requires API key authentication.\n\n**Actions Available:**\n- `fill`: Fill form fields\n- `click`: Click on elements\n- `moveCursor`: Move cursor with human-like movement\n- `scroll`: Scroll page with human-like behavior\n- `screenshot`: Capture screenshots\n\n**Optional Parameters:**\n- `waitUntil`: Navigation wait option\n- `priority`: Job priority (0-100)\n- `timeoutMs`: Job timeout in milliseconds (1000-300000)\n- `maxRetries`: Maximum retry attempts (0-10)"
+						"description": "Create a new automation job. Requires API key authentication.\n\n**Actions Available:**\n- `fill`: Fill form fields\n- `click`: Click on elements\n- `moveCursor`: Move cursor with human-like movement\n- `scroll`: Scroll page with human-like behavior\n- `screenshot`: Capture screenshots\n- `snapshot`: Capture page state including HTML, metadata, and optional storage data\n\n**Request Parameters:**\n- `browserTypeId`: Integer, min 1 (required)\n- `targetUrl`: Valid URL with protocol (required)\n- `actions`: Array, min 1 item (required)\n- `waitUntil`: Enum (load, domcontentloaded, networkidle) - optional\n- `priority`: Integer, 0-100 - optional\n- `timeoutMs`: Integer, 1000-300000 - optional\n- `maxRetries`: Integer, 0-10 - optional\n\n**Response:** 201 Created with jobId, status, and createdAt"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Job with Snapshot",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"jobId\", jsonData.id || jsonData.jobId);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"browserTypeId\": 1,\n  \"targetUrl\": \"https://example.com/login\",\n  \"actions\": [\n    {\n      \"action\": \"fill\",\n      \"target\": \"Email\",\n      \"getTargetBy\": \"getByLabel\",\n      \"value\": \"user@example.com\"\n    },\n    {\n      \"action\": \"fill\",\n      \"target\": \"Password\",\n      \"getTargetBy\": \"getByLabel\",\n      \"value\": \"password123\"\n    },\n    {\n      \"action\": \"click\",\n      \"target\": \"Login\",\n      \"getTargetBy\": \"getByText\",\n      \"waitForNavigation\": true\n    },\n    {\n      \"action\": \"snapshot\",\n      \"snapshotConfig\": {\n        \"cookies\": true,\n        \"localStorage\": true,\n        \"sessionStorage\": true\n      }\n    }\n  ],\n  \"waitUntil\": \"networkidle\",\n  \"priority\": 10,\n  \"timeoutMs\": 30000,\n  \"maxRetries\": 3\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"jobs"
+							]
+						},
+						"description": "Create a job with snapshot action to capture page state including HTML, metadata, and browser storage.\n\n**Snapshot Action:**\n- Captures HTML content, URL, title, timestamp, and metadata\n- Optional storage capture via `snapshotConfig`:\n  - `cookies`: Capture all cookies (boolean, default: false)\n  - `localStorage`: Capture localStorage data (boolean, default: false)\n  - `sessionStorage`: Capture sessionStorage data (boolean, default: false)\n\n**Use Cases:**\n- Debugging page state\n- Preserving authentication state\n- Archiving application state\n- Compliance and auditing\n\n**Response:** Creates a JSON artifact with type 'snapshot' and mimeType 'application/json'"
 					},
 					"response": []
 				},
@@ -67,7 +120,13 @@
 					"name": "List Jobs",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/jobs?status=pending&page=1&limit=20",
 							"host": [
@@ -82,7 +141,7 @@
 								{
 									"key": "status",
 									"value": "pending",
-									"description": "Filter by job status (pending, in-progress, completed, failed, cancelled)"
+									"description": "Filter by job status (pending, processing, completed, failed, cancelled)"
 								},
 								{
 									"key": "browserTypeId",
@@ -119,7 +178,13 @@
 					"name": "Get Job by ID",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
 							"host": [
@@ -132,7 +197,7 @@
 								"{{jobId}}"
 							]
 						},
-						"description": "Get detailed information about a specific job including status and results."
+						"description": "Get detailed information about a specific job including status, results, and artifacts.\n\n**Response includes:**\n- Job details (id, browserTypeId, targetUrl, status, priority, retryCount, etc.)\n- Browser type information\n- Timestamps (createdAt, startedAt, completedAt)\n- Result array with action results\n- Artifacts array with artifact metadata (id, artifactType, filePath, mimeType, sizeBytes, createdAt)"
 					},
 					"response": []
 				},
@@ -140,7 +205,13 @@
 					"name": "Cancel Job",
 					"request": {
 						"method": "DELETE",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
 							"host": [
@@ -153,7 +224,7 @@
 								"{{jobId}}"
 							]
 						},
-						"description": "Cancel a pending or in-progress job. Returns 204 No Content on success."
+						"description": "Cancel a pending or processing job. Returns 204 No Content on success.\n\n**Errors:**\n- 404: Job not found\n- 400: Job cannot be cancelled (already completed/failed)"
 					},
 					"response": []
 				},
@@ -177,7 +248,13 @@
 					],
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}/artifacts",
 							"host": [
@@ -191,7 +268,7 @@
 								"artifacts"
 							]
 						},
-						"description": "Get all artifacts (screenshots, files, etc.) associated with a job. Returns a list of artifact metadata including IDs, file paths, mime types, and sizes."
+						"description": "Get all artifacts (screenshots, snapshots, files, etc.) associated with a job.\n\n**Response:** Array of artifact objects with:\n- `id`: Artifact UUID\n- `artifactType`: Type (screenshot, snapshot, etc.)\n- `filePath`: Path to artifact file\n- `mimeType`: MIME type (image/png, application/json, etc.)\n- `sizeBytes`: File size in bytes\n- `createdAt`: ISO timestamp"
 					},
 					"response": []
 				},
@@ -199,7 +276,13 @@
 					"name": "Download Artifact",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}/artifacts/{{artifactId}}",
 							"host": [
@@ -222,13 +305,51 @@
 			"description": "Job management endpoints for creating, listing, and managing automation jobs."
 		},
 		{
+			"name": "Actions",
+			"item": [
+				{
+					"name": "Get Available Actions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/actions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"actions"
+							]
+						},
+						"description": "Get a list of all available actions with their required and optional fields.\n\n**Response includes:**\n- Action type (screenshot, fill, click, scroll, moveCursor, snapshot)\n- Description\n- Required fields\n- Optional fields"
+					},
+					"response": []
+				}
+			],
+			"description": "Actions information endpoints."
+		},
+		{
 			"name": "Browsers",
 			"item": [
 				{
 					"name": "List Browsers",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/browsers",
 							"host": [
@@ -248,7 +369,13 @@
 					"name": "Get Browser by ID",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/browsers/1",
 							"host": [
@@ -275,7 +402,13 @@
 					"name": "List Workers",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/workers",
 							"host": [
@@ -295,7 +428,13 @@
 					"name": "Get Worker Stats",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/workers/stats",
 							"host": [
@@ -712,7 +851,7 @@
 								"metrics"
 							]
 						},
-						"description": "Get application metrics and statistics."
+						"description": "Get Prometheus-formatted metrics for monitoring.\n\n**Response Format:** Prometheus text format\n\n**Metrics Include:**\n- HTTP request totals by method and route\n- Job totals by status\n- Worker statistics\n- Browser pool metrics\n\n**Note:** This endpoint returns Prometheus-compatible metrics in text format."
 					},
 					"response": []
 				}

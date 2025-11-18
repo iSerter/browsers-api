@@ -51,7 +51,10 @@ import { SsrfUrlValidationPipe } from './pipes/ssrf-url-validation.pipe';
   providers: [
     CaptchaSolverService,
     DetectionService,
-    ConfidenceScoringService,
+    {
+      provide: ConfidenceScoringService,
+      useFactory: () => new ConfidenceScoringService(),
+    },
     DetectionRegistryService,
     HumanBehaviorSimulationService,
     CaptchaWidgetInteractionService,
@@ -67,7 +70,10 @@ import { SsrfUrlValidationPipe } from './pipes/ssrf-url-validation.pipe';
     SolverRegistry,
     SolverFactory,
     SolverHealthChecker,
-    SolverPerformanceTracker,
+    {
+      provide: SolverPerformanceTracker,
+      useFactory: () => new SolverPerformanceTracker(),
+    },
     NativeSolverRegistryService,
     WinstonLoggerService,
     CaptchaLoggingService,

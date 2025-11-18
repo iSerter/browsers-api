@@ -50,10 +50,10 @@ export class CaptchaSolverService implements OnModuleInit {
         `Failed to initialize Captcha Solver Service: ${error.message}`,
       );
       // Don't throw - allow app to start but log the error
-      // In production, you might want to throw to prevent startup
-      if (process.env.NODE_ENV === 'production') {
-        throw error;
-      }
+      // The captcha solver endpoints will return appropriate errors when called
+      this.logger.warn(
+        'Captcha Solver Service will be unavailable until API keys are configured',
+      );
     }
   }
 

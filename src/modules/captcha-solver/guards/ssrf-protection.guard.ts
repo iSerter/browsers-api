@@ -8,7 +8,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { isURL } from 'validator';
 import * as dns from 'dns';
-import { promisify } from 'util';
 
 /**
  * SSRF Protection Guard
@@ -25,11 +24,11 @@ export class SsrfProtectionGuard implements CanActivate {
   private readonly logger = new Logger(SsrfProtectionGuard.name);
 
   // Private IP ranges (CIDR notation)
-  private readonly privateIpRanges = [
-    { start: this.ipToNumber('10.0.0.0'), end: this.ipToNumber('10.255.255.255') }, // 10.0.0.0/8
-    { start: this.ipToNumber('172.16.0.0'), end: this.ipToNumber('172.31.255.255') }, // 172.16.0.0/12
-    { start: this.ipToNumber('192.168.0.0'), end: this.ipToNumber('192.168.255.255') }, // 192.168.0.0/16
-    { start: this.ipToNumber('127.0.0.0'), end: this.ipToNumber('127.255.255.255') }, // 127.0.0.0/8
+  private readonly privateIpRanges: Array<{ start: number; end: number }> = [
+    { start: this.ipToNumber('10.0.0.0')!, end: this.ipToNumber('10.255.255.255')! }, // 10.0.0.0/8
+    { start: this.ipToNumber('172.16.0.0')!, end: this.ipToNumber('172.31.255.255')! }, // 172.16.0.0/12
+    { start: this.ipToNumber('192.168.0.0')!, end: this.ipToNumber('192.168.255.255')! }, // 192.168.0.0/16
+    { start: this.ipToNumber('127.0.0.0')!, end: this.ipToNumber('127.255.255.255')! }, // 127.0.0.0/8
   ];
 
   // Blocked hostnames
@@ -51,11 +50,8 @@ export class SsrfProtectionGuard implements CanActivate {
   ];
 
   private readonly allowedDomains: string[];
-  private readonly dnsLookup: (hostname: string, options?: dns.LookupOptions) => Promise<dns.LookupAddress>;
 
   constructor(private readonly configService: ConfigService) {
-    // Create promisified DNS lookup function
-    this.dnsLookup = promisify(dns.lookup);
     // Load allowed domains from configuration
     const allowedDomainsEnv = this.configService.get<string>(
       'SSRF_ALLOWED_DOMAINS',
@@ -138,7 +134,7 @@ export class SsrfProtectionGuard implements CanActivate {
     // Step 5: Resolve DNS to get actual IP address (prevents DNS rebinding)
     let resolvedIp: string;
     try {
-      const lookupResult = await this.dnsLookup(hostname, { family: 4 });
+      const lookupResult = await dns.promises.lookup(hostname, { family: 4 });
       resolvedIp = lookupResult.address;
     } catch (error) {
       // If DNS lookup fails, we can't verify the IP, so block it for safety

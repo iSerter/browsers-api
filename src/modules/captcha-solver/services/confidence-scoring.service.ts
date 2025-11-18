@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import {
   DetectionSignal,
   SignalStrength,
@@ -113,7 +113,7 @@ export interface ConfidenceScoreBreakdown {
 export class ConfidenceScoringService {
   private config: ConfidenceScoringConfig;
 
-  constructor(config?: Partial<ConfidenceScoringConfig>) {
+  constructor(@Optional() config?: Partial<ConfidenceScoringConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
