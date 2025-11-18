@@ -15,7 +15,7 @@ import { JobLogService } from './job-log.service';
 import { WorkerManagerService } from './worker-manager.service';
 import { LogLevel } from '../entities/job-log.entity';
 import { WorkerStatus } from '../../workers/entities/browser-worker.entity';
-import { Browser, Page } from 'playwright';
+import { Browser, Page, BrowserContext } from 'playwright';
 import { JobEventsGateway } from '../gateways/job-events.gateway';
 import {
   SolverOrchestrationService,
@@ -275,6 +275,11 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
         `Navigated to target URL: ${job.targetUrl}`,
       );
 
+      // Apply browser storage if provided (cookies, localStorage, sessionStorage)
+      if (job.browserStorage) {
+        await this.applyBrowserStorage(page, context, job.browserStorage, job.targetUrl, job.id);
+      }
+
       // Handle captcha solving if enabled
       const captchaResult = await this.handleCaptchaSolving(page, job);
       if (captchaResult) {
@@ -354,11 +359,190 @@ export class JobProcessorService implements OnModuleInit, OnModuleDestroy {
       );
     } catch (error) {
       this.logger.error(`Error executing job ${job.id}: ${error.message}`);
-      await page.close();
       throw error;
     } finally {
-      await page.close();
+      // Explicitly clear browser storage before closing context
+      // This ensures no data leakage between jobs
+      try {
+        if (!page.isClosed()) {
+          await this.clearBrowserStorage(page, context);
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to clear browser storage: ${error.message}`);
+        // Don't fail job cleanup if storage clearing fails
+      }
+
+      if (!page.isClosed()) {
+        await page.close();
+      }
       await this.contextManager.closeContext(context);
+    }
+  }
+
+  /**
+   * Apply browser storage (cookies, localStorage, sessionStorage) to the page/context
+   */
+  private async applyBrowserStorage(
+    page: Page,
+    context: BrowserContext,
+    browserStorage: {
+      cookies?: Array<{
+        name: string;
+        value: string;
+        domain: string;
+        path?: string;
+        secure?: boolean;
+        httpOnly?: boolean;
+        expires?: number;
+        sameSite?: 'Strict' | 'Lax' | 'None';
+      }>;
+      localStorage?: Record<string, string>;
+      sessionStorage?: Record<string, string>;
+    },
+    targetUrl: string,
+    jobId: string,
+  ): Promise<void> {
+    let cookiesCount = 0;
+    let hasLocalStorage = false;
+    let hasSessionStorage = false;
+
+    try {
+      // Extract domain from target URL for validation
+      const targetDomain = new URL(targetUrl).hostname;
+
+      // Apply cookies if provided
+      if (browserStorage.cookies && browserStorage.cookies.length > 0) {
+        try {
+          // Filter cookies to only include those matching the target domain
+          const validCookies = browserStorage.cookies.filter((cookie) => {
+            const cookieDomain = cookie.domain.startsWith('.')
+              ? cookie.domain.substring(1)
+              : cookie.domain;
+
+            // Check if cookie domain matches target domain or is a subdomain
+            return (
+              cookieDomain === targetDomain ||
+              targetDomain.endsWith('.' + cookieDomain)
+            );
+          });
+
+          if (validCookies.length > 0) {
+            // Convert to Playwright cookie format
+            const playwrightCookies = validCookies.map((cookie) => ({
+              name: cookie.name,
+              value: cookie.value,
+              domain: cookie.domain,
+              path: cookie.path || '/',
+              secure: cookie.secure ?? false,
+              httpOnly: cookie.httpOnly ?? false,
+              expires: cookie.expires,
+              sameSite: cookie.sameSite as 'Strict' | 'Lax' | 'None' | undefined,
+            }));
+
+            await context.addCookies(playwrightCookies);
+            cookiesCount = playwrightCookies.length;
+
+            // Log skipped cookies if any
+            const skippedCount = browserStorage.cookies.length - validCookies.length;
+            if (skippedCount > 0) {
+              this.logger.warn(
+                `Skipped ${skippedCount} cookies with invalid domains for job ${jobId}`,
+              );
+            }
+          } else {
+            this.logger.warn(
+              `No valid cookies found matching domain ${targetDomain} for job ${jobId}`,
+            );
+          }
+        } catch (error: any) {
+          this.logger.warn(
+            `Failed to apply cookies for job ${jobId}: ${error.message}`,
+          );
+        }
+      }
+
+      // Apply localStorage if provided
+      if (browserStorage.localStorage) {
+        try {
+          await page.evaluate((storage) => {
+            Object.entries(storage).forEach(([key, value]) => {
+              localStorage.setItem(key, value);
+            });
+          }, browserStorage.localStorage);
+          hasLocalStorage = true;
+        } catch (error: any) {
+          this.logger.warn(
+            `Failed to apply localStorage for job ${jobId}: ${error.message}`,
+          );
+        }
+      }
+
+      // Apply sessionStorage if provided
+      if (browserStorage.sessionStorage) {
+        try {
+          await page.evaluate((storage) => {
+            Object.entries(storage).forEach(([key, value]) => {
+              sessionStorage.setItem(key, value);
+            });
+          }, browserStorage.sessionStorage);
+          hasSessionStorage = true;
+        } catch (error: any) {
+          this.logger.warn(
+            `Failed to apply sessionStorage for job ${jobId}: ${error.message}`,
+          );
+        }
+      }
+
+      // Log successful application
+      if (cookiesCount > 0 || hasLocalStorage || hasSessionStorage) {
+        await this.jobLogService.logJobEvent(
+          jobId,
+          LogLevel.INFO,
+          `Applied browser storage: ${cookiesCount} cookies, localStorage: ${hasLocalStorage}, sessionStorage: ${hasSessionStorage}`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `Error applying browser storage for job ${jobId}: ${error.message}`,
+      );
+      // Don't throw - continue with job execution even if storage application fails
+    }
+  }
+
+  /**
+   * Clear all browser storage (cookies, localStorage, sessionStorage) from the page/context
+   * This ensures no data leakage between jobs
+   */
+  private async clearBrowserStorage(
+    page: Page,
+    context: BrowserContext,
+  ): Promise<void> {
+    try {
+      // Clear all cookies from context
+      await context.clearCookies();
+
+      // Clear localStorage
+      try {
+        await page.evaluate(() => {
+          localStorage.clear();
+        });
+      } catch (error: any) {
+        this.logger.debug(`Failed to clear localStorage: ${error.message}`);
+      }
+
+      // Clear sessionStorage
+      try {
+        await page.evaluate(() => {
+          sessionStorage.clear();
+        });
+      } catch (error: any) {
+        this.logger.debug(`Failed to clear sessionStorage: ${error.message}`);
+      }
+
+      this.logger.debug('Browser storage cleared successfully');
+    } catch (error: any) {
+      // Log but don't throw - cleanup should be best-effort
+      this.logger.warn(`Error clearing browser storage: ${error.message}`);
     }
   }
 

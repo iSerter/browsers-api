@@ -52,6 +52,9 @@ export class JobsService {
       ...(createJobDto.captcha && {
         captchaConfig: createJobDto.captcha,
       }),
+      ...(createJobDto.browserStorage && {
+        browserStorage: createJobDto.browserStorage,
+      }),
     });
 
     const savedJob = await this.jobRepository.save(job);

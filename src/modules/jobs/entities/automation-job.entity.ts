@@ -101,6 +101,22 @@ export class AutomationJob {
   @Column({ nullable: true, type: 'jsonb', name: 'captcha_config' })
   captchaConfig: any;
 
+  @Column({ nullable: true, type: 'jsonb', name: 'browser_storage' })
+  browserStorage: {
+    cookies?: Array<{
+      name: string;
+      value: string;
+      domain: string;
+      path?: string;
+      secure?: boolean;
+      httpOnly?: boolean;
+      expires?: number;
+      sameSite?: 'Strict' | 'Lax' | 'None';
+    }>;
+    localStorage?: Record<string, string>;
+    sessionStorage?: Record<string, string>;
+  } | null;
+
   @OneToMany(
     () => require('./job-artifact.entity').JobArtifact,
     (artifact: any) => artifact.job,

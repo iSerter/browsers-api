@@ -16,6 +16,7 @@ import { WaitUntilOption } from '../entities/automation-job.entity';
 import { ActionConfigDto } from './action-config.dto';
 import { ProxyConfigDto } from './proxy-config.dto';
 import { CaptchaConfigDto } from './captcha-config.dto';
+import { BrowserStorageDto } from './browser-storage.dto';
 
 export class CreateJobDto {
   @IsInt()
@@ -63,4 +64,9 @@ export class CreateJobDto {
   @ValidateNested()
   @Type(() => CaptchaConfigDto)
   captcha?: CaptchaConfigDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BrowserStorageDto)
+  browserStorage?: BrowserStorageDto;
 }
