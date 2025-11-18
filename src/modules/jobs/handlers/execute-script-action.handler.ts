@@ -55,8 +55,26 @@ export class ExecuteScriptActionHandler implements IActionHandler {
         `Executing script for job ${jobId} (length: ${script.length} chars)`,
       );
 
+      // Wrap script in a function if it's not already a function
+      // This allows users to write scripts like "return document.title" 
+      // instead of requiring "(function() { return document.title; })()"
+      let wrappedScript = script.trim();
+      
+      // Check if script is already wrapped in a function (starts with function, =>, or (function)
+      const isAlreadyFunction = 
+        wrappedScript.startsWith('function') ||
+        wrappedScript.startsWith('(') ||
+        wrappedScript.startsWith('async') ||
+        wrappedScript.startsWith('() =>') ||
+        wrappedScript.startsWith('async () =>');
+      
+      if (!isAlreadyFunction) {
+        // Wrap in an arrow function to allow return statements
+        wrappedScript = `(() => { ${script} })()`;
+      }
+
       // Execute the script in the page context
-      const result = await page.evaluate(script);
+      const result = await page.evaluate(wrappedScript);
 
       this.logger.log(
         `Script execution completed successfully for job ${jobId}`,

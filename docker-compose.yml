@@ -79,6 +79,9 @@ services:
       METRICS_PORT: 9090
       LOG_LEVEL: info
       
+      # Feature Flags
+      ENABLE_EXECUTE_SCRIPT: "true"
+      
       # Proxy Configuration
       DEFAULT_PROXY: ${DEFAULT_PROXY:-}  # Optional: Default proxy for all browsers
       
