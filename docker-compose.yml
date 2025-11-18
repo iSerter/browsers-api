@@ -85,6 +85,9 @@ services:
       # Captcha Solver
       TWOCAPTCHA_API_KEY: ${TWOCAPTCHA_API_KEY:-}
       ANTICAPTCHA_API_KEY: ${ANTICAPTCHA_API_KEY:-}
+      
+      # Database Migrations
+      RUN_MIGRATIONS: "true"  # Set to "false" to skip automatic migrations on startup
     volumes:
       - ./artifacts:/app/artifacts
       - ./screenshots:/app/screenshots

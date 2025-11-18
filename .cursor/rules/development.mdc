@@ -53,11 +53,14 @@ npm run start:debug
 
 ```bash
 # Start the full stack (PostgreSQL + API)
+# Migrations run automatically on startup
 ./scripts/docker-dev.sh start
 
-# Run migrations and seeds
-./scripts/docker-dev.sh migrate
+# Seed the database (after first startup)
 ./scripts/docker-dev.sh seed
+
+# Run migrations manually (if needed)
+./scripts/docker-dev.sh migrate
 
 # View logs
 ./scripts/docker-dev.sh logs
@@ -193,6 +196,13 @@ docker run -d \
 
 ### Migrations
 
+**Automatic migrations in Docker:**
+- Migrations run automatically when the Docker container starts
+- Set `RUN_MIGRATIONS=false` environment variable to skip automatic migrations
+- The container waits for the database to be ready before running migrations
+- If migrations fail, the container will exit with an error
+
+**Manual migration commands:**
 ```bash
 # Generate a new migration (after entity changes)
 npm run migration:generate -- src/database/migrations/MigrationName
@@ -200,8 +210,11 @@ npm run migration:generate -- src/database/migrations/MigrationName
 # Create a blank migration
 npm run migration:create -- src/database/migrations/MigrationName
 
-# Run pending migrations
+# Run pending migrations (local development)
 npm run migration:run
+
+# Run migrations in Docker
+docker compose exec api npm run migration:run
 
 # Revert the last migration
 npm run migration:revert
@@ -213,6 +226,8 @@ npm run migration:revert
 - Test migrations both up and down
 - Never modify deployed migrations
 - Use descriptive migration names
+- Migrations run automatically in Docker on container startup
+- Database connection is verified before running migrations
 
 ### Seeds
 

@@ -17,10 +17,10 @@ Browser Automation API that provides HTTP endpoints for browser tasks using Play
 
 ```bash
 # Start the full stack (PostgreSQL + API)
+# Migrations run automatically on startup
 ./scripts/docker-dev.sh start
 
-# Run migrations and seeds
-./scripts/docker-dev.sh migrate
+# Seed the database (after first startup)
 ./scripts/docker-dev.sh seed
 
 # API will be available at http://localhost:3333
@@ -83,12 +83,18 @@ npm run start:dev
 ### Database Management
 
 **Migrations:**
+- **Docker:** Migrations run automatically on container startup (set `RUN_MIGRATIONS=false` to skip)
+- **Local:** Run migrations manually after starting PostgreSQL
+
 ```bash
 # Generate migration after entity changes
 npm run migration:generate -- src/database/migrations/MigrationName
 
-# Run pending migrations
+# Run pending migrations (local development)
 npm run migration:run
+
+# Run migrations in Docker (if RUN_MIGRATIONS=false)
+docker compose exec api npm run migration:run
 
 # Revert last migration
 npm run migration:revert

@@ -64,6 +64,9 @@ COPY package.json package-lock.json ./
 # Copy TypeScript configs (needed if running migrations or CLI tools)
 COPY tsconfig.json tsconfig.build.json ./
 
+# Copy source files (needed for TypeORM CLI migrations)
+COPY --from=builder /app/src ./src
+
 # Copy production dependencies from builder
 COPY --from=builder /app/node_modules ./node_modules
 

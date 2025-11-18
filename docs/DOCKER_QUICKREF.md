@@ -33,7 +33,7 @@ docker run --rm -p 8080:8080 -e PORT=8080 --env-file ./.env browsers-api:latest
 ### Docker Compose
 
 ```bash
-# Start stack
+# Start stack (migrations run automatically on startup)
 docker compose up -d
 
 # Stop stack
@@ -42,8 +42,11 @@ docker compose down
 # View logs
 docker compose logs -f api
 
-# Run command in container
+# Run migrations manually (if RUN_MIGRATIONS=false)
 docker compose exec api npm run migration:run
+
+# Skip automatic migrations on startup
+docker compose up -d -e RUN_MIGRATIONS=false
 
 # Rebuild and restart
 docker compose up -d --build
@@ -112,6 +115,7 @@ Key environment variables (see `.env.example`):
 - `NODE_ENV` - Environment mode
 - `PORT` - Application port
 - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` - Database config
+- `RUN_MIGRATIONS` - Auto-run migrations on startup (default: `true`, set to `false` to skip)
 - `WORKER_MAX_CONCURRENT_JOBS` - Worker concurrency
 - `PLAYWRIGHT_HEADLESS` - Browser mode
 - `LOG_LEVEL` - Logging level

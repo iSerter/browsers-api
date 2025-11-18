@@ -131,6 +131,51 @@ else
   echo "Xvfb is disabled (XVFB_ENABLED=false)"
 fi
 
+# Wait for database to be ready
+if [ ! -z "$DB_HOST" ]; then
+  echo "Waiting for database to be ready..."
+  MAX_DB_WAIT=30
+  DB_WAIT_COUNT=0
+  while [ $DB_WAIT_COUNT -lt $MAX_DB_WAIT ]; do
+    if node -e "
+      const { Client } = require('pg');
+      const client = new Client({
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT || 5432,
+        user: process.env.DB_USERNAME,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_DATABASE
+      });
+      client.connect()
+        .then(() => { client.end(); process.exit(0); })
+        .catch(() => process.exit(1));
+    " 2>/dev/null; then
+      echo "Database is ready!"
+      break
+    fi
+    DB_WAIT_COUNT=$((DB_WAIT_COUNT + 1))
+    echo "Waiting for database... ($DB_WAIT_COUNT/$MAX_DB_WAIT)"
+    sleep 1
+  done
+  
+  if [ $DB_WAIT_COUNT -eq $MAX_DB_WAIT ]; then
+    echo "ERROR: Database connection timeout"
+    exit 1
+  fi
+fi
+
+# Run database migrations
+if [ "$RUN_MIGRATIONS" != "false" ]; then
+  echo "Running database migrations..."
+  npm run migration:run || {
+    echo "ERROR: Migration failed"
+    exit 1
+  }
+  echo "Migrations completed successfully"
+else
+  echo "Skipping migrations (RUN_MIGRATIONS=false)"
+fi
+
 # Start Node.js application
 echo "Starting Node.js application..."
 node dist/main.js &
