@@ -1297,5 +1297,14 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
   getMetrics(): RecaptchaSolverMetrics {
     return { ...this.metrics };
   }
+
+  /**
+   * Sleep for a specified number of milliseconds
+   * @param milliseconds - The number of milliseconds to sleep
+   * @returns Promise that resolves after the specified delay
+   */
+  private sleep(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
 }
 

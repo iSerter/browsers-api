@@ -432,6 +432,208 @@ async execute(page: Page, config: MoveCursorConfig, jobId: string) {
 }
 ```
 
+### Snapshot Handler
+
+Captures the current state of a web page including HTML content, metadata (URL, title, timestamp, viewport), and optionally cookies, localStorage, and sessionStorage.
+
+**Configuration**:
+```typescript
+{
+  action: 'snapshot',
+  snapshotConfig?: {
+    cookies?: boolean,           // Capture browser cookies (default: false)
+    localStorage?: boolean,       // Capture localStorage data (default: false)
+    sessionStorage?: boolean      // Capture sessionStorage data (default: false)
+  }
+}
+```
+
+**Implementation**:
+```typescript
+@Injectable()
+export class SnapshotActionHandler implements IActionHandler {
+  private readonly logger = new Logger(SnapshotActionHandler.name);
+
+  constructor(
+    private readonly artifactStorageService: ArtifactStorageService,
+  ) {}
+
+  async execute(
+    page: Page,
+    config: SnapshotActionConfig,
+    jobId: string
+  ): Promise<ActionResult> {
+    const snapshotConfig = config.snapshotConfig || {};
+    const {
+      cookies = false,
+      localStorage = false,
+      sessionStorage = false,
+    } = snapshotConfig;
+
+    // 1. Always capture HTML content
+    const htmlContent = await page.content();
+
+    // 2. Capture metadata (always included)
+    const url = page.url();
+    const viewport = page.viewportSize();
+    const title = await page.title().catch(() => undefined);
+    const userAgent = await page.evaluate(() => navigator.userAgent).catch(() => undefined);
+    const language = await page.evaluate(() => navigator.language).catch(() => undefined);
+    const platform = await page.evaluate(() => navigator.platform).catch(() => undefined);
+    const timezone = await page.evaluate(() =>
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    ).catch(() => undefined);
+
+    // 3. Build snapshot data object
+    const snapshotData = {
+      html: htmlContent,
+      url,
+      title,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        viewport: viewport ? { width: viewport.width, height: viewport.height } : null,
+        userAgent,
+        language,
+        platform,
+        timezone,
+      },
+    };
+
+    // 4. Conditionally capture cookies
+    if (cookies) {
+      try {
+        const context = page.context();
+        const contextCookies = await context.cookies();
+        snapshotData.cookies = contextCookies;
+      } catch (error) {
+        this.logger.warn(`Failed to capture cookies: ${error.message}`);
+        snapshotData.cookies = null;
+      }
+    }
+
+    // 5. Conditionally capture localStorage
+    if (localStorage) {
+      try {
+        const localStorageData = await page.evaluate(() => {
+          const storage: Record<string, string> = {};
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key) {
+              storage[key] = window.localStorage.getItem(key) || '';
+            }
+          }
+          return storage;
+        });
+        snapshotData.localStorage = localStorageData;
+      } catch (error) {
+        this.logger.warn(`Failed to capture localStorage: ${error.message}`);
+        snapshotData.localStorage = null;
+      }
+    }
+
+    // 6. Conditionally capture sessionStorage
+    if (sessionStorage) {
+      try {
+        const sessionStorageData = await page.evaluate(() => {
+          const storage: Record<string, string> = {};
+          for (let i = 0; i < window.sessionStorage.length; i++) {
+            const key = window.sessionStorage.key(i);
+            if (key) {
+              storage[key] = window.sessionStorage.getItem(key) || '';
+            }
+          }
+          return storage;
+        });
+        snapshotData.sessionStorage = sessionStorageData;
+      } catch (error) {
+        this.logger.warn(`Failed to capture sessionStorage: ${error.message}`);
+        snapshotData.sessionStorage = null;
+      }
+    }
+
+    // 7. Convert to JSON and save artifact
+    const jsonString = JSON.stringify(snapshotData, null, 2);
+    const jsonBuffer = Buffer.from(jsonString, 'utf-8');
+    const timestamp = Date.now();
+    const filename = `${timestamp}-snapshot.json`;
+
+    const filePath = await this.artifactStorageService.saveArtifact(
+      jsonBuffer,
+      jobId,
+      filename,
+      ArtifactType.SNAPSHOT,
+      'application/json',
+    );
+
+    return {
+      success: true,
+      artifactId: filePath,
+      data: {
+        filePath,
+        size: jsonBuffer.length,
+        mimeType: 'application/json',
+        url,
+        title,
+        timestamp: snapshotData.timestamp,
+      },
+    };
+  }
+}
+```
+
+**Snapshot Data Structure**:
+
+The saved artifact is a JSON file containing:
+
+```typescript
+{
+  html: string,                    // Complete HTML source of the page
+  url: string,                      // Current page URL
+  title?: string,                   // Page title (if available)
+  timestamp: string,                // ISO 8601 timestamp
+  metadata: {
+    viewport: {                     // Viewport dimensions
+      width: number,
+      height: number
+    } | null,
+    userAgent?: string,             // Browser user agent
+    language?: string,              // Browser language
+    platform?: string,              // Operating system platform
+    timezone?: string               // Timezone identifier
+  },
+  cookies?: Cookie[],               // Array of cookie objects (if enabled)
+  localStorage?: Record<string, string>,  // localStorage key-value pairs (if enabled)
+  sessionStorage?: Record<string, string>  // sessionStorage key-value pairs (if enabled)
+}
+```
+
+**Artifact Details**:
+- **ArtifactType**: `SNAPSHOT`
+- **Content-Type**: `application/json`
+- **File Format**: JSON file named `{timestamp}-snapshot.json`
+- **Storage**: Saved to both filesystem and database
+
+**Error Handling**:
+- HTML capture failures cause the entire snapshot to fail
+- Metadata capture failures (title, userAgent, etc.) are logged but don't fail the snapshot (set to `undefined` or `null`)
+- Cookie capture failures are logged with warnings, snapshot continues with `cookies: null`
+- localStorage/sessionStorage capture failures are logged with warnings, snapshot continues with `localStorage: null` or `sessionStorage: null`
+- Timeout errors are retryable; other errors are not retryable
+
+**Edge Cases**:
+- **Pages without storage support**: localStorage and sessionStorage capture gracefully handles unsupported scenarios
+- **Cookie access restrictions**: Cookie capture may fail due to security policies, but snapshot continues
+- **Large data handling**: Large HTML content or extensive storage data can result in large artifact files; consider memory usage for very large pages
+- **CSP restrictions**: Content Security Policy may block JavaScript evaluation needed for storage capture
+
+**Integration**:
+- Registered in `ActionHandlerFactory` constructor: `this.handlers.set('snapshot', this.snapshotHandler)`
+- Provided in `JobsModule` providers array
+- Uses `ArtifactStorageService` for artifact persistence
+- See [API Reference](./05-api-reference.md#snapshot-action) for API usage examples
+- See `ActionType.SNAPSHOT` enum value in `ActionConfigDto`
+- See `ArtifactType.SNAPSHOT` enum value in `JobArtifact` entity
+
 ## Locator Helper
 
 Centralized element location logic:

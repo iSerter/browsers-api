@@ -1,3 +1,16 @@
+/**
+ * StealthService Test Suite
+ *
+ * This test suite requires Playwright browsers to be installed.
+ * If browsers are not installed, tests will be skipped gracefully.
+ *
+ * To install Playwright browsers, run:
+ *   npx playwright install
+ *
+ * Or use the npm script:
+ *   npm run test:setup
+ */
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { StealthService } from './stealth.service';
 import { Browser, BrowserContext, Page, chromium } from 'playwright';
@@ -9,9 +22,10 @@ import {
 
 describe('StealthService', () => {
   let service: StealthService;
-  let browser: Browser;
-  let context: BrowserContext;
-  let page: Page;
+  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
+  let browsersAvailable: boolean;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -20,8 +34,18 @@ describe('StealthService', () => {
 
     service = module.get<StealthService>(StealthService);
 
-    // Launch a real browser for integration tests
-    browser = await chromium.launch({ headless: true });
+    // Check for Playwright browser availability
+    try {
+      browser = await chromium.launch({ headless: true });
+      browsersAvailable = true;
+    } catch (error) {
+      console.warn(
+        'Skipping StealthService tests: Playwright browsers not installed.',
+      );
+      console.warn('Run: npx playwright install');
+      browsersAvailable = false;
+      browser = undefined;
+    }
   });
 
   afterAll(async () => {
@@ -31,6 +55,9 @@ describe('StealthService', () => {
   });
 
   beforeEach(async () => {
+    if (!browsersAvailable || !browser) {
+      return;
+    }
     context = await browser.newContext();
     page = await context.newPage();
   });
@@ -46,6 +73,10 @@ describe('StealthService', () => {
 
   describe('applyStealthToContext', () => {
     it('should apply stealth configuration to context', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       const config: StealthConfig = {
         overrideWebdriver: true,
         preventCanvasFingerprinting: true,
@@ -60,6 +91,10 @@ describe('StealthService', () => {
     });
 
     it('should use default config when no config provided', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context);
 
       const newPage = await context.newPage();
@@ -78,6 +113,10 @@ describe('StealthService', () => {
 
   describe('applyStealthToPage', () => {
     it('should apply stealth configuration to existing page', async () => {
+      if (!browsersAvailable || !page) {
+        return;
+      }
+
       const config: StealthConfig = {
         overrideWebdriver: true,
       };
@@ -89,6 +128,10 @@ describe('StealthService', () => {
     });
 
     it('should use default config when no config provided', async () => {
+      if (!browsersAvailable || !page) {
+        return;
+      }
+
       await service.applyStealthToPage(page);
 
       const webdriver = await page.evaluate(() => navigator.webdriver);
@@ -98,6 +141,10 @@ describe('StealthService', () => {
 
   describe('navigator.webdriver override', () => {
     it('should override navigator.webdriver to false', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         overrideWebdriver: true,
       });
@@ -109,6 +156,10 @@ describe('StealthService', () => {
     });
 
     it('should not override when disabled', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         overrideWebdriver: false,
       });
@@ -123,6 +174,10 @@ describe('StealthService', () => {
 
   describe('canvas fingerprinting prevention', () => {
     it('should prevent canvas fingerprinting', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         preventCanvasFingerprinting: true,
       });
@@ -145,6 +200,10 @@ describe('StealthService', () => {
 
   describe('WebGL fingerprinting prevention', () => {
     it('should prevent WebGL fingerprinting', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         preventWebGLFingerprinting: true,
       });
@@ -166,6 +225,10 @@ describe('StealthService', () => {
 
   describe('battery API mocking', () => {
     it('should mock battery API', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         mockBatteryAPI: true,
       });
@@ -187,6 +250,10 @@ describe('StealthService', () => {
 
   describe('hardware concurrency randomization', () => {
     it('should randomize hardware concurrency', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         randomizeHardwareConcurrency: true,
         hardwareConcurrencyRange: [2, 4],
@@ -203,6 +270,10 @@ describe('StealthService', () => {
     });
 
     it('should use default range when not specified', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         randomizeHardwareConcurrency: true,
       });
@@ -220,6 +291,10 @@ describe('StealthService', () => {
 
   describe('plugins mocking', () => {
     it('should mock browser plugins', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         mockPlugins: true,
       });
@@ -234,6 +309,10 @@ describe('StealthService', () => {
 
   describe('languages mocking', () => {
     it('should mock browser languages', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         mockLanguages: true,
         locale: 'en-US',
@@ -249,6 +328,10 @@ describe('StealthService', () => {
 
   describe('timezone consistency', () => {
     it('should enforce timezone consistency', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       await service.applyStealthToContext(context, {
         enforceTimezoneConsistency: true,
         timezoneId: 'America/New_York',
@@ -266,6 +349,10 @@ describe('StealthService', () => {
 
   describe('moveMouseHumanLike', () => {
     it('should move mouse with human-like behavior', async () => {
+      if (!browsersAvailable || !page) {
+        return;
+      }
+
       await page.setContent('<div style="width: 100px; height: 100px;"></div>');
       await page.goto('about:blank');
 
@@ -285,6 +372,10 @@ describe('StealthService', () => {
     });
 
     it('should use default config when not provided', async () => {
+      if (!browsersAvailable || !page) {
+        return;
+      }
+
       await page.setContent('<div></div>');
       await page.goto('about:blank');
 
@@ -304,6 +395,10 @@ describe('StealthService', () => {
 
   describe('clickHumanLike', () => {
     it('should click with human-like behavior', async () => {
+      if (!browsersAvailable || !page) {
+        return;
+      }
+
       await page.setContent(
         '<button id="test-btn">Click me</button>',
       );
@@ -386,6 +481,10 @@ describe('StealthService', () => {
 
   describe('combined stealth features', () => {
     it('should apply all stealth features together', async () => {
+      if (!browsersAvailable || !context) {
+        return;
+      }
+
       const config: StealthConfig = {
         overrideWebdriver: true,
         preventCanvasFingerprinting: true,

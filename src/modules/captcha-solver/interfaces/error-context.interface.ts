@@ -42,3 +42,4 @@ export interface ErrorContext {
   additionalContext?: Record<string, any>;
 }
 
+

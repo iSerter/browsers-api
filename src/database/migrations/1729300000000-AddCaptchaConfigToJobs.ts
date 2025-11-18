@@ -18,3 +18,4 @@ export class AddCaptchaConfigToJobs1729300000000 implements MigrationInterface {
   }
 }
 
+

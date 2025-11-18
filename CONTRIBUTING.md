@@ -39,7 +39,14 @@ Thank you for your interest in contributing to Browsers API! This document outli
    - Configure required environment variables
    - Set up PostgreSQL database
 
-4. **Run Tests**
+4. **Install Playwright Browsers (Required for Tests)**
+   ```bash
+   npm run test:setup
+   # Or manually: npx playwright install
+   ```
+   **Note:** Some tests require Playwright browsers to be installed. Tests that require browsers will be skipped gracefully if browsers are not available, but you should install them to run the full test suite.
+
+5. **Run Tests**
    ```bash
    npm test
    npm run test:cov  # Check coverage
@@ -158,6 +165,9 @@ describe('FeatureService', () => {
 ### Running Tests
 
 ```bash
+# Install Playwright browsers (required for some tests)
+npm run test:setup
+
 # Run all tests
 npm test
 
@@ -173,6 +183,8 @@ npm run test:e2e
 # Run specific test file
 npm test -- feature.service.spec.ts
 ```
+
+**Note:** Tests that require Playwright browsers (e.g., `stealth.service.spec.ts`, `human-behavior-simulation.service.spec.ts`) will be skipped gracefully if browsers are not installed. Install browsers using `npm run test:setup` to run the complete test suite.
 
 ### Test Proof in PRs
 

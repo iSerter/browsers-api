@@ -261,18 +261,26 @@ describe('JobEventsGateway', () => {
       await gateway.handleConnection(mockSocket);
     });
 
-    it('should update last pong timestamp', () => {
-      const originalLastPong =
-        gateway['clients'].get('socket-id-123')!.lastPong;
+    it('should update last pong timestamp', async () => {
+      // Verify client exists before accessing properties
+      const client = gateway['clients'].get('socket-id-123');
+      expect(client).toBeDefined();
+      expect(client!.lastPong).toBeDefined();
 
-      // Wait a bit
-      setTimeout(() => {
-        gateway.handlePong(mockSocket);
-        const newLastPong = gateway['clients'].get('socket-id-123')!.lastPong;
-        expect(newLastPong.getTime()).toBeGreaterThan(
-          originalLastPong.getTime(),
-        );
-      }, 10);
+      const originalLastPong = client!.lastPong;
+
+      // Wait a bit to ensure timestamp difference
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      gateway.handlePong(mockSocket);
+
+      // Verify client still exists and lastPong was updated
+      const updatedClient = gateway['clients'].get('socket-id-123');
+      expect(updatedClient).toBeDefined();
+      expect(updatedClient!.lastPong).toBeDefined();
+      expect(updatedClient!.lastPong.getTime()).toBeGreaterThan(
+        originalLastPong.getTime(),
+      );
     });
   });
 

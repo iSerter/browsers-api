@@ -235,6 +235,12 @@ Retrieve artifacts for a job.
       "description": "Move cursor to element",
       "requiredFields": ["target", "getTargetBy"],
       "optionalFields": ["speed", "jitter", "overshoot"]
+    },
+    {
+      "type": "snapshot",
+      "description": "Capture page state including HTML, metadata, and optional storage data",
+      "requiredFields": [],
+      "optionalFields": ["snapshotConfig"]
     }
   ]
 }
@@ -329,6 +335,197 @@ Retrieve artifacts for a job.
 - `speed`: Movement speed in milliseconds
 - `jitter`: Random movement factor (0-1)
 - `overshoot`: Overshoot factor (0-1)
+
+### Snapshot Action
+
+The SNAPSHOT action captures the current state of a web page, including HTML content, metadata, and optionally browser storage data (cookies, localStorage, sessionStorage). This is useful for debugging, state preservation, and archiving application states.
+
+**Action Type Value**: `"snapshot"`
+
+#### Overview
+
+The SNAPSHOT action captures:
+- **HTML content**: The complete HTML source of the current page
+- **Metadata**: URL, title, timestamp, viewport dimensions, user agent, language, platform, and timezone
+- **Optional storage data**: Cookies, localStorage, and sessionStorage (when enabled via configuration)
+
+The captured data is saved as a JSON artifact that can be retrieved via the job artifacts endpoint.
+
+#### Configuration Options
+
+The snapshot action accepts an optional `snapshotConfig` object to control which browser state data is captured:
+
+```json
+{
+  "action": "snapshot",
+  "snapshotConfig": {
+    "cookies": true,
+    "localStorage": true,
+    "sessionStorage": false
+  }
+}
+```
+
+**Configuration Fields**:
+
+- `cookies` (boolean, optional, default: `false`): When `true`, captures all cookies from the browser context. Cookies are captured as an array of cookie objects with properties like `name`, `value`, `domain`, `path`, `expires`, etc.
+- `localStorage` (boolean, optional, default: `false`): When `true`, captures all key-value pairs from the page's localStorage. Data is captured as a plain object where keys are localStorage keys and values are the stored strings.
+- `sessionStorage` (boolean, optional, default: `false`): When `true`, captures all key-value pairs from the page's sessionStorage. Data is captured as a plain object where keys are sessionStorage keys and values are the stored strings.
+
+**Note**: All configuration fields are optional. If `snapshotConfig` is omitted entirely, only HTML and metadata will be captured (no storage data).
+
+#### Request Examples
+
+**Basic Example** (HTML and metadata only):
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {
+      "action": "snapshot"
+    }
+  ]
+}
+```
+
+**Advanced Example** (with all storage data enabled):
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {
+      "action": "visit",
+      "target": "https://example.com/login"
+    },
+    {
+      "action": "fill",
+      "target": "Email",
+      "getTargetBy": "getByLabel",
+      "value": "user@example.com"
+    },
+    {
+      "action": "fill",
+      "target": "Password",
+      "getTargetBy": "getByLabel",
+      "value": "password123"
+    },
+    {
+      "action": "click",
+      "target": "Login",
+      "getTargetBy": "getByText",
+      "waitForNavigation": true
+    },
+    {
+      "action": "snapshot",
+      "snapshotConfig": {
+        "cookies": true,
+        "localStorage": true,
+        "sessionStorage": true
+      }
+    }
+  ]
+}
+```
+
+#### Response/Artifact Structure
+
+When a SNAPSHOT action completes successfully, it creates an artifact with:
+- **Artifact Type**: `"snapshot"`
+- **MIME Type**: `"application/json"`
+- **File Format**: JSON file named `{timestamp}-snapshot.json`
+
+The JSON artifact contains the following structure:
+
+```json
+{
+  "html": "<!DOCTYPE html>...",
+  "url": "https://example.com/page",
+  "title": "Page Title",
+  "timestamp": "2025-01-18T10:00:00.000Z",
+  "metadata": {
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "userAgent": "Mozilla/5.0...",
+    "language": "en-US",
+    "platform": "MacIntel",
+    "timezone": "America/New_York"
+  },
+  "cookies": [
+    {
+      "name": "sessionId",
+      "value": "abc123",
+      "domain": ".example.com",
+      "path": "/",
+      "expires": 1737216000,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "localStorage": {
+    "userId": "12345",
+    "theme": "dark",
+    "preferences": "{\"notifications\":true}"
+  },
+  "sessionStorage": {
+    "tempData": "value"
+  }
+}
+```
+
+**Field Descriptions**:
+
+- `html` (string, always present): The complete HTML source code of the page
+- `url` (string, always present): The current URL of the page
+- `title` (string, optional): The page title (may be `undefined` if unavailable)
+- `timestamp` (string, always present): ISO 8601 timestamp of when the snapshot was taken
+- `metadata` (object, always present): Browser and environment metadata
+  - `viewport` (object | null): Viewport dimensions (width, height) or `null` if unavailable
+  - `userAgent` (string, optional): Browser user agent string
+  - `language` (string, optional): Browser language setting
+  - `platform` (string, optional): Operating system platform
+  - `timezone` (string, optional): Timezone identifier (e.g., "America/New_York")
+- `cookies` (array, optional): Array of cookie objects (only present if `cookies: true` in config). Each cookie object follows the Playwright cookie format.
+- `localStorage` (object, optional): Key-value pairs from localStorage (only present if `localStorage: true` in config). Values are always strings.
+- `sessionStorage` (object, optional): Key-value pairs from sessionStorage (only present if `sessionStorage: true` in config). Values are always strings.
+
+**Note**: If storage capture fails for any reason, the corresponding field will be set to `null` rather than omitted.
+
+#### Use Cases
+
+1. **Capturing Page State for Debugging**: Take snapshots at various points during automation to inspect the exact state of the page, including HTML structure and metadata.
+
+2. **Preserving Authentication State**: Capture cookies after login to understand session management and authentication tokens.
+
+3. **Archiving Application State**: Save complete application state including localStorage and sessionStorage for later analysis or restoration.
+
+4. **Compliance and Auditing**: Create point-in-time records of page state for compliance requirements or audit trails.
+
+5. **Testing State Transitions**: Capture state before and after actions to verify expected state changes.
+
+#### Browser Compatibility
+
+- Supported in all browser types (Chromium, Firefox, WebKit)
+- Storage capture (cookies, localStorage, sessionStorage) works across all supported browsers
+- Metadata capture may vary slightly between browsers (e.g., user agent strings)
+
+#### Security Considerations
+
+- **Sensitive Data**: Be aware that snapshots may contain sensitive information including authentication tokens, session IDs, and user data stored in cookies or storage.
+- **Storage Access**: Capturing localStorage and sessionStorage requires JavaScript execution in the page context, which may be blocked by Content Security Policy (CSP) in some cases.
+- **Cookie Access**: Cookies are captured from the browser context and may include HttpOnly cookies that are not accessible via JavaScript.
+
+#### Performance Implications
+
+- **HTML Capture**: Capturing full HTML content can be memory-intensive for large pages. Consider the page size when using snapshots.
+- **Storage Capture**: Reading localStorage and sessionStorage requires JavaScript evaluation, which adds minimal overhead.
+- **File Size**: Snapshot artifacts can be large, especially for pages with extensive HTML or significant storage data. Monitor artifact storage usage.
 
 ## Workers API
 

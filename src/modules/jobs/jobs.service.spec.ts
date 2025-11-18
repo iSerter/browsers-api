@@ -7,6 +7,7 @@ import { AutomationJob, JobStatus } from './entities/automation-job.entity';
 import { JobArtifact } from './entities/job-artifact.entity';
 import { BrowsersService } from '../browsers/browsers.service';
 import { JobEventsGateway } from './gateways/job-events.gateway';
+import { ArtifactStorageService } from './services/artifact-storage.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { ActionType } from './dto/action-config.dto';
 
@@ -16,6 +17,7 @@ describe('JobsService', () => {
   let artifactRepository: jest.Mocked<Repository<JobArtifact>>;
   let browsersService: jest.Mocked<BrowsersService>;
   let jobEventsGateway: jest.Mocked<JobEventsGateway>;
+  let artifactStorageService: jest.Mocked<ArtifactStorageService>;
 
   const mockJobRepository = {
     create: jest.fn(),
@@ -34,6 +36,14 @@ describe('JobsService', () => {
 
   const mockJobEventsGateway = {
     emitJobEvent: jest.fn(),
+  };
+
+  const mockArtifactStorageService = {
+    saveArtifact: jest.fn(),
+    getArtifact: jest.fn(),
+    readArtifactFile: jest.fn(),
+    deleteArtifact: jest.fn(),
+    cleanupJobArtifacts: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -56,6 +66,10 @@ describe('JobsService', () => {
           provide: JobEventsGateway,
           useValue: mockJobEventsGateway,
         },
+        {
+          provide: ArtifactStorageService,
+          useValue: mockArtifactStorageService,
+        },
       ],
     }).compile();
 
@@ -64,6 +78,7 @@ describe('JobsService', () => {
     artifactRepository = module.get(getRepositoryToken(JobArtifact));
     browsersService = module.get(BrowsersService);
     jobEventsGateway = module.get(JobEventsGateway);
+    artifactStorageService = module.get(ArtifactStorageService);
   });
 
   afterEach(() => {

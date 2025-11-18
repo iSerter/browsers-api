@@ -67,6 +67,7 @@ Create a new automation job.
 - **moveCursor**: Move cursor to element using human-like movement (includes customizable speed, jitter, overshoot, and timing options)
 - **scroll**: Scroll the page with human-like behavior (can scroll to specific position, element, or to bottom)
 - **screenshot**: Capture screenshots of the page or specific elements
+- **snapshot**: Capture the current state of a web page including HTML content, metadata, and optionally cookies, localStorage, and sessionStorage
 
 #### Action Configuration Examples
 
@@ -84,6 +85,62 @@ Create a new automation job.
 ```json
 {"action": "scroll", "target": "#footer", "getTargetBy": "getBySelector", "speed": 2000, "variance": 0.4}
 ```
+
+**Snapshot Action:**
+
+The snapshot action captures the current state of a web page. By default, it captures HTML content, URL, title, timestamp, and metadata (viewport, userAgent, language, platform, timezone). Optionally, you can capture cookies, localStorage, and sessionStorage.
+
+**Basic snapshot (minimal configuration):**
+```json
+{"action": "snapshot"}
+```
+
+**Snapshot with all optional features enabled:**
+```json
+{
+  "action": "snapshot",
+  "snapshot": {
+    "cookies": true,
+    "localStorage": true,
+    "sessionStorage": true
+  }
+}
+```
+
+**Snapshot configuration options:**
+- **cookies** (boolean, optional, default: false): When `true`, captures all browser cookies for the current domain
+- **localStorage** (boolean, optional, default: false): When `true`, captures all localStorage key-value pairs
+- **sessionStorage** (boolean, optional, default: false): When `true`, captures all sessionStorage key-value pairs
+
+**Complete job example with snapshot:**
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {"action": "visit"},
+    {"action": "wait", "wait": {"duration": 2000}},
+    {
+      "action": "snapshot",
+      "snapshot": {
+        "cookies": true,
+        "localStorage": true
+      }
+    }
+  ],
+  "timeoutMs": 30000
+}
+```
+
+Snapshot data is saved as a JSON artifact with type `snapshot` that can be retrieved via the artifacts API endpoint. The JSON structure includes:
+- `html`: The full HTML content of the page
+- `url`: The current page URL
+- `title`: The page title
+- `timestamp`: ISO 8601 timestamp of when the snapshot was taken
+- `metadata`: Object containing viewport dimensions, userAgent, language, platform, and timezone
+- `cookies` (optional): Array of cookie objects if cookies option is enabled
+- `localStorage` (optional): Object with localStorage key-value pairs if localStorage option is enabled
+- `sessionStorage` (optional): Object with sessionStorage key-value pairs if sessionStorage option is enabled
 
 **Response:**
 ```json
@@ -113,7 +170,7 @@ Get job status and results.
 ```
 
 #### `GET /api/v1/jobs/:jobId/artifacts`
-Get list of all artifacts (screenshots, files, etc.) associated with a job.
+Get list of all artifacts (screenshots, snapshots, files, etc.) associated with a job.
 
 **Response:**
 ```json
@@ -126,16 +183,25 @@ Get list of all artifacts (screenshots, files, etc.) associated with a job.
     "mimeType": "image/png",
     "sizeBytes": 123456,
     "createdAt": "2025-10-18T10:00:05Z"
+  },
+  {
+    "id": "artifact-uuid-2",
+    "jobId": "550e8400-e29b-41d4-a716-446655440000",
+    "artifactType": "snapshot",
+    "filePath": "/artifacts/job-id/1762825733438-snapshot.json",
+    "mimeType": "application/json",
+    "sizeBytes": 45678,
+    "createdAt": "2025-10-18T10:00:10Z"
   }
 ]
 ```
 
 #### `GET /api/v1/jobs/:jobId/artifacts/:artifactId`
-Download a specific artifact file (screenshot, PDF, etc.).
+Download a specific artifact file (screenshot, snapshot, PDF, etc.).
 
 **Response:**
 - Returns the file content with appropriate headers:
-  - `Content-Type`: Based on artifact's mimeType (e.g., `image/png`, `image/jpeg`)
+  - `Content-Type`: Based on artifact's mimeType (e.g., `image/png`, `image/jpeg`, `application/json`)
   - `Content-Disposition`: Attachment with filename
   - `Content-Length`: File size in bytes
 
@@ -143,6 +209,9 @@ Download a specific artifact file (screenshot, PDF, etc.).
 ```bash
 # Download a screenshot
 curl -O http://localhost:3333/api/v1/jobs/{jobId}/artifacts/{artifactId}
+
+# Download a snapshot (JSON file)
+curl http://localhost:3333/api/v1/jobs/{jobId}/artifacts/{artifactId} | jq .
 ```
 
 ## Tech Stack

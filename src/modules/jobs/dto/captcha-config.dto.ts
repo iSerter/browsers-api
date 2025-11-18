@@ -62,3 +62,4 @@ export class CaptchaConfigDto {
   timeouts?: Record<string, number>;
 }
 
+
