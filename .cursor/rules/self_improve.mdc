@@ -69,4 +69,85 @@ alwaysApply: true
   - Update references to external docs
   - Maintain links between related rules
   - Document breaking changes
+
+## Project-Specific Rule Improvements
+
+- **Action Handler Patterns**
+  - Monitor new action handlers for common patterns
+  - Update [nestjs.mdc](mdc:.cursor/rules/nestjs.mdc) with new handler patterns
+  - Document error handling strategies
+  - Add examples from actual handlers
+
+- **DTO Evolution**
+  - Track validation patterns across DTOs
+  - Update [api-patterns.mdc](mdc:.cursor/rules/api-patterns.mdc) with new patterns
+  - Document polymorphic DTO handling
+  - Add complex validation examples
+
+- **Testing Patterns**
+  - Monitor test file organization
+  - Update testing best practices based on what works
+  - Document mock strategies for browser automation
+  - Add examples from high-quality tests
+
+- **Docker & Deployment**
+  - Track deployment issues and solutions
+  - Update [docker.mdc](mdc:.cursor/rules/docker.mdc) with new patterns
+  - Document helper script conventions
+  - Add troubleshooting guides from real issues
+
+- **Development Workflow**
+  - Monitor common developer questions
+  - Update [development.mdc](mdc:.cursor/rules/development.mdc) with new workflows
+  - Document frequently used commands
+  - Add troubleshooting for common setup issues
+
+## When to Update Project Rules
+
+**Update [nestjs.mdc](mdc:.cursor/rules/nestjs.mdc) when:**
+- A new action handler pattern emerges
+- A better browser pool management pattern is discovered
+- Job processing patterns evolve
+- WebSocket event patterns change
+
+**Update [api-patterns.mdc](mdc:.cursor/rules/api-patterns.mdc) when:**
+- New endpoint patterns are established
+- DTO validation strategies improve
+- Authentication/authorization patterns change
+- Response structure conventions evolve
+
+**Update [docker.mdc](mdc:.cursor/rules/docker.mdc) when:**
+- New helper scripts are created
+- Docker configuration changes
+- Performance optimization patterns emerge
+- Troubleshooting solutions are discovered
+
+**Update [development.mdc](mdc:.cursor/rules/development.mdc) when:**
+- New development workflows are established
+- Testing strategies improve
+- Build processes change
+- Common setup issues are resolved
+
+## Monitoring Code Changes
+
+- **Review Pull Requests for:**
+  - Repeated validation patterns in DTOs
+  - Common error handling in action handlers
+  - Browser pool management patterns
+  - Testing strategies for async operations
+  - Docker configuration improvements
+
+- **Track Issues for:**
+  - Common developer setup problems
+  - Testing difficulties
+  - Docker/deployment issues
+  - API design questions
+  - Performance bottlenecks
+
+- **Update Documentation When:**
+  - New features are added (actions, endpoints)
+  - Dependencies are updated (Playwright, NestJS)
+  - Configuration changes significantly
+  - Best practices are established through code reviews
+
 Follow [cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc) for proper rule formatting and structure.

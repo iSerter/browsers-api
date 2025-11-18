@@ -53,7 +53,27 @@ Create a new browser automation job.
   "waitUntil": "networkidle",
   "priority": 10,
   "timeoutMs": 30000,
-  "maxRetries": 3
+  "maxRetries": 3,
+  "browserStorage": {
+    "cookies": [
+      {
+        "name": "sessionId",
+        "value": "abc123xyz",
+        "domain": ".example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Lax"
+      }
+    ],
+    "localStorage": {
+      "userId": "12345",
+      "theme": "dark"
+    },
+    "sessionStorage": {
+      "tempData": "value"
+    }
+  }
 }
 ```
 
@@ -74,6 +94,7 @@ Create a new browser automation job.
 - `priority`: Integer, 0-100
 - `timeoutMs`: Integer, 1000-300000
 - `maxRetries`: Integer, 0-10
+- `browserStorage`: Optional object with cookies, localStorage, and sessionStorage
 
 ### Get Job
 
@@ -243,6 +264,131 @@ Retrieve artifacts for a job.
       "optionalFields": ["snapshotConfig"]
     }
   ]
+}
+```
+
+## Browser Storage Configuration
+
+The `browserStorage` field allows you to pre-populate browser storage (cookies, localStorage, sessionStorage) before the job execution begins. This is useful for maintaining authentication state, preserving user preferences, or restoring previous session data.
+
+### Browser Storage Object
+
+```json
+{
+  "browserStorage": {
+    "cookies": [
+      {
+        "name": "sessionId",
+        "value": "abc123xyz",
+        "domain": ".example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Lax",
+        "expires": 1737216000
+      }
+    ],
+    "localStorage": {
+      "userId": "12345",
+      "theme": "dark",
+      "preferences": "{\"notifications\":true}"
+    },
+    "sessionStorage": {
+      "tempData": "value",
+      "sessionId": "session-123"
+    }
+  }
+}
+```
+
+### Cookie Configuration
+
+Each cookie object supports the following fields:
+
+- `name` (string, required): Cookie name
+- `value` (string, required): Cookie value
+- `domain` (string, required): Cookie domain (e.g., ".example.com" or "example.com")
+- `path` (string, optional): Cookie path (default: "/")
+- `secure` (boolean, optional): Whether cookie is only sent over HTTPS
+- `httpOnly` (boolean, optional): Whether cookie is accessible via JavaScript
+- `sameSite` (string, optional): SameSite attribute ("Strict", "Lax", or "None")
+- `expires` (number, optional): Unix timestamp in seconds for cookie expiration
+
+**Note**: Cookies are validated against the target URL domain. Cookies with domains that don't match the target URL will be rejected.
+
+### LocalStorage Configuration
+
+`localStorage` accepts a plain object where:
+- Keys are localStorage keys (strings)
+- Values are localStorage values (strings)
+
+**Example**:
+```json
+{
+  "localStorage": {
+    "userId": "12345",
+    "theme": "dark",
+    "preferences": "{\"notifications\":true}"
+  }
+}
+```
+
+### SessionStorage Configuration
+
+`sessionStorage` accepts a plain object where:
+- Keys are sessionStorage keys (strings)
+- Values are sessionStorage values (strings)
+
+**Example**:
+```json
+{
+  "sessionStorage": {
+    "tempData": "value",
+    "sessionId": "session-123"
+  }
+}
+```
+
+### Use Cases
+
+1. **Authentication State**: Pre-populate authentication cookies to access protected pages without logging in
+2. **User Preferences**: Restore user preferences from localStorage to maintain consistent user experience
+3. **Session Continuity**: Preserve session data across multiple job executions
+4. **Testing**: Set up specific browser state for testing scenarios
+
+### Complete Example
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com/dashboard",
+  "actions": [
+    {
+      "action": "screenshot",
+      "fullPage": true,
+      "type": "png"
+    }
+  ],
+  "browserStorage": {
+    "cookies": [
+      {
+        "name": "authToken",
+        "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "domain": ".example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Lax"
+      }
+    ],
+    "localStorage": {
+      "userId": "12345",
+      "theme": "dark"
+    },
+    "sessionStorage": {
+      "sessionId": "session-123"
+    }
+  }
 }
 ```
 
@@ -526,6 +672,262 @@ The JSON artifact contains the following structure:
 - **HTML Capture**: Capturing full HTML content can be memory-intensive for large pages. Consider the page size when using snapshots.
 - **Storage Capture**: Reading localStorage and sessionStorage requires JavaScript evaluation, which adds minimal overhead.
 - **File Size**: Snapshot artifacts can be large, especially for pages with extensive HTML or significant storage data. Monitor artifact storage usage.
+
+### ExecuteScript Action
+
+The EXECUTE_SCRIPT action executes custom JavaScript code in the browser context, allowing for complex automation scenarios beyond standard actions. This is a powerful feature that enables DOM manipulation, data extraction, async operations, and custom business logic execution.
+
+⚠️ **Security Warning**: This action is **disabled by default** and must be explicitly enabled via the `ENABLE_EXECUTE_SCRIPT` environment variable. Only enable this feature in trusted environments as it allows arbitrary code execution in the browser context.
+
+**Action Type Value**: `"executeScript"`
+
+#### Overview
+
+The EXECUTE_SCRIPT action:
+- **Executes JavaScript**: Runs custom JavaScript code in the browser's main context
+- **Returns Values**: Captures and returns the script's return value (any JSON-serializable type)
+- **Supports Async**: Handles both synchronous and asynchronous (Promise-based) scripts
+- **Full Browser Access**: Scripts have complete access to the DOM, window object, and all browser APIs
+
+#### Configuration
+
+**Enable Feature**: Set environment variable before using this action:
+```bash
+ENABLE_EXECUTE_SCRIPT=true
+```
+
+#### Configuration Options
+
+```json
+{
+  "action": "executeScript",
+  "script": "return document.title"
+}
+```
+
+**Configuration Fields**:
+
+- `script` (string, **required**): The JavaScript code to execute. The script can use `return` to send back values. The script is executed with `page.evaluate()` in Playwright.
+
+**Script Execution Context**:
+- Scripts execute in the browser's page context (not Node.js)
+- No access to Node.js modules or backend services
+- Full access to DOM, window, document, and browser APIs
+- Can use modern JavaScript features (ES6+, async/await)
+
+#### Request Examples
+
+**Basic Script** (Return primitive value):
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {
+      "action": "executeScript",
+      "script": "return document.title"
+    }
+  ]
+}
+```
+
+**Complex Data Extraction**:
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {
+      "action": "executeScript",
+      "script": "return { title: document.title, url: window.location.href, linkCount: document.querySelectorAll('a').length, links: Array.from(document.querySelectorAll('a')).map(a => ({ text: a.textContent, href: a.href })) }"
+    }
+  ]
+}
+```
+
+**Async Script Example** (with Promises):
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://api.example.com",
+  "actions": [
+    {
+      "action": "executeScript",
+      "script": "return await fetch('/api/data').then(r => r.json())"
+    }
+  ]
+}
+```
+
+**DOM Manipulation**:
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {
+      "action": "executeScript",
+      "script": "document.querySelector('h1').style.color = 'red'; document.querySelector('h1').textContent = 'Modified Title'; return document.querySelector('h1').textContent"
+    }
+  ]
+}
+```
+
+**Multiple Scripts in Sequence**:
+
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {
+      "action": "executeScript",
+      "script": "localStorage.setItem('customKey', 'customValue'); return 'Data stored'"
+    },
+    {
+      "action": "executeScript",
+      "script": "return localStorage.getItem('customKey')"
+    },
+    {
+      "action": "executeScript",
+      "script": "return { allKeys: Object.keys(localStorage), customKey: localStorage.getItem('customKey') }"
+    }
+  ]
+}
+```
+
+#### Response Structure
+
+When an EXECUTE_SCRIPT action completes successfully, the result is included in the action's response data:
+
+```json
+{
+  "id": "job-uuid",
+  "status": "completed",
+  "result": {
+    "actions": [
+      {
+        "action": "executeScript",
+        "success": true,
+        "data": {
+          "scriptLength": 22,
+          "result": "Example Page Title"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Response Fields**:
+- `success` (boolean): Whether the script executed successfully
+- `data.scriptLength` (number): Length of the executed script in characters
+- `data.result` (any): The value returned by the script (can be any JSON-serializable type: string, number, boolean, object, array, null)
+
+#### Error Handling
+
+**Feature Disabled Error** (when `ENABLE_EXECUTE_SCRIPT` is not set to `true`):
+
+```json
+{
+  "id": "job-uuid",
+  "status": "failed",
+  "error": "executeScript action is disabled. Set ENABLE_EXECUTE_SCRIPT=true to enable this feature.",
+  "result": {
+    "actions": [
+      {
+        "action": "executeScript",
+        "success": false,
+        "error": {
+          "message": "executeScript action is disabled. Set ENABLE_EXECUTE_SCRIPT=true to enable this feature.",
+          "code": "SCRIPT_EXECUTION_DISABLED",
+          "retryable": false
+        }
+      }
+    ]
+  }
+}
+```
+
+**Script Execution Error**:
+
+```json
+{
+  "id": "job-uuid",
+  "status": "failed",
+  "error": "ReferenceError: undefinedVariable is not defined",
+  "result": {
+    "actions": [
+      {
+        "action": "executeScript",
+        "success": false,
+        "error": {
+          "message": "ReferenceError: undefinedVariable is not defined",
+          "code": "SCRIPT_EVALUATION_ERROR",
+          "retryable": false
+        }
+      }
+    ]
+  }
+}
+```
+
+**Common Error Codes**:
+- `SCRIPT_EXECUTION_DISABLED`: Feature flag not enabled
+- `SCRIPT_EVALUATION_ERROR`: Syntax error or runtime error in script
+- `SCRIPT_TIMEOUT`: Script execution exceeded timeout
+- `SCRIPT_EXECUTION_ERROR`: General execution failure
+
+#### Use Cases
+
+1. **Custom Data Extraction**: Extract specific data that doesn't fit standard action patterns
+2. **Complex Validation**: Verify page state or data using custom business logic
+3. **DOM Manipulation**: Modify page content, styles, or structure before other actions
+4. **API Calls**: Make in-page fetch requests and process responses
+5. **State Setup**: Configure application state via localStorage, sessionStorage, or window properties
+6. **Dynamic Calculations**: Perform computations based on page content
+
+#### Security Considerations
+
+⚠️ **CRITICAL SECURITY WARNINGS**:
+
+- **Code Injection Risk**: User-provided scripts can execute arbitrary JavaScript. Never allow untrusted users to provide script content.
+- **Privilege Escalation**: Scripts run with full browser context access, including sensitive data in DOM, cookies, and storage.
+- **XSS Potential**: Malicious scripts could extract sensitive information or perform unauthorized actions.
+- **Production Use**: Only enable in production if absolutely necessary and with strict access controls.
+
+**Best Practices**:
+1. Only enable `ENABLE_EXECUTE_SCRIPT` in trusted, controlled environments
+2. Implement strict API key-based access control
+3. Validate and sanitize script content if possible
+4. Use allowlisting for known safe scripts rather than accepting arbitrary code
+5. Monitor and audit all executeScript action usage
+6. Consider implementing script size limits and execution timeouts
+7. Log all script executions for security auditing
+
+#### Performance Considerations
+
+- **Execution Time**: Scripts are subject to the page's JavaScript environment and may take time for complex operations
+- **Timeout**: Scripts that run too long may timeout (configurable via job `timeoutMs`)
+- **Memory Usage**: Large data structures returned by scripts are held in memory until serialization
+- **Serialization**: Only JSON-serializable values can be returned; functions, DOM nodes, and circular references will cause errors
+
+#### Browser Compatibility
+
+- Supported in all browser types (Chromium, Firefox, WebKit)
+- Script behavior may vary slightly between browsers based on their JavaScript engine
+- Some browser-specific APIs may not be available in all browsers (check compatibility)
+
+#### Limitations
+
+- **No Node.js Access**: Scripts cannot access Node.js modules, filesystem, or backend services
+- **Serialization Required**: Return values must be JSON-serializable (no functions, DOM elements, etc.)
+- **Page Context Only**: Scripts execute in the page context, not the extension or privileged context
+- **CSP Restrictions**: Content Security Policy on the page may restrict certain operations
 
 ## Workers API
 

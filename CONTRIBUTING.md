@@ -1,304 +1,273 @@
 # Contributing to Browsers API
 
-Thank you for your interest in contributing to Browsers API! This document outlines the best practices and rules that all contributors must follow.
+Thank you for considering contributing to Browsers API! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
 - [Development Workflow](#development-workflow)
+- [Coding Standards](#coding-standards)
 - [Testing Requirements](#testing-requirements)
-- [Code Style & Standards](#code-style--standards)
 - [Pull Request Process](#pull-request-process)
-- [Commit Message Guidelines](#commit-message-guidelines)
-- [Documentation](#documentation)
-- [Dependencies](#dependencies)
-
-## Code of Conduct
-
-- Be respectful and inclusive
-- Provide constructive feedback
-- Focus on what is best for the project
-- Help others learn and grow
+- [Project Structure](#project-structure)
 
 ## Getting Started
 
-1. **Fork and Clone**
-   ```bash
-   git clone https://github.com/your-username/browsers-api.git
-   cd browsers-api
-   ```
+### Prerequisites
 
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
+- Node.js v20.x LTS or higher
+- Docker & Docker Compose
+- PostgreSQL 15.x (for local development without Docker)
+- Git
 
-3. **Set Up Environment**
-   - Copy `.env.example` to `.env` (if available)
-   - Configure required environment variables
-   - Set up PostgreSQL database
+### Initial Setup
 
-4. **Install Playwright Browsers (Required for Tests)**
-   ```bash
-   npm run test:setup
-   # Or manually: npx playwright install
-   ```
-   **Note:** Some tests require Playwright browsers to be installed. Tests that require browsers will be skipped gracefully if browsers are not available, but you should install them to run the full test suite.
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/browsers-api.git
+cd browsers-api
 
-5. **Run Tests**
-   ```bash
-   npm test
-   npm run test:cov  # Check coverage
-   ```
+# Install dependencies
+npm install
+
+# Install Playwright browsers
+npm run test:setup
+
+# Copy environment configuration
+cp .env.example .env
+
+# Start development stack with Docker
+./scripts/docker-dev.sh start
+./scripts/docker-dev.sh migrate
+./scripts/docker-dev.sh seed
+```
+
+### Development Environment
+
+We recommend using VS Code with the following extensions:
+- ESLint
+- Prettier
+- Jest
+- NestJS Snippets
+- Docker
+
+See [`.cursor/rules/vscode.mdc`](.cursor/rules/vscode.mdc) for complete setup instructions.
 
 ## Development Workflow
 
-### Branch Naming
+### Creating a New Feature
 
-Use descriptive branch names following these patterns:
+1. **Create a feature branch:**
+   ```bash
+   git checkout -b feature/my-new-feature
+   ```
 
-- `feature/description` - New features
-- `fix/description` - Bug fixes
-- `refactor/description` - Code refactoring
-- `docs/description` - Documentation updates
-- `test/description` - Test improvements
-- `chore/description` - Maintenance tasks
+2. **Make your changes:**
+   - Write code following our [coding standards](#coding-standards)
+   - Add tests for your changes
+   - Update documentation as needed
+
+3. **Run tests and linting:**
+   ```bash
+   npm run lint
+   npm test
+   npm run test:e2e
+   ```
+
+4. **Commit your changes:**
+   ```bash
+   git add .
+   git commit -m "feat: add my new feature"
+   ```
+
+5. **Push and create a pull request:**
+   ```bash
+   git push origin feature/my-new-feature
+   ```
+
+### Commit Message Convention
+
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks
 
 **Examples:**
-- `feature/captcha-solver-integration`
-- `fix/job-timeout-handling`
-- `refactor/browser-pool-service`
+```
+feat: add executeScript action handler
+fix: resolve browser pool memory leak
+docs: update API reference for snapshot action
+test: add e2e tests for browser storage
+```
 
-### Branch Strategy
+## Coding Standards
 
-- Create a new branch from `main` (or `master`) for each feature/fix
-- Keep branches focused on a single feature or fix
-- Keep branches up to date with the base branch
-- Delete branches after merging
+### TypeScript/NestJS Guidelines
+
+- Follow NestJS conventions and patterns
+- Use dependency injection for all dependencies
+- Use constructor injection over property injection
+- Add proper TypeScript types (avoid `any`)
+- Use meaningful variable and function names
+- Keep functions small and focused (< 50 lines ideally)
+
+### Code Organization
+
+```typescript
+// ✅ DO: Proper service structure
+@Injectable()
+export class MyService {
+  private readonly logger = new Logger(MyService.name);
+
+  constructor(
+    private readonly repository: Repository<MyEntity>,
+    private readonly configService: ConfigService,
+  ) {}
+
+  async doSomething(id: string): Promise<MyEntity> {
+    try {
+      this.logger.log(`Processing ${id}`);
+      return await this.repository.findOne({ where: { id } });
+    } catch (error) {
+      this.logger.error(`Failed to process ${id}: ${error.message}`);
+      throw error;
+    }
+  }
+}
+```
+
+### Error Handling
+
+- Use specific NestJS exception types
+- Log errors with context
+- Don't expose sensitive information
+
+```typescript
+// ✅ DO: Specific error handling
+if (!job) {
+  throw new NotFoundException(`Job with ID ${id} not found`);
+}
+
+// ❌ DON'T: Generic errors
+throw new Error('Something went wrong');
+```
+
+### DTO Validation
+
+- Use class-validator decorators
+- Make optional fields truly optional
+- Add descriptive comments
+
+```typescript
+// ✅ DO: Well-validated DTO
+export class CreateJobDto {
+  @IsInt()
+  @IsPositive()
+  @ApiProperty({ description: 'Browser type ID' })
+  browserTypeId: number;
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  timeoutMs?: number;
+}
+```
 
 ## Testing Requirements
 
-### ⚠️ MANDATORY: All Contributions Must Include Tests
+### Unit Tests
 
-**Testing is non-negotiable.** Every PR must include comprehensive tests.
-
-### Test Coverage Requirements
-
-- **Minimum 80% code coverage** for all new code
-- **100% coverage** for critical business logic
-- All services, controllers, and handlers must have unit tests
-- Integration tests required for complex workflows
-- E2E tests required for critical API endpoints
-
-### Test Structure
-
-1. **Unit Tests** (`*.spec.ts`)
-   - Place next to source files: `src/modules/feature/feature.service.spec.ts`
-   - Test individual components in isolation
-   - Mock external dependencies (databases, APIs, filesystem)
-   - Follow AAA pattern (Arrange, Act, Assert)
-
-2. **Integration Tests**
-   - Test module wiring (controllers + services + repositories)
-   - Focus on behavior contracts
-   - Use NestJS `TestingModule`
-
-3. **E2E Tests** (`test/*.e2e-spec.ts`)
-   - Test critical API endpoints end-to-end
-   - Use `supertest` for HTTP testing
-   - Place in `test/` directory
-
-### Test Best Practices
+- Write unit tests for all services, controllers, and handlers
+- Place tests next to source files: `*.spec.ts`
+- Use Jest testing framework
+- Follow AAA pattern (Arrange, Act, Assert)
+- Mock external dependencies
+- Aim for 80%+ code coverage
 
 ```typescript
-// ✅ DO: Clear test structure with AAA pattern
-describe('FeatureService', () => {
-  let service: FeatureService;
-  let repository: Repository<Entity>;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        FeatureService,
-        {
-          provide: getRepositoryToken(Entity),
-          useValue: mockRepository,
-        },
-      ],
-    }).compile();
-
-    service = module.get<FeatureService>(FeatureService);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  describe('methodName', () => {
-    it('should handle happy path correctly', async () => {
+// ✅ DO: Clear test structure
+describe('JobsService', () => {
+  describe('createJob', () => {
+    it('should create a new job', async () => {
       // Arrange
-      const input = { /* test data */ };
-      mockRepository.findOne.mockResolvedValue(expectedResult);
-
+      const dto = { browserTypeId: 1, targetUrl: 'https://example.com', actions: [] };
+      
       // Act
-      const result = await service.methodName(input);
-
+      const result = await service.createJob(dto);
+      
       // Assert
-      expect(result).toEqual(expectedResult);
-      expect(mockRepository.findOne).toHaveBeenCalledWith(/* expected args */);
-    });
-
-    it('should throw error when validation fails', async () => {
-      // Arrange
-      const invalidInput = { /* invalid data */ };
-
-      // Act & Assert
-      await expect(service.methodName(invalidInput)).rejects.toThrow(
-        BadRequestException,
-      );
+      expect(result).toBeDefined();
+      expect(result.status).toBe('pending');
     });
   });
 });
 ```
 
-### Running Tests
+### E2E Tests
+
+- Place E2E tests in `test/` directory
+- Test complete workflows
+- Use real database (test database)
+- Clean up test data
 
 ```bash
-# Install Playwright browsers (required for some tests)
-npm run test:setup
-
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run with coverage
-npm run test:cov
-
-# Run E2E tests
+# Run all E2E tests
 npm run test:e2e
 
-# Run specific test file
-npm test -- feature.service.spec.ts
+# Run specific test
+npm run test:e2e -- job-workflow.e2e-spec.ts
 ```
 
-**Note:** Tests that require Playwright browsers (e.g., `stealth.service.spec.ts`, `human-behavior-simulation.service.spec.ts`) will be skipped gracefully if browsers are not installed. Install browsers using `npm run test:setup` to run the complete test suite.
+### Testing Checklist
 
-### Test Proof in PRs
-
-**MANDATORY:** Every PR must include:
-
-1. **Coverage Report**
-   - Run `npm run test:cov` before submitting PR
-   - Include coverage summary in PR description
-   - Ensure coverage meets minimum requirements
-
-2. **Test Results**
-   - All tests must pass: `npm test`
-   - Include test output or screenshot in PR
-   - Document any known test limitations
-
-3. **Test Files**
-   - Include all `*.spec.ts` files in the PR
-   - Tests must be committed alongside implementation
-   - No PR will be merged without tests
-
-**Example PR Description:**
-```markdown
-## Changes
-- Added new feature X
-- Fixed bug Y
-
-## Tests
-- ✅ Unit tests: 15 tests, all passing
-- ✅ Integration tests: 3 tests, all passing
-- ✅ Coverage: 85% (exceeds 80% requirement)
-- ✅ Test files: feature.service.spec.ts, feature.controller.spec.ts
-
-## Test Coverage Report
-```
-File      | % Stmts | % Branch | % Funcs | % Lines
-----------|---------|----------|---------|--------
-feature   |   85.2  |   82.5   |   90.0  |   85.0
-```
-```
-```
-
-## Code Style & Standards
-
-### TypeScript & NestJS
-
-- Use **TypeScript strictly** (no `any` types unless absolutely necessary)
-- Follow **NestJS conventions** and patterns
-- Use **dependency injection** for all services
-- Keep controllers thin (routing only)
-- Business logic belongs in services
-- Use **class-validator** for DTO validation
-
-### Code Formatting
-
-- Use **Prettier** for code formatting
-- Run `npm run format` before committing
-- Use **ESLint** for linting
-- Run `npm run lint` to check and fix issues
-
-### File Organization
-
-```
-src/
-├── modules/           # Feature modules
-│   └── feature/
-│       ├── feature.controller.ts
-│       ├── feature.service.ts
-│       ├── feature.service.spec.ts  # Tests next to source
-│       ├── entities/
-│       ├── dto/
-│       └── feature.module.ts
-├── common/            # Shared utilities
-├── config/            # Configuration
-└── database/          # Database setup
-```
-
-### Naming Conventions
-
-- **Files**: kebab-case for files, PascalCase for classes
-- **Classes**: PascalCase (e.g., `UserService`, `JobController`)
-- **Variables/Functions**: camelCase (e.g., `getUserById`, `jobStatus`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `MAX_RETRY_ATTEMPTS`)
-- **Interfaces**: PascalCase with `I` prefix or descriptive name (e.g., `IUser` or `UserInterface`)
-
-### Best Practices
-
-- **Keep functions small and focused** (single responsibility)
-- **Use meaningful names** that describe purpose
-- **Document complex logic** with comments
-- **Handle errors explicitly** with proper exception types
-- **Use async/await** over Promises when possible
-- **Always handle async errors** with try/catch
+Before submitting a PR, ensure:
+- [ ] All unit tests pass
+- [ ] All E2E tests pass
+- [ ] Code coverage is maintained or improved
+- [ ] No linting errors
+- [ ] Tests for new features are included
+- [ ] Tests for bug fixes demonstrate the fix
 
 ## Pull Request Process
 
 ### Before Submitting
 
-1. ✅ **All tests pass**: `npm test`
-2. ✅ **Coverage meets requirements**: `npm run test:cov`
-3. ✅ **Code is formatted**: `npm run format`
-4. ✅ **Linting passes**: `npm run lint`
-5. ✅ **Branch is up to date** with base branch
-6. ✅ **No merge conflicts**
+1. **Update your branch:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout feature/my-feature
+   git rebase main
+   ```
+
+2. **Run full test suite:**
+   ```bash
+   npm run lint
+   npm test
+   npm run test:e2e
+   npm run test:docker  # Optional but recommended
+   ```
+
+3. **Update documentation:**
+   - Update README.md if adding new features
+   - Update API documentation in `docs/tech/05-api-reference.md`
+   - Add JSDoc comments for public APIs
 
 ### PR Checklist
 
-- [ ] Code follows project style guidelines
-- [ ] Tests added/updated and passing
-- [ ] Test coverage ≥ 80%
-- [ ] Documentation updated (if needed)
-- [ ] Commit messages follow guidelines
-- [ ] No console.logs or debug code
-- [ ] No commented-out code
-- [ ] Dependencies added are necessary and justified
+- [ ] Branch is up to date with main
+- [ ] All tests pass
+- [ ] No linting errors
+- [ ] Code follows project conventions
+- [ ] Documentation is updated
+- [ ] Commit messages follow convention
+- [ ] PR has clear description
+- [ ] Breaking changes are documented
 
 ### PR Description Template
 
@@ -313,149 +282,150 @@ Brief description of changes
 - [ ] Documentation update
 
 ## Testing
-- ✅ Unit tests: X tests, all passing
-- ✅ Integration tests: Y tests, all passing
-- ✅ Coverage: Z% (exceeds 80% requirement)
-- ✅ Test files included: [list files]
-
-## Test Coverage Report
-```
-[Coverage output]
-```
-
-## Checklist
-- [ ] Code follows style guidelines
-- [ ] Tests added/updated
-- [ ] Documentation updated
-- [ ] No breaking changes (or documented)
-```
-
-### Code Review
-
-- All PRs require at least one approval
-- Address review comments promptly
-- Be open to feedback and suggestions
-- Keep discussions constructive and respectful
-- Update PR based on feedback
-
-## Commit Message Guidelines
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/) format:
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-### Types
-
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
-- `perf`: Performance improvements
-
-### Examples
-
-```bash
-feat(captcha): add 2captcha provider integration
-
-- Implement 2captcha API client
-- Add provider registration
-- Include unit tests with 90% coverage
-
-Closes #123
-
----
-
-fix(jobs): handle timeout errors gracefully
-
-- Add timeout error handling in job processor
-- Update error messages for better debugging
-- Add integration tests for timeout scenarios
-
-Fixes #456
-
----
-
-test(browser-pool): improve test coverage to 85%
-
-- Add edge case tests for pool exhaustion
-- Test error recovery scenarios
-- Mock external dependencies properly
-```
-
-### Commit Best Practices
-
-- Write clear, descriptive commit messages
-- Keep commits focused (one logical change per commit)
-- Reference issue numbers when applicable
-- Use present tense ("add feature" not "added feature")
-- Keep subject line under 50 characters
-- Use body to explain what and why, not how
+- [ ] Unit tests added/updated
+- [ ] E2E tests added/updated
+- [ ] Manual testing performed
 
 ## Documentation
+- [ ] README updated
+- [ ] API docs updated
+- [ ] Code comments added
 
-### Code Documentation
+## Related Issues
+Closes #123
+```
 
-- **JSDoc comments** for public APIs
-- **Inline comments** for complex logic
-- **README updates** for new features or breaking changes
-- **API documentation** via Swagger/OpenAPI decorators
+## Project Structure
 
-### Documentation Updates
+```
+browsers-api/
+├── src/
+│   ├── modules/              # Feature modules
+│   │   ├── jobs/            # Job processing
+│   │   │   ├── handlers/    # Action handlers
+│   │   │   ├── dto/         # Data transfer objects
+│   │   │   ├── entities/    # TypeORM entities
+│   │   │   └── services/    # Business logic
+│   │   ├── browsers/        # Browser pool management
+│   │   ├── auth/            # Authentication
+│   │   └── ...
+│   ├── common/              # Shared utilities
+│   │   ├── filters/         # Exception filters
+│   │   ├── guards/          # Auth guards
+│   │   ├── interceptors/    # Request/response interceptors
+│   │   └── middleware/      # Custom middleware
+│   ├── config/              # Configuration
+│   │   ├── database.config.ts
+│   │   └── validation.schema.ts
+│   └── database/            # Database
+│       ├── migrations/      # TypeORM migrations
+│       └── seeds/           # Database seeds
+├── test/                    # E2E tests
+├── scripts/                 # Development scripts
+├── dev/                     # Developer helper scripts
+├── docs/                    # Documentation
+└── .cursor/rules/           # Cursor AI rules
+```
 
-- Update README.md for user-facing changes
-- Update API documentation for endpoint changes
-- Add migration guides for breaking changes
-- Document new environment variables
-- Update examples if API changes
+## Adding New Features
 
-## Dependencies
+### Adding a New Action Handler
 
-### Adding Dependencies
+1. **Create handler file:**
+   ```
+   src/modules/jobs/handlers/my-action.handler.ts
+   ```
 
-- **Justify** why a new dependency is needed
-- **Prefer** well-maintained, popular packages
-- **Check** for security vulnerabilities: `npm audit`
-- **Consider** bundle size and performance impact
-- **Document** in PR description why it's needed
+2. **Implement handler:**
+   ```typescript
+   @Injectable()
+   export class MyActionHandler {
+     async execute(page: Page, action: ActionConfig, jobId: string): Promise<void> {
+       // Implementation
+     }
+   }
+   ```
 
-### Updating Dependencies
+3. **Create tests:**
+   ```
+   src/modules/jobs/handlers/my-action.handler.spec.ts
+   ```
 
-- Test thoroughly after updating
-- Check for breaking changes
-- Update related code if needed
-- Document breaking changes in PR
+4. **Register in factory:**
+   ```typescript
+   // action-handler.factory.ts
+   case 'myAction':
+     return this.myActionHandler;
+   ```
 
-### Security
+5. **Update DTO:**
+   ```typescript
+   // action-config.dto.ts
+   @IsIn(['click', 'fill', 'myAction', ...])
+   action: string;
+   ```
 
-- Run `npm audit` regularly
-- Fix security vulnerabilities promptly
-- Keep dependencies up to date
-- Report security issues privately
+6. **Update documentation:**
+   - README.md
+   - docs/tech/05-api-reference.md
 
-## Getting Help
+### Adding a New API Endpoint
 
-- Check existing documentation in `docs/`
-- Review similar code in the codebase
-- Ask questions in PR comments
+1. **Add controller method:**
+   ```typescript
+   @Get('new-endpoint')
+   async newEndpoint() {
+     return this.service.newMethod();
+   }
+   ```
+
+2. **Add service method:**
+   ```typescript
+   async newMethod(): Promise<Result> {
+     // Implementation
+   }
+   ```
+
+3. **Create/update DTOs:**
+   - Request DTO
+   - Response DTO
+
+4. **Add tests:**
+   - Unit tests for controller and service
+   - E2E test for the endpoint
+
+5. **Update documentation:**
+   - API reference
+   - Swagger/OpenAPI annotations
+
+## Code Review Process
+
+### As a Reviewer
+
+- Review code for correctness and adherence to standards
+- Test the changes locally
+- Provide constructive feedback
+- Approve when satisfied
+
+### As an Author
+
+- Respond to feedback promptly
+- Make requested changes
+- Re-request review when ready
+- Don't force push after reviews start (add new commits)
+
+## Questions or Issues?
+
 - Open an issue for bugs or feature requests
+- Ask questions in pull request comments
+- Review existing documentation in `docs/`
 
 ## Additional Resources
 
-- [NestJS Documentation](https://docs.nestjs.com/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [Jest Documentation](https://jestjs.io/docs/getting-started)
-- [Conventional Commits](https://www.conventionalcommits.org/)
+- [Development Guide](.cursor/rules/development.mdc)
+- [NestJS Best Practices](.cursor/rules/nestjs.mdc)
+- [API Patterns](.cursor/rules/api-patterns.mdc)
+- [Docker Guide](.cursor/rules/docker.mdc)
+- [VS Code Setup](.cursor/rules/vscode.mdc)
 
----
-
-Thank you for contributing to Browsers API! 🚀
-
+Thank you for contributing! 🎉

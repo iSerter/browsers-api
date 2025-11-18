@@ -1,16 +1,19 @@
-
-For now, it's just my playground. 
-
-I'm experimenting with task-master and Github Speckit. 
-
-
 # Browsers API
 
 Browser Automation API that provides HTTP endpoints for browser tasks using Playwright. The system follows a producer-consumer pattern where API requests are queued in PostgreSQL and processed asynchronously by browser workers.
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Development](#development)
+- [API Reference](#api-reference)
+- [Testing](#testing)
+- [Building & Deployment](#building--deployment)
+- [Tech Stack](#tech-stack)
+
 ## Quick Start
 
-### Docker Compose (Development)
+### Docker Compose (Recommended)
 
 ```bash
 # Start the full stack (PostgreSQL + API)
@@ -21,9 +24,30 @@ Browser Automation API that provides HTTP endpoints for browser tasks using Play
 ./scripts/docker-dev.sh seed
 
 # API will be available at http://localhost:3333
+# Metrics available at http://localhost:9090/metrics
 ```
 
-For detailed Docker setup and deployment instructions, see [docs/DOCKER.md](docs/DOCKER.md).
+For detailed Docker setup, see [docs/DOCKER.md](docs/DOCKER.md).
+
+### Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Install Playwright browsers
+npm run test:setup
+
+# Copy and configure environment
+cp .env.example .env
+
+# Run migrations and seeds (PostgreSQL must be running)
+npm run migration:run
+npm run seed
+
+# Start development server
+npm run start:dev
+```
 
 ### Kubernetes (Production)
 
@@ -34,11 +58,99 @@ For detailed Docker setup and deployment instructions, see [docs/DOCKER.md](docs
 # Monitor deployment
 ./scripts/k8s/monitor.sh
 
-# Access via LoadBalancer or port-forward
+# Access via port-forward
 kubectl port-forward -n browsers-api service/browsers-api 3333:80
 ```
 
-For detailed Kubernetes setup and deployment instructions, see [docs/KUBERNETES.md](docs/KUBERNETES.md).
+For Kubernetes setup, see [docs/KUBERNETES.md](docs/KUBERNETES.md).
+
+## Development
+
+### Running the Application
+
+**Local development (hot reload):**
+```bash
+npm run start:dev
+```
+
+**Docker development:**
+```bash
+./scripts/docker-dev.sh start
+./scripts/docker-dev.sh logs  # View logs
+./scripts/docker-dev.sh stop  # Stop stack
+```
+
+### Database Management
+
+**Migrations:**
+```bash
+# Generate migration after entity changes
+npm run migration:generate -- src/database/migrations/MigrationName
+
+# Run pending migrations
+npm run migration:run
+
+# Revert last migration
+npm run migration:revert
+```
+
+**Seeds:**
+```bash
+npm run seed  # Seed browser types
+```
+
+### Development Scripts
+
+Helper scripts in `./dev/` and `./scripts/`:
+- `./scripts/docker-dev.sh` - Docker development workflow
+- `./dev/docker-build-test-tag-publish.sh` - Build, test, and publish Docker images
+
+## Testing
+
+**Unit tests:**
+```bash
+npm test                # Run all unit tests
+npm run test:watch      # Run tests in watch mode
+npm run test:cov        # Run tests with coverage
+```
+
+**E2E tests:**
+```bash
+npm run test:e2e                              # Run all E2E tests
+npm run test:e2e -- job-workflow.e2e-spec.ts # Run specific test
+```
+
+**Docker testing:**
+```bash
+npm run test:docker        # Run all tests in Docker
+npm run test:docker:unit   # Run unit tests only
+npm run test:docker:e2e    # Run E2E tests only
+```
+
+## Building & Deployment
+
+**Development build:**
+```bash
+npm run build  # Output in dist/
+```
+
+**Docker build:**
+```bash
+# Build image
+docker build -t browsers-api:latest .
+
+# Build, test, and tag version
+./dev/docker-build-test-tag-publish.sh v0.0.3
+
+# Build, test, tag, and push to Docker Hub
+./dev/docker-build-test-tag-publish.sh v0.0.3 --push
+```
+
+**Production deployment:**
+- Docker: See [docs/DOCKER.md](docs/DOCKER.md)
+- Kubernetes: See [docs/KUBERNETES.md](docs/KUBERNETES.md)
+
+## API Reference
 
 #### `POST /api/v1/jobs`
 Create a new automation job.
@@ -56,9 +168,54 @@ Create a new automation job.
     {"action": "click", "target": "Submit", "getTargetBy": "getByText", "waitForNavigation": true},
     {"action": "screenshot", "fullPage": true, "type": "png"}
   ],
-  "timeoutMs": 30000
+  "timeoutMs": 30000,
+  "browserStorage": {
+    "cookies": [
+      {
+        "name": "sessionId",
+        "value": "abc123xyz",
+        "domain": ".iserter.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Lax"
+      }
+    ],
+    "localStorage": {
+      "userId": "12345",
+      "theme": "dark",
+      "preferences": "{\"notifications\":true}"
+    },
+    "sessionStorage": {
+      "tempData": "value"
+    }
+  }
 }
 ```
+
+#### Browser Storage
+
+The `browserStorage` field allows you to pre-populate browser storage (cookies, localStorage, sessionStorage) before job execution. This is useful for maintaining authentication state, preserving user preferences, or restoring previous session data.
+
+**Browser Storage Configuration:**
+- **cookies** (array, optional): Array of cookie objects with `name`, `value`, `domain`, and optional fields (`path`, `secure`, `httpOnly`, `sameSite`, `expires`)
+- **localStorage** (object, optional): Key-value pairs to set in localStorage (all values must be strings)
+- **sessionStorage** (object, optional): Key-value pairs to set in sessionStorage (all values must be strings)
+
+**Cookie Example:**
+```json
+{
+  "name": "sessionId",
+  "value": "abc123xyz",
+  "domain": ".example.com",
+  "path": "/",
+  "secure": true,
+  "httpOnly": true,
+  "sameSite": "Lax"
+}
+```
+
+**Note**: Cookies are validated against the target URL domain. Cookies with domains that don't match the target URL will be rejected.
 
 #### Available Actions
 
@@ -68,6 +225,7 @@ Create a new automation job.
 - **scroll**: Scroll the page with human-like behavior (can scroll to specific position, element, or to bottom)
 - **screenshot**: Capture screenshots of the page or specific elements
 - **snapshot**: Capture the current state of a web page including HTML content, metadata, and optionally cookies, localStorage, and sessionStorage
+- **executeScript**: Execute custom JavaScript code in the browser context (⚠️ Security: Only enable in trusted environments)
 
 #### Action Configuration Examples
 
@@ -141,6 +299,73 @@ Snapshot data is saved as a JSON artifact with type `snapshot` that can be retri
 - `cookies` (optional): Array of cookie objects if cookies option is enabled
 - `localStorage` (optional): Object with localStorage key-value pairs if localStorage option is enabled
 - `sessionStorage` (optional): Object with sessionStorage key-value pairs if sessionStorage option is enabled
+
+**ExecuteScript Action:**
+
+⚠️ **Security Warning**: The executeScript action allows arbitrary JavaScript execution in the browser context. This feature is **disabled by default** and should only be enabled in trusted environments. Scripts execute with full browser context access and can potentially be used for code injection attacks.
+
+To enable this feature, set the `ENABLE_EXECUTE_SCRIPT` environment variable to `true`:
+```bash
+ENABLE_EXECUTE_SCRIPT=true
+```
+
+**Basic script execution:**
+```json
+{
+  "action": "executeScript",
+  "script": "return document.title"
+}
+```
+
+**Script that returns a computed value:**
+```json
+{
+  "action": "executeScript",
+  "script": "return document.querySelectorAll('a').length"
+}
+```
+
+**Script with complex return value:**
+```json
+{
+  "action": "executeScript",
+  "script": "return { title: document.title, links: Array.from(document.querySelectorAll('a')).map(a => a.href) }"
+}
+```
+
+**Async script execution:**
+```json
+{
+  "action": "executeScript",
+  "script": "return await fetch('/api/data').then(r => r.json())"
+}
+```
+
+**DOM manipulation example:**
+```json
+{
+  "action": "executeScript",
+  "script": "document.querySelector('h1').textContent = 'Modified Title'; return document.querySelector('h1').textContent"
+}
+```
+
+**Complete job example with executeScript:**
+```json
+{
+  "browserTypeId": 1,
+  "targetUrl": "https://example.com",
+  "actions": [
+    {"action": "visit"},
+    {
+      "action": "executeScript",
+      "script": "return { title: document.title, url: window.location.href, linkCount: document.querySelectorAll('a').length }"
+    }
+  ],
+  "timeoutMs": 30000
+}
+```
+
+Script execution results are included in the job response data. The script can return any JSON-serializable value (primitives, objects, arrays). If the script throws an error or if the feature is disabled, the job will fail with an appropriate error message.
 
 **Response:**
 ```json
@@ -217,11 +442,169 @@ curl http://localhost:3333/api/v1/jobs/{jobId}/artifacts/{artifactId} | jq .
 ## Tech Stack
 
 ### Core Dependencies
-- **Framework**: Nest.js (v10.x)
+- **Framework**: Nest.js (v11.x)
 - **Runtime**: Node.js (v20.x LTS)
 - **Database**: PostgreSQL (v15.x)
 - **ORM**: TypeORM
-- **Automation**: Playwright (v1.40+)
+- **Automation**: Playwright (v1.56+)
 - **Validation**: class-validator, class-transformer
-- **Queue Management**: Bull (Redis-based) or custom PostgreSQL queue
-- **Configuration**: @nestjs/config
+- **Configuration**: @nestjs/config, Joi
+- **Metrics**: Prometheus (@willsoto/nestjs-prometheus)
+- **WebSockets**: Socket.IO
+
+### Development Tools
+- **Testing**: Jest, Supertest
+- **Linting**: ESLint with TypeScript support
+- **Formatting**: Prettier
+- **Build**: NestJS CLI, TypeScript
+- **Containerization**: Docker, Docker Compose
+
+## Contributing
+
+### Project Structure
+
+```
+browsers-api/
+├── src/
+│   ├── modules/          # Feature modules
+│   │   ├── jobs/         # Job processing and actions
+│   │   ├── browsers/     # Browser pool management
+│   │   ├── auth/         # Authentication (API keys)
+│   │   └── ...
+│   ├── common/           # Shared utilities
+│   ├── config/           # Configuration
+│   └── database/         # Migrations and seeds
+├── test/                 # E2E tests
+├── scripts/              # Development scripts
+├── dev/                  # Developer helper scripts
+└── docs/                 # Documentation
+```
+
+### Adding a New Action
+
+1. Create handler in `src/modules/jobs/handlers/`:
+   ```typescript
+   @Injectable()
+   export class MyActionHandler {
+     async execute(page: Page, action: ActionConfig, jobId: string): Promise<void> {
+       // Implementation
+     }
+   }
+   ```
+
+2. Create spec file: `my-action.handler.spec.ts`
+
+3. Register in `action-handler.factory.ts`:
+   ```typescript
+   case 'myAction':
+     return this.myActionHandler;
+   ```
+
+4. Update `action-config.dto.ts`:
+   ```typescript
+   @IsIn(['click', 'fill', 'myAction', ...])
+   action: string;
+   ```
+
+5. Add tests and update documentation
+
+### Code Style Guidelines
+
+- Follow NestJS conventions
+- Use dependency injection
+- Add JSDoc comments for public APIs
+- Write tests alongside implementation
+- Use meaningful variable/function names
+- Keep functions small and focused
+
+### Pull Request Process
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Make changes with tests
+4. Run linter: `npm run lint`
+5. Run tests: `npm test && npm run test:e2e`
+6. Commit with descriptive message
+7. Push and create pull request
+
+## Environment Variables
+
+See `.env.example` for complete list. Key variables:
+
+**Database:**
+- `DB_HOST` - Database host
+- `DB_PORT` - Database port
+- `DB_USERNAME` - Database user
+- `DB_PASSWORD` - Database password
+- `DB_DATABASE` - Database name
+
+**Application:**
+- `PORT` - API port (default: 3333)
+- `NODE_ENV` - Environment (development/production/test)
+- `LOG_LEVEL` - Logging level (debug/info/warn/error)
+
+**Browser:**
+- `PLAYWRIGHT_HEADLESS` - Run browsers headless (true/false)
+- `BROWSER_POOL_MIN_SIZE` - Minimum browsers in pool
+- `BROWSER_POOL_MAX_SIZE` - Maximum browsers in pool
+
+**Features:**
+- `ENABLE_EXECUTE_SCRIPT` - Enable executeScript action (default: false)
+- `DEFAULT_PROXY` - Default proxy for all browsers
+- `TWOCAPTCHA_API_KEY` - 2Captcha API key
+- `ANTICAPTCHA_API_KEY` - AntiCaptcha API key
+
+## Troubleshooting
+
+**Tests failing with database errors:**
+```bash
+# Ensure PostgreSQL is running
+docker-compose up -d postgres
+
+# Run migrations
+npm run migration:run
+```
+
+**Playwright browser not found:**
+```bash
+npm run test:setup
+```
+
+**Port already in use:**
+```bash
+# Kill process on port 3333
+lsof -ti:3333 | xargs kill -9
+
+# Or use different port
+PORT=3334 npm run start:dev
+```
+
+**Docker build fails:**
+```bash
+docker builder prune -f
+docker build --no-cache -t browsers-api:latest .
+```
+
+## Additional Resources
+
+- **Documentation:**
+  - [API Reference](docs/tech/05-api-reference.md)
+  - [Docker Guide](docs/DOCKER.md)
+  - [Kubernetes Guide](docs/KUBERNETES.md)
+  - [CAPTCHA Solver Guide](docs/CAPTCHA-SOLVER-USAGE-GUIDE.md)
+  
+- **Architecture:**
+  - [Architecture Overview](docs/tech/01-architecture-overview.md)
+  - [System Design](docs/tech/02-system-design.md)
+  - [Module Structure](docs/tech/03-module-structure.md)
+  - [Database Schema](docs/tech/04-database-schema.md)
+
+- **Development:**
+  - [Job Processing](docs/tech/06-job-processing.md)
+  - [Browser Pool & Actions](docs/tech/07-browser-pool-actions.md)
+  - [Security & Authentication](docs/tech/08-security-authentication.md)
+  - [Proxy Support](docs/tech/09-proxies.md)
+
+## License
+
+UNLICENSED - This is a private project.

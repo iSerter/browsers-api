@@ -38,10 +38,29 @@ describe('ActionType Enum', () => {
         'extract',
         'pdf',
         'snapshot',
+        'executeScript',
       ];
       const actualTypes = Object.values(ActionType);
       expect(actualTypes).toEqual(expect.arrayContaining(expectedTypes));
       expect(actualTypes.length).toBe(expectedTypes.length);
+    });
+  });
+
+  describe('EXECUTE_SCRIPT type', () => {
+    it('should have EXECUTE_SCRIPT enum value defined', () => {
+      expect(ActionType.EXECUTE_SCRIPT).toBeDefined();
+      expect(ActionType.EXECUTE_SCRIPT).toBe('executeScript');
+    });
+
+    it('should be accessible and usable in type annotations', () => {
+      const executeScriptType: ActionType = ActionType.EXECUTE_SCRIPT;
+      expect(executeScriptType).toBe('executeScript');
+    });
+
+    it('should be included in all ActionType values', () => {
+      const allTypes = Object.values(ActionType);
+      expect(allTypes).toContain('executeScript');
+      expect(allTypes).toContain(ActionType.EXECUTE_SCRIPT);
     });
   });
 });
@@ -134,6 +153,67 @@ describe('ActionConfigDto', () => {
         (e) => e.property === 'snapshotConfig',
       );
       expect(snapshotConfigErrors).toBeDefined();
+    });
+  });
+
+  describe('EXECUTE_SCRIPT action validation', () => {
+    it('should accept EXECUTE_SCRIPT as a valid action type', async () => {
+      const dto = plainToInstance(ActionConfigDto, {
+        action: ActionType.EXECUTE_SCRIPT,
+        script: 'return document.title',
+      });
+
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should accept EXECUTE_SCRIPT action with script field', async () => {
+      const dto = plainToInstance(ActionConfigDto, {
+        action: ActionType.EXECUTE_SCRIPT,
+        script: 'console.log("test")',
+      });
+
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+      expect(dto.script).toBe('console.log("test")');
+    });
+
+    it('should accept EXECUTE_SCRIPT action with complex script', async () => {
+      const complexScript = `
+        const data = document.querySelectorAll('a');
+        return Array.from(data).map(a => a.href);
+      `;
+      const dto = plainToInstance(ActionConfigDto, {
+        action: ActionType.EXECUTE_SCRIPT,
+        script: complexScript,
+      });
+
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+      expect(dto.script).toBe(complexScript);
+    });
+
+    it('should accept EXECUTE_SCRIPT action without script field (validation happens at handler level)', async () => {
+      const dto = plainToInstance(ActionConfigDto, {
+        action: ActionType.EXECUTE_SCRIPT,
+      });
+
+      const errors = await validate(dto);
+      // DTO validation passes, handler will enforce script requirement
+      expect(errors.length).toBe(0);
+    });
+
+    it('should serialize and deserialize EXECUTE_SCRIPT action correctly', () => {
+      const config: ActionConfigDto = {
+        action: ActionType.EXECUTE_SCRIPT,
+        script: 'return 42',
+      };
+
+      const serialized = JSON.stringify(config);
+      const deserialized = JSON.parse(serialized);
+
+      expect(deserialized.action).toBe('executeScript');
+      expect(deserialized.script).toBe('return 42');
     });
   });
 });

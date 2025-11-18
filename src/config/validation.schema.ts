@@ -43,6 +43,7 @@ export const validationSchema = Joi.object({
   API_KEY_HEADER: Joi.string().default('X-API-Key'),
   RATE_LIMIT_MAX: Joi.number().default(100),
   RATE_LIMIT_WINDOW_MS: Joi.number().default(60000),
+  ENABLE_EXECUTE_SCRIPT: Joi.boolean().default(false),
 
   // Monitoring
   ENABLE_METRICS: Joi.boolean().default(false),

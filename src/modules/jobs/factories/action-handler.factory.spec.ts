@@ -6,6 +6,7 @@ import { ClickActionHandler } from '../handlers/click-action.handler';
 import { MoveCursorActionHandler } from '../handlers/move-cursor-action.handler';
 import { ScrollActionHandler } from '../handlers/scroll-action.handler';
 import { SnapshotActionHandler } from '../handlers/snapshot-action.handler';
+import { ExecuteScriptActionHandler } from '../handlers/execute-script-action.handler';
 import { IActionHandler } from '../interfaces/action-handler.interface';
 
 describe('ActionHandlerFactory', () => {
@@ -16,6 +17,7 @@ describe('ActionHandlerFactory', () => {
   let moveCursorHandler: jest.Mocked<MoveCursorActionHandler>;
   let scrollHandler: jest.Mocked<ScrollActionHandler>;
   let snapshotHandler: jest.Mocked<SnapshotActionHandler>;
+  let executeScriptHandler: jest.Mocked<ExecuteScriptActionHandler>;
 
   beforeEach(async () => {
     // Create mock handlers
@@ -40,6 +42,10 @@ describe('ActionHandlerFactory', () => {
     } as any;
 
     const mockSnapshotHandler = {
+      execute: jest.fn(),
+    } as any;
+
+    const mockExecuteScriptHandler = {
       execute: jest.fn(),
     } as any;
 
@@ -70,6 +76,10 @@ describe('ActionHandlerFactory', () => {
           provide: SnapshotActionHandler,
           useValue: mockSnapshotHandler,
         },
+        {
+          provide: ExecuteScriptActionHandler,
+          useValue: mockExecuteScriptHandler,
+        },
       ],
     }).compile();
 
@@ -80,6 +90,7 @@ describe('ActionHandlerFactory', () => {
     moveCursorHandler = module.get(MoveCursorActionHandler);
     scrollHandler = module.get(ScrollActionHandler);
     snapshotHandler = module.get(SnapshotActionHandler);
+    executeScriptHandler = module.get(ExecuteScriptActionHandler);
   });
 
   afterEach(() => {
@@ -94,6 +105,11 @@ describe('ActionHandlerFactory', () => {
     it('should inject SnapshotActionHandler as a dependency', () => {
       expect(snapshotHandler).toBeDefined();
       expect(snapshotHandler.execute).toBeDefined();
+    });
+
+    it('should inject ExecuteScriptActionHandler as a dependency', () => {
+      expect(executeScriptHandler).toBeDefined();
+      expect(executeScriptHandler.execute).toBeDefined();
     });
   });
 
@@ -130,6 +146,13 @@ describe('ActionHandlerFactory', () => {
       expect(handler).toBe(scrollHandler);
     });
 
+    it('should return ExecuteScriptActionHandler for "executeScript" action type', () => {
+      const handler = factory.getHandler('executeScript');
+      expect(handler).toBe(executeScriptHandler);
+      expect(handler).toBeInstanceOf(Object);
+      expect(handler.execute).toBeDefined();
+    });
+
     it('should throw error for unknown action type', () => {
       expect(() => factory.getHandler('unknown')).toThrow(
         'No handler found for action type: unknown',
@@ -140,6 +163,10 @@ describe('ActionHandlerFactory', () => {
   describe('hasHandler', () => {
     it('should return true for "snapshot" action type', () => {
       expect(factory.hasHandler('snapshot')).toBe(true);
+    });
+
+    it('should return true for "executeScript" action type', () => {
+      expect(factory.hasHandler('executeScript')).toBe(true);
     });
 
     it('should return true for existing action types', () => {
@@ -161,6 +188,11 @@ describe('ActionHandlerFactory', () => {
       expect(actions).toContain('snapshot');
     });
 
+    it('should include "executeScript" in supported actions', () => {
+      const actions = factory.getAllSupportedActions();
+      expect(actions).toContain('executeScript');
+    });
+
     it('should include all existing action types', () => {
       const actions = factory.getAllSupportedActions();
       expect(actions).toContain('screenshot');
@@ -169,11 +201,12 @@ describe('ActionHandlerFactory', () => {
       expect(actions).toContain('moveCursor');
       expect(actions).toContain('scroll');
       expect(actions).toContain('snapshot');
+      expect(actions).toContain('executeScript');
     });
 
     it('should return array with correct length', () => {
       const actions = factory.getAllSupportedActions();
-      expect(actions.length).toBe(6);
+      expect(actions.length).toBe(7);
     });
   });
 
@@ -204,8 +237,19 @@ describe('ActionHandlerFactory', () => {
       expect(handler).toBe(snapshotHandler);
     });
 
+    it('should register executeScript handler with correct key', () => {
+      const handler = factory.getHandler('executeScript');
+      expect(handler).toBe(executeScriptHandler);
+    });
+
     it('should return handler that implements IActionHandler interface', () => {
       const handler = factory.getHandler('snapshot');
+      expect(handler).toHaveProperty('execute');
+      expect(typeof handler.execute).toBe('function');
+    });
+
+    it('should return executeScript handler that implements IActionHandler interface', () => {
+      const handler = factory.getHandler('executeScript');
       expect(handler).toHaveProperty('execute');
       expect(typeof handler.execute).toBe('function');
     });

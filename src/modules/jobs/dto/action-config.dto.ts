@@ -28,6 +28,7 @@ export enum ActionType {
   EXTRACT = 'extract',
   PDF = 'pdf',
   SNAPSHOT = 'snapshot',
+  EXECUTE_SCRIPT = 'executeScript',
 }
 
 export enum ScreenshotType {
@@ -249,5 +250,15 @@ export class ActionConfigDto {
   @ValidateNested()
   @Type(() => SnapshotConfigDto)
   snapshotConfig?: SnapshotConfigDto;
+
+  // ExecuteScript action fields
+  /**
+   * JavaScript code to execute in the browser context.
+   * Only allowed when ENABLE_EXECUTE_SCRIPT environment variable is set to true.
+   * Security Warning: This allows arbitrary code execution in the browser context.
+   */
+  @IsOptional()
+  @IsString()
+  script?: string;
 }
 

@@ -267,3 +267,168 @@ describe('JobsService', () => {
   - Use connection pooling
   - Cache frequently accessed data
   - Monitor and optimize slow queries
+
+## Project-Specific Patterns
+
+- **Action Handler Pattern**
+  - Create handlers in `src/modules/jobs/handlers/`
+  - Implement the action handler interface
+  - Use dependency injection for services
+  - Handle errors gracefully with try/catch
+  - Always clean up resources (browser contexts, pages)
+
+```typescript
+// ✅ DO: Proper action handler implementation
+@Injectable()
+export class SnapshotActionHandler {
+  private readonly logger = new Logger(SnapshotActionHandler.name);
+
+  constructor(
+    private readonly artifactStorageService: ArtifactStorageService,
+  ) {}
+
+  async execute(page: Page, action: ActionConfig, jobId: string): Promise<void> {
+    try {
+      this.logger.log(`Executing snapshot action for job ${jobId}`);
+      const snapshot = await this.captureSnapshot(page, action);
+      await this.saveSnapshot(snapshot, jobId);
+    } catch (error) {
+      this.logger.error(`Snapshot action failed: ${error.message}`);
+      throw error;
+    }
+  }
+}
+```
+
+- **Browser Pool Management**
+  - Always acquire from pool before use
+  - Always release back to pool in finally block
+  - Handle browser crashes gracefully
+  - Set appropriate timeouts
+
+```typescript
+// ✅ DO: Proper browser pool usage
+async processJob(jobId: string): Promise<void> {
+  const browser = await this.browserPool.acquire();
+  try {
+    const page = await browser.newPage();
+    await this.executeActions(page, jobId);
+  } catch (error) {
+    this.logger.error(`Job ${jobId} failed: ${error.message}`);
+    throw error;
+  } finally {
+    await this.browserPool.release(browser);
+  }
+}
+```
+
+- **Artifact Storage**
+  - Save artifacts using ArtifactStorageService
+  - Store in job-specific subdirectories
+  - Use appropriate MIME types
+  - Clean up old artifacts based on retention policy
+
+```typescript
+// ✅ DO: Proper artifact storage
+const artifact = await this.artifactStorageService.saveArtifact(
+  buffer,
+  jobId,
+  filename,
+  ArtifactType.SCREENSHOT,
+  'image/png'
+);
+```
+
+- **Job Processing**
+  - Poll for jobs using configured interval
+  - Use transactions for status updates
+  - Handle job timeouts appropriately
+  - Implement retry logic for transient failures
+
+```typescript
+// ✅ DO: Proper job status updates
+await this.dataSource.transaction(async (manager) => {
+  job.status = JobStatus.COMPLETED;
+  job.completedAt = new Date();
+  await manager.save(job);
+});
+```
+
+- **Action Configuration DTOs**
+  - Use discriminated unions for action types
+  - Validate action-specific fields
+  - Use optional fields appropriately
+  - Document expected behavior
+
+```typescript
+// ✅ DO: Proper DTO validation
+export class ActionConfig {
+  @IsString()
+  @IsIn(['click', 'fill', 'screenshot', 'scroll', 'snapshot', 'executeScript'])
+  action: string;
+
+  @IsOptional()
+  @IsString()
+  target?: string;
+
+  @ValidateIf((o) => o.action === 'fill')
+  @IsString()
+  @IsNotEmpty()
+  value?: string;
+}
+```
+
+- **WebSocket Events**
+  - Emit events for job status changes
+  - Include relevant context in events
+  - Handle connection errors gracefully
+  - Don't block on event emission
+
+```typescript
+// ✅ DO: Proper event emission
+@WebSocketGateway()
+export class JobEventsGateway {
+  @WebSocketServer()
+  server: Server;
+
+  emitJobUpdate(jobId: string, status: string) {
+    this.server.emit('job:update', { jobId, status });
+  }
+}
+```
+
+- **Playwright Integration**
+  - Use page.waitForSelector() with appropriate timeouts
+  - Handle navigation with waitForNavigation when needed
+  - Take screenshots for debugging failed tests
+  - Use human-like interactions (delays, randomization)
+
+```typescript
+// ✅ DO: Proper Playwright usage
+await page.fill(selector, value);
+await page.waitForTimeout(randomBetween(100, 300)); // Human-like delay
+
+if (waitForNavigation) {
+  await Promise.all([
+    page.waitForNavigation({ timeout: 30000 }),
+    page.click(selector)
+  ]);
+}
+```
+
+- **Browser Storage Management**
+  - Validate cookies against target URL domain
+  - Set localStorage/sessionStorage before page load
+  - Handle storage errors gracefully
+  - Document storage limitations
+
+```typescript
+// ✅ DO: Proper browser storage handling
+if (browserStorage?.cookies) {
+  const targetDomain = new URL(targetUrl).hostname;
+  const validCookies = browserStorage.cookies.filter(
+    (cookie) => this.isValidCookieDomain(cookie.domain, targetDomain)
+  );
+  await context.addCookies(validCookies);
+}
+```

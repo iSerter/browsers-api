@@ -1,0 +1,473 @@
+---
+description: Development workflow, testing, building, and using helper scripts for the Browsers API project.
+globs: **/*
+alwaysApply: true
+---
+
+## Development Setup
+
+- **Prerequisites**
+  - Node.js v20.x LTS or higher
+  - Docker & Docker Compose (for containerized development)
+  - PostgreSQL 15.x (for local development without Docker)
+  - npm or yarn package manager
+
+- **Initial Setup**
+  ```bash
+  # Clone and install dependencies
+  npm install
+  
+  # Install Playwright browsers (required for testing)
+  npm run test:setup
+  
+  # Copy environment variables
+  cp .env.example .env
+  # Edit .env with your configuration
+  ```
+
+## Running the Application
+
+### Local Development (Without Docker)
+
+```bash
+# Start PostgreSQL (must be running separately)
+# Update .env with your local PostgreSQL credentials
+
+# Run database migrations
+npm run migration:run
+
+# Seed the database with initial data
+npm run seed
+
+# Start in development mode (with hot reload)
+npm run start:dev
+
+# Start in debug mode
+npm run start:debug
+
+# API will be available at http://localhost:3333
+# Metrics available at http://localhost:9090/metrics
+```
+
+### Docker Development (Recommended)
+
+```bash
+# Start the full stack (PostgreSQL + API)
+./scripts/docker-dev.sh start
+
+# Run migrations and seeds
+./scripts/docker-dev.sh migrate
+./scripts/docker-dev.sh seed
+
+# View logs
+./scripts/docker-dev.sh logs
+
+# Stop the stack
+./scripts/docker-dev.sh stop
+
+# Clean up everything (containers, volumes, images)
+./scripts/docker-dev.sh clean
+```
+
+**Available docker-dev.sh commands:**
+- `build` - Build the Docker image
+- `start` - Start the full stack (PostgreSQL + API)
+- `stop` - Stop the full stack
+- `logs` - View API logs (real-time)
+- `migrate` - Run database migrations
+- `seed` - Run database seeds
+- `clean` - Remove all containers, volumes, and images
+
+## Testing
+
+### Unit Tests
+
+```bash
+# Run all unit tests
+npm test
+
+# Run tests in watch mode (for development)
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:cov
+
+# Run tests in debug mode
+npm run test:debug
+```
+
+**Unit test patterns:**
+- Tests are located next to source files: `*.spec.ts`
+- Use Jest testing framework
+- Follow AAA pattern (Arrange, Act, Assert)
+- Mock external dependencies (databases, APIs, filesystem)
+- Aim for 80%+ code coverage for business logic
+
+### E2E Tests
+
+```bash
+# Run all E2E tests
+npm run test:e2e
+
+# Run specific E2E test file
+npm run test:e2e -- job-workflow-captcha.e2e-spec.ts
+```
+
+**E2E test patterns:**
+- Tests are located in `test/` directory
+- Use real database (test database)
+- Test complete workflows end-to-end
+- Clean up test data after each test
+
+### Docker Testing
+
+```bash
+# Run all tests in Docker (unit + e2e)
+npm run test:docker
+
+# Run only unit tests in Docker
+npm run test:docker:unit
+
+# Run only e2e tests in Docker
+npm run test:docker:e2e
+
+# Or use the script directly
+./scripts/docker-test.sh all
+./scripts/docker-test.sh unit
+./scripts/docker-test.sh e2e
+```
+
+**When to use Docker testing:**
+- Before pushing to ensure consistency
+- When tests fail locally but pass in CI
+- To test in a clean environment
+- Before creating a pull request
+
+## Building
+
+### Development Build
+
+```bash
+# Build the application
+npm run build
+
+# Output is in dist/ directory
+```
+
+### Production Build
+
+```bash
+# Build Docker image for production
+docker build -t browsers-api:latest .
+
+# Run production container
+docker run -d \
+  -p 3333:3333 \
+  -p 9090:9090 \
+  --env-file .env \
+  browsers-api:latest
+```
+
+### Docker Build, Test, and Publish
+
+```bash
+# Build, test, and tag a version
+./dev/docker-build-test-tag-publish.sh v0.0.3
+
+# Build, test, tag, and push to Docker Hub
+./dev/docker-build-test-tag-publish.sh v0.0.3 --push
+```
+
+**What this script does:**
+1. Builds the Docker image with version tag
+2. Verifies the image was created successfully
+3. Runs basic container tests (Node.js availability)
+4. Lists the created image tags
+5. Optionally pushes to Docker Hub if `--push` flag is provided
+
+**Version tag format:**
+- Use semantic versioning: `vX.Y.Z` (e.g., `v0.0.3`, `v1.2.0`)
+- Script will warn if format doesn't match but allows override
+
+## Database Management
+
+### Migrations
+
+```bash
+# Generate a new migration (after entity changes)
+npm run migration:generate -- src/database/migrations/MigrationName
+
+# Create a blank migration
+npm run migration:create -- src/database/migrations/MigrationName
+
+# Run pending migrations
+npm run migration:run
+
+# Revert the last migration
+npm run migration:revert
+```
+
+**Migration best practices:**
+- Always generate migrations after entity changes
+- Review generated migrations before committing
+- Test migrations both up and down
+- Never modify deployed migrations
+- Use descriptive migration names
+
+### Seeds
+
+```bash
+# Run database seeds
+npm run seed
+```
+
+**Seeding strategy:**
+- Seeds are in `src/database/seeds/`
+- Seeds should be idempotent (safe to run multiple times)
+- Current seeds: browser types (Chromium, Firefox, WebKit)
+
+## Development Helper Scripts
+
+### Location: `./dev/`
+
+**Purpose:** Helper scripts for development workflow automation
+
+**Current scripts:**
+- `docker-build-test-tag-publish.sh` - Complete Docker build, test, and publish workflow
+
+**Creating new helper scripts:**
+```bash
+# 1. Create script in ./dev/
+touch ./dev/my-helper-script.sh
+
+# 2. Add shebang and set executable
+echo '#!/bin/bash' > ./dev/my-helper-script.sh
+chmod +x ./dev/my-helper-script.sh
+
+# 3. Follow existing patterns:
+#    - Use colored output (RED, GREEN, YELLOW, BLUE, NC)
+#    - Add usage/help function
+#    - Use 'set -e' for error handling
+#    - Add descriptive comments
+#    - Validate inputs
+```
+
+**Example helper script structure:**
+```bash
+#!/bin/bash
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Functions
+info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+usage() {
+    echo "Usage: $0 [options]"
+    exit 1
+}
+
+# Main logic
+info "Starting script..."
+# Your code here
+success "Script completed!"
+```
+
+**When to create helper scripts:**
+- Repetitive multi-step workflows
+- Complex Docker operations
+- Build and deployment automation
+- Testing workflows
+- Database management tasks
+
+## Code Quality
+
+### Linting
+
+```bash
+# Run ESLint
+npm run lint
+
+# Auto-fix linting issues
+npm run lint -- --fix
+```
+
+### Formatting
+
+```bash
+# Format code with Prettier
+npm run format
+```
+
+## Environment Variables
+
+**Required for development:**
+- `DB_HOST` - Database host (default: localhost or postgres for Docker)
+- `DB_PORT` - Database port (default: 5432)
+- `DB_USERNAME` - Database username
+- `DB_PASSWORD` - Database password
+- `DB_DATABASE` - Database name
+
+**Optional configuration:**
+- `PORT` - API port (default: 3333)
+- `NODE_ENV` - Environment (development, production, test)
+- `LOG_LEVEL` - Logging level (debug, info, warn, error)
+- `PLAYWRIGHT_HEADLESS` - Run browsers headless (true/false)
+- `DEFAULT_PROXY` - Default proxy for all browsers
+- `TWOCAPTCHA_API_KEY` - 2Captcha API key for CAPTCHA solving
+- `ANTICAPTCHA_API_KEY` - AntiCaptcha API key for CAPTCHA solving
+
+See `.env.example` for complete list and documentation.
+
+## Debugging
+
+### VS Code Debug Configuration
+
+```json
+{
+  "type": "node",
+  "request": "launch",
+  "name": "Debug Nest Application",
+  "runtimeArgs": ["--nolazy", "-r", "ts-node/register"],
+  "args": ["${workspaceFolder}/src/main.ts"],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "console": "integratedTerminal",
+  "sourceMaps": true
+}
+```
+
+### Debugging Tests
+
+```bash
+# Debug a specific test
+npm run test:debug -- path/to/test.spec.ts
+
+# Then attach debugger to process in your IDE
+```
+
+## Common Development Tasks
+
+### Adding a New Action Handler
+
+1. Create handler in `src/modules/jobs/handlers/`
+2. Implement the action handler interface
+3. Create corresponding spec file for tests
+4. Register in action handler factory
+5. Update action config DTO
+6. Update documentation in README.md
+
+**Example:** See [execute-script-action.handler.ts](mdc:src/modules/jobs/handlers/execute-script-action.handler.ts)
+
+### Adding a New API Endpoint
+
+1. Add method to controller in `src/modules/jobs/jobs.controller.ts`
+2. Add corresponding service method
+3. Create/update DTOs for request/response
+4. Add validation decorators
+5. Create unit tests for controller and service
+6. Create E2E test in `test/` directory
+7. Update API documentation in README.md
+
+### Working with Artifacts
+
+- Artifacts are stored in `artifacts/` directory
+- Each job gets its own subdirectory
+- Supported types: screenshot, snapshot, pdf, html, json
+- Use `ArtifactStorageService` for saving artifacts
+- Use `JobsService.getArtifactFile()` for retrieving artifacts
+
+**Example:**
+```typescript
+// Save artifact
+const artifact = await artifactStorageService.saveArtifact(
+  buffer,
+  jobId,
+  'screenshot.png',
+  ArtifactType.SCREENSHOT,
+  'image/png'
+);
+
+// Retrieve artifact
+const { buffer, mimeType, filename } = 
+  await jobsService.getArtifactFile(jobId, artifactId);
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: Tests failing with database connection errors**
+```bash
+# Ensure PostgreSQL is running
+docker-compose up -d postgres
+
+# Or start locally
+pg_ctl -D /usr/local/var/postgres start
+
+# Check connection
+psql -h localhost -U automation_user -d browser_automation
+```
+
+**Issue: Playwright browser not found**
+```bash
+# Install Playwright browsers
+npm run test:setup
+
+# Or manually
+npx playwright install
+```
+
+**Issue: Port already in use**
+```bash
+# Find and kill process using port 3333
+lsof -ti:3333 | xargs kill -9
+
+# Or use a different port
+PORT=3334 npm run start:dev
+```
+
+**Issue: Docker build fails**
+```bash
+# Clean up Docker cache
+docker builder prune -f
+
+# Rebuild without cache
+docker build --no-cache -t browsers-api:latest .
+```
+
+**Issue: Migration errors**
+```bash
+# Check migration status
+npm run typeorm -- migration:show
+
+# Revert last migration
+npm run migration:revert
+
+# Run migrations again
+npm run migration:run
+```
+
+## Performance Tips
+
+- **Development:** Use `npm run start:dev` for hot reload
+- **Testing:** Use `npm run test:watch` for rapid feedback
+- **Database:** Keep connection pool size appropriate (see `DB_POOL_MIN`, `DB_POOL_MAX`)
+- **Browser Pool:** Adjust `BROWSER_POOL_MIN_SIZE` and `BROWSER_POOL_MAX_SIZE` based on workload
+- **Docker:** Use BuildKit for faster builds: `DOCKER_BUILDKIT=1 docker build ...`
+
+## Additional Resources
+
+- [Docker Setup Guide](mdc:docs/DOCKER.md)
+- [Kubernetes Deployment](mdc:docs/KUBERNETES.md)
+- [API Reference](mdc:docs/tech/05-api-reference.md)
+- [CAPTCHA Solver Guide](mdc:docs/CAPTCHA-SOLVER-USAGE-GUIDE.md)
