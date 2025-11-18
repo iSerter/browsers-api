@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SolverRegistry } from './solver-registry.service';
-import { ICaptchaSolver, CaptchaParams, CaptchaSolution } from '../interfaces/captcha-solver.interface';
+import {
+  ICaptchaSolver,
+  CaptchaParams,
+  CaptchaSolution,
+} from '../interfaces/captcha-solver.interface';
 import { SolverCapability } from './interfaces/solver-capability.interface';
 import {
   SolverCircuitBreakerService,
@@ -279,14 +283,39 @@ describe('SolverRegistry', () => {
     });
 
     it('should return all solvers when circuit breaker allows all', () => {
-      registry.register('solver1', MockSolver, {
+      const capabilities1 = {
         ...mockCapabilities,
         supportedChallengeTypes: ['recaptcha'],
-      });
-      registry.register('solver2', MockSolver, {
+        isEnabled: true,
+      };
+      const capabilities2 = {
         ...mockCapabilities,
         supportedChallengeTypes: ['recaptcha'],
-      });
+        isEnabled: true,
+      };
+
+      registry.register('solver1', MockSolver, capabilities1);
+      registry.register('solver2', MockSolver, capabilities2);
+
+      // Verify solvers are registered
+      expect(registry.has('solver1')).toBe(true);
+      expect(registry.has('solver2')).toBe(true);
+
+      // Verify solver metadata
+      const solver1Meta = registry.get('solver1');
+      const solver2Meta = registry.get('solver2');
+      expect(solver1Meta?.capabilities.isEnabled).toBe(true);
+      expect(solver2Meta?.capabilities.isEnabled).toBe(true);
+      expect(solver1Meta?.capabilities.supportedChallengeTypes).toContain(
+        'recaptcha',
+      );
+      expect(solver2Meta?.capabilities.supportedChallengeTypes).toContain(
+        'recaptcha',
+      );
+
+      // Verify solvers can be retrieved for challenge type
+      const allSolvers = registry.getSolversForChallengeType('recaptcha');
+      expect(allSolvers).toHaveLength(2);
 
       // Mock circuit breaker: all solvers available
       mockCircuitBreaker.isAvailable.mockReturnValue(true);
@@ -298,19 +327,26 @@ describe('SolverRegistry', () => {
     });
 
     it('should filter solvers by circuit breaker availability in getAvailableSolvers', () => {
-      registry.register('solver1', MockSolver, {
+      const capabilities1 = {
         ...mockCapabilities,
         supportedChallengeTypes: ['recaptcha'],
-      });
-      registry.register('solver2', MockSolver, {
+        isEnabled: true,
+      };
+      const capabilities2 = {
         ...mockCapabilities,
         supportedChallengeTypes: ['recaptcha'],
-      });
+        isEnabled: true,
+      };
+
+      registry.register('solver1', MockSolver, capabilities1);
+      registry.register('solver2', MockSolver, capabilities2);
 
       // Mock circuit breaker: solver1 available, solver2 unavailable
-      mockCircuitBreaker.isAvailable.mockImplementation((solverType: string) => {
-        return solverType === 'solver1';
-      });
+      mockCircuitBreaker.isAvailable.mockImplementation(
+        (solverType: string) => {
+          return solverType === 'solver1';
+        },
+      );
 
       const availableSolvers = registry.getAvailableSolvers('recaptcha');
       expect(availableSolvers).toHaveLength(1);
@@ -337,23 +373,32 @@ describe('SolverRegistry', () => {
     });
 
     it('should skip unavailable solvers in getSolversByPriority', () => {
-      registry.register('solver1', MockSolver, {
+      const capabilities1 = {
         ...mockCapabilities,
         supportedChallengeTypes: ['recaptcha'],
         priority: 1,
-        healthStatus: 'healthy',
-      });
-      registry.register('solver2', MockSolver, {
+        isEnabled: true,
+      };
+      const capabilities2 = {
         ...mockCapabilities,
         supportedChallengeTypes: ['recaptcha'],
         priority: 2,
-        healthStatus: 'healthy',
-      });
+        isEnabled: true,
+      };
+
+      registry.register('solver1', MockSolver, capabilities1);
+      registry.register('solver2', MockSolver, capabilities2);
+
+      // Set health status manually
+      registry.updateHealthStatus('solver1', 'healthy');
+      registry.updateHealthStatus('solver2', 'healthy');
 
       // Mock circuit breaker: solver1 available, solver2 unavailable
-      mockCircuitBreaker.isAvailable.mockImplementation((solverType: string) => {
-        return solverType === 'solver1';
-      });
+      mockCircuitBreaker.isAvailable.mockImplementation(
+        (solverType: string) => {
+          return solverType === 'solver1';
+        },
+      );
 
       const solvers = registry.getSolversByPriority('recaptcha');
       expect(solvers).toHaveLength(1);
@@ -361,10 +406,13 @@ describe('SolverRegistry', () => {
     });
 
     it('should include circuit breaker state in getAllSolversForChallengeType', () => {
-      registry.register('solver1', MockSolver, {
+      const capabilities1 = {
         ...mockCapabilities,
         supportedChallengeTypes: ['recaptcha'],
-      });
+        isEnabled: true,
+      };
+
+      registry.register('solver1', MockSolver, capabilities1);
 
       mockCircuitBreaker.isAvailable.mockReturnValue(true);
       mockCircuitBreaker.getState.mockReturnValue(CircuitState.CLOSED);
@@ -395,8 +443,9 @@ describe('SolverRegistry', () => {
       expect(states.solver1.isAvailable).toBe(true);
       expect(states.solver1.details).toBeDefined();
       expect(mockCircuitBreaker.getState).toHaveBeenCalledWith('solver1');
-      expect(mockCircuitBreaker.getStateDetails).toHaveBeenCalledWith('solver1');
+      expect(mockCircuitBreaker.getStateDetails).toHaveBeenCalledWith(
+        'solver1',
+      );
     });
   });
 });
-
