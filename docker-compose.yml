@@ -32,7 +32,7 @@ services:
     container_name: browsers-api
     ports:
       - "${PORT:-3333}:${PORT:-3333}"
-      - "9090:9090"  # Metrics port
+      - "9091:9090"  # Metrics port (host:container)
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3333}
