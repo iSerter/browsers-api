@@ -347,6 +347,14 @@ ENABLE_EXECUTE_SCRIPT=true
 }
 ```
 
+**Wait 5 seconds:**
+```json
+{
+  "action": "executeScript",
+  "script": "await new Promise(resolve => setTimeout(resolve, 5000)); return 'Waited 5 seconds'"
+}
+```
+
 **DOM manipulation example:**
 ```json
 {
