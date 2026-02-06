@@ -13,7 +13,7 @@ services:
       -c log_connections=off
       -c log_disconnections=off
     ports:
-      - "5432:5432"
+      - "${DB_FORWARD_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
