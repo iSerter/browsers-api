@@ -75,8 +75,13 @@ export const validationSchema = Joi.object({
     .allow('')
     .pattern(/^[a-zA-Z0-9,]+$/)
     .message('ANTICAPTCHA_API_KEY must contain only alphanumeric characters and commas'),
+  CAPMONSTER_API_KEY: Joi.string()
+    .optional()
+    .allow('')
+    .pattern(/^[a-zA-Z0-9,]+$/)
+    .message('CAPMONSTER_API_KEY must contain only alphanumeric characters and commas'),
   CAPTCHA_SOLVER_PREFERRED_PROVIDER: Joi.string()
-    .valid('2captcha', 'anticaptcha')
+    .valid('2captcha', 'anticaptcha', 'capmonster')
     .optional()
     .default('2captcha'),
   CAPTCHA_SOLVER_TIMEOUT_SECONDS: Joi.number().integer().min(10).max(300).optional().default(60),

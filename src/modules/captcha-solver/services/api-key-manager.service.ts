@@ -33,9 +33,10 @@ export class ApiKeyManagerService implements OnModuleInit {
       await this.loadApiKeys();
       await this.validateAllApiKeys();
       this.logger.log('API Key Manager initialized');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to initialize API Key Manager: ${error.message}`,
+        `Failed to initialize API Key Manager: ${errorMessage}`,
       );
       // Don't throw - allow app to start but log the error
       // Database tables may not exist yet (migrations not run)
@@ -50,7 +51,7 @@ export class ApiKeyManagerService implements OnModuleInit {
    * Load API keys from environment variables and database
    */
   private async loadApiKeys() {
-    const providers = ['2captcha', 'anticaptcha'];
+    const providers = ['2captcha', 'anticaptcha', 'capmonster'];
 
     for (const provider of providers) {
       const keys: ApiKeyMetadata[] = [];
@@ -182,14 +183,15 @@ export class ApiKeyManagerService implements OnModuleInit {
           if (keyMetadata.source === 'database') {
             await this.updateApiKeyInDatabase(keyMetadata);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           this.logger.error(
-            `Error validating API key for ${provider}: ${error.message}`,
+            `Error validating API key for ${provider}: ${errorMessage}`,
           );
           keyMetadata.healthStatus = ApiKeyHealthStatus.UNHEALTHY;
           keyMetadata.lastFailure = new Date();
           keyMetadata.consecutiveFailures += 1;
-          keyMetadata.lastValidationError = error.message;
+          keyMetadata.lastValidationError = errorMessage;
         }
       }
     }

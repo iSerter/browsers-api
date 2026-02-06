@@ -316,7 +316,7 @@ describe('CaptchaSolverService', () => {
     it('should get config value by key', async () => {
       // Arrange
       const mockConfig = { key: 'test', value: 'value' };
-      mockConfigRepository.findOne.mockResolvedValue(mockConfig);
+      mockConfigRepository.find.mockResolvedValue([mockConfig]);
 
       // Act
       const result = await service.getConfigValue('test');

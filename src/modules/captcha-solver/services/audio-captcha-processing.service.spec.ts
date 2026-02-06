@@ -7,11 +7,6 @@ import {
   AudioFormat,
   SpeechToTextProvider,
 } from './interfaces/audio-captcha.interface';
-import {
-  GoogleCloudSpeechProvider,
-  OpenAIWhisperProvider,
-  AzureSpeechProvider,
-} from './providers';
 import * as fs from 'fs/promises';
 
 // Mock fs module
@@ -19,6 +14,7 @@ jest.mock('fs/promises', () => ({
   mkdir: jest.fn().mockResolvedValue(undefined),
   writeFile: jest.fn().mockResolvedValue(undefined),
   unlink: jest.fn().mockResolvedValue(undefined),
+  chmod: jest.fn().mockResolvedValue(undefined),
 }));
 
 describe('AudioCaptchaProcessingService', () => {
@@ -82,18 +78,6 @@ describe('AudioCaptchaProcessingService', () => {
             detectAudioChallenge: jest.fn(),
           },
         },
-        {
-          provide: GoogleCloudSpeechProvider,
-          useValue: mockGoogleProvider,
-        },
-        {
-          provide: OpenAIWhisperProvider,
-          useValue: mockOpenaiProvider,
-        },
-        {
-          provide: AzureSpeechProvider,
-          useValue: mockAzureProvider,
-        },
       ],
     }).compile();
 
@@ -113,6 +97,20 @@ describe('AudioCaptchaProcessingService', () => {
     // Mock startCacheCleanup to prevent setInterval from running
     jest.spyOn(service as any, 'startCacheCleanup').mockImplementation(() => {
       // No-op: don't start the interval in tests
+    });
+
+    // Mock initializeProviders to register mock providers directly
+    // (dynamic imports don't work in test environment)
+    jest.spyOn(service as any, 'initializeProviders').mockImplementation(async () => {
+      if (await mockOpenaiProvider.isAvailable()) {
+        service.registerProvider(mockOpenaiProvider);
+      }
+      if (await mockGoogleProvider.isAvailable()) {
+        service.registerProvider(mockGoogleProvider);
+      }
+      if (await mockAzureProvider.isAvailable()) {
+        service.registerProvider(mockAzureProvider);
+      }
     });
 
     // Initialize service to register providers

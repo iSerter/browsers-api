@@ -112,8 +112,9 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
         const context = this.page.context();
         this.cdpSession = await context.newCDPSession(this.page);
         this.logger.debug('CDP session initialized');
-      } catch (error: any) {
-        this.logger.warn(`Failed to initialize CDP session: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`Failed to initialize CDP session: ${errorMessage}`);
       }
     }
   }
@@ -210,11 +211,11 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
           solvedAt: response.solvedAt,
           solverId: this.getName(),
         };
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
         const duration = Date.now() - startTime;
         this.metrics.failureCount++;
-        const errorMessage = error.message || 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.metrics.failureReasons[errorMessage] =
           (this.metrics.failureReasons[errorMessage] || 0) + 1;
         this.updateMetrics(duration);
@@ -355,8 +356,9 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
           sensorVersion: detectionData.sensorVersion || undefined,
         },
       };
-    } catch (error: any) {
-      this.logger.warn(`Error detecting Akamai Bot Manager: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error detecting Akamai Bot Manager: ${errorMessage}`);
       return {
         container: null,
         challengeIframe: null,
@@ -412,8 +414,9 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
 
       // Default to Level 1 (passive monitoring)
       return AkamaiChallengeLevel.LEVEL_1;
-    } catch (error: any) {
-      this.logger.warn(`Error determining challenge level: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error determining challenge level: ${errorMessage}`);
       return AkamaiChallengeLevel.LEVEL_1;
     }
   }
@@ -812,8 +815,9 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
             postData: JSON.stringify(payload),
             headers,
           });
-        } catch (error: any) {
-          this.logger.warn(`Failed to modify Akamai request: ${error.message}`);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          this.logger.warn(`Failed to modify Akamai request: ${errorMessage}`);
           await route.continue();
         }
       } else {
@@ -1085,8 +1089,9 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
       });
 
       return endpoint;
-    } catch (error: any) {
-      this.logger.warn(`Failed to find sensor endpoint: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to find sensor endpoint: ${errorMessage}`);
       return null;
     }
   }
@@ -1129,8 +1134,9 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
       );
 
       this.logger.debug(`Submitted sensor data to ${endpoint}`);
-    } catch (error: any) {
-      this.logger.warn(`Failed to submit sensor data: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to submit sensor data: ${errorMessage}`);
       throw error;
     }
   }
@@ -1138,8 +1144,8 @@ export class NativeAkamaiSolver implements ICaptchaSolver {
   /**
    * Determine if an error should not trigger a retry
    */
-  private shouldNotRetry(error: any): boolean {
-    const errorMessage = error?.message?.toLowerCase() || '';
+  private shouldNotRetry(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
 
     // Don't retry on widget not detected errors
     if (errorMessage.includes('not detected')) {

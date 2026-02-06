@@ -175,15 +175,17 @@ export class SolverOrchestrationService {
       );
 
       return result;
-    } catch (error: any) {
-      this.logger.error(`Orchestration failed: ${error.message}`, {
-        error: error.stack,
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Orchestration failed: ${errorMessage}`, {
+        error: errorStack,
       });
       return {
         solved: false,
         duration: Date.now() - startTime,
         attempts,
-        error: error.message,
+        error: errorMessage,
       };
     }
   }
@@ -407,10 +409,10 @@ export class SolverOrchestrationService {
             solverType,
             attempts,
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           const duration = Date.now() - attemptStartTime;
           const errorMessage =
-            error.message || 'Unknown error during solving';
+            error instanceof Error ? error.message : 'Unknown error during solving';
 
           // Log failure
           this.captchaLogging.logSolving(
@@ -422,7 +424,7 @@ export class SolverOrchestrationService {
             maxRetries,
             page.url(),
             undefined,
-            error,
+            error instanceof Error ? error : new Error(String(error)),
             false,
           );
 
@@ -561,10 +563,10 @@ export class SolverOrchestrationService {
             solverType: providerName,
             attempts,
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           const duration = Date.now() - attemptStartTime;
           const errorMessage =
-            error.message || 'Unknown error during solving';
+            error instanceof Error ? error.message : 'Unknown error during solving';
 
           // Log failure
           this.captchaLogging.logSolving(
@@ -576,7 +578,7 @@ export class SolverOrchestrationService {
             maxRetries,
             page.url(),
             undefined,
-            error,
+            error instanceof Error ? error : new Error(String(error)),
             true,
           );
 

@@ -80,9 +80,10 @@ export class OpenAIWhisperProvider extends BaseSpeechProvider {
           language: response.data.language,
         },
       };
-    } catch (error: any) {
-      this.logger.error(`OpenAI Whisper transcription failed: ${error.message}`);
-      throw new Error(`OpenAI Whisper transcription failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`OpenAI Whisper transcription failed: ${errorMessage}`);
+      throw new Error(`OpenAI Whisper transcription failed: ${errorMessage}`);
     }
   }
 }

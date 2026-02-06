@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { ICaptchaSolver } from '../interfaces/captcha-solver.interface';
 import { TwoCaptchaProvider } from '../providers/two-captcha.provider';
 import { AntiCaptchaProvider } from '../providers/anti-captcha.provider';
+import { CapMonsterProvider } from '../providers/capmonster.provider';
 import { ApiKeyManagerService } from './api-key-manager.service';
 import { CostTrackingService } from './cost-tracking.service';
 import { CaptchaSolverConfigService } from '../config';
@@ -36,8 +37,9 @@ export class ProviderRegistryService implements OnModuleInit {
         this.captchaConfig,
       );
       this.registerProvider('2captcha', twoCaptcha);
-    } catch (error: any) {
-      this.logger.warn(`Failed to register 2Captcha provider: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to register 2Captcha provider: ${errorMessage}`);
     }
 
     // Register Anti-Captcha provider
@@ -49,8 +51,23 @@ export class ProviderRegistryService implements OnModuleInit {
         this.captchaConfig,
       );
       this.registerProvider('anticaptcha', antiCaptcha);
-    } catch (error: any) {
-      this.logger.warn(`Failed to register Anti-Captcha provider: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to register Anti-Captcha provider: ${errorMessage}`);
+    }
+
+    // Register CapMonster provider
+    try {
+      const capMonster = new CapMonsterProvider(
+        this.httpService,
+        this.configService,
+        this.apiKeyManager,
+        this.captchaConfig,
+      );
+      this.registerProvider('capmonster', capMonster);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to register CapMonster provider: ${errorMessage}`);
     }
 
     this.logger.log(

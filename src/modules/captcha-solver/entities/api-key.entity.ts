@@ -12,6 +12,7 @@ import { ApiKeyHealthStatus } from '../interfaces/captcha-config.interface';
  * Entity for storing API keys in the database
  */
 @Entity('captcha_solver_api_keys')
+@Index('IDX_provider_active_health', ['provider', 'isActive', 'healthStatus'])
 export class CaptchaSolverApiKey {
   @PrimaryGeneratedColumn()
   id: number;

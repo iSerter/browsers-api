@@ -79,9 +79,10 @@ export class SolverHealthChecker implements OnModuleInit {
 
       try {
         await this.checkSolverHealth(metadata.solverType);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(
-          `Error checking health of ${metadata.solverType}: ${error.message}`,
+          `Error checking health of ${metadata.solverType}: ${errorMessage}`,
         );
       }
     }
@@ -116,9 +117,10 @@ export class SolverHealthChecker implements OnModuleInit {
         this.registry.updateHealthStatus(solverType, 'unhealthy');
         this.logger.warn(`Solver ${solverType} is unavailable`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(
-        `Health check failed for ${solverType}: ${error.message}`,
+        `Health check failed for ${solverType}: ${errorMessage}`,
       );
       this.registry.updateHealthStatus(solverType, 'unhealthy');
     }
@@ -135,9 +137,10 @@ export class SolverHealthChecker implements OnModuleInit {
       // For now, we'll just check if the constructor can be called
       // In a real implementation, solvers should provide a lightweight health check method
       return null; // Placeholder - actual implementation depends on solver constructors
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to create test solver for ${metadata.solverType}: ${error.message}`,
+        `Failed to create test solver for ${metadata.solverType}: ${errorMessage}`,
       );
       return null;
     }

@@ -99,7 +99,7 @@ describe('ExecuteScriptActionHandler', () => {
         'ENABLE_EXECUTE_SCRIPT',
         false,
       );
-      expect(mockPage.evaluate).toHaveBeenCalledWith('return document.title');
+      expect(mockPage.evaluate).toHaveBeenCalledWith('(() => { return document.title })()');
     });
 
     it('should handle script evaluation errors', async () => {

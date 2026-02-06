@@ -18,11 +18,19 @@ import {
   ProviderException,
   InternalException,
 } from './exceptions';
+import {
+  captchaSolverConfigurationSchema,
+  validateConfigKeyValue,
+} from './config';
 
 @Injectable()
 export class CaptchaSolverService implements OnModuleInit {
   private readonly logger = new Logger(CaptchaSolverService.name);
   private configuration: CaptchaSolverConfiguration = {};
+
+  /** In-memory config cache with TTL */
+  private configCache: { data: CaptchaSolverConfig[]; expiresAt: number } | null = null;
+  private readonly CONFIG_CACHE_TTL_MS = 60000; // 60 seconds
 
   constructor(
     private readonly configService: ConfigService,
@@ -45,12 +53,18 @@ export class CaptchaSolverService implements OnModuleInit {
       await this.loadConfiguration();
       await this.validateConfiguration();
       this.logger.log('Captcha Solver Service initialized successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to initialize Captcha Solver Service: ${error.message}`,
+        `Failed to initialize Captcha Solver Service: ${errorMessage}`,
       );
-      // Don't throw - allow app to start but log the error
-      // The captcha solver endpoints will return appropriate errors when called
+
+      // In production, fail hard if no providers are available
+      if (process.env.NODE_ENV === 'production') {
+        throw error;
+      }
+
+      // In development, allow app to start but log the error
       this.logger.warn(
         'Captcha Solver Service will be unavailable until API keys are configured',
       );
@@ -152,16 +166,11 @@ export class CaptchaSolverService implements OnModuleInit {
    * Validate configuration and ensure at least one provider is available
    */
   private async validateConfiguration() {
-    // Validate preferred provider
-    if (
-      this.configuration.preferredProvider &&
-      !['2captcha', 'anticaptcha'].includes(
-        this.configuration.preferredProvider,
-      )
-    ) {
-      throw new BadRequestException(
-        `Invalid preferred provider: ${this.configuration.preferredProvider}. Must be '2captcha' or 'anticaptcha'`,
-      );
+    // Validate configuration using Joi schema
+    const { error } = captchaSolverConfigurationSchema.validate(this.configuration, { abortEarly: false });
+    if (error) {
+      const messages = error.details.map(d => d.message).join('; ');
+      throw new BadRequestException(`Invalid captcha solver configuration: ${messages}`);
     }
 
     // Check if preferred provider is available
@@ -249,17 +258,32 @@ export class CaptchaSolverService implements OnModuleInit {
   }
 
   /**
-   * Get all configuration settings
+   * Get all configuration settings (uses in-memory cache with 60s TTL)
    */
   async getAllConfigs(): Promise<CaptchaSolverConfig[]> {
-    return this.configRepository.find();
+    const now = Date.now();
+    if (this.configCache && now < this.configCache.expiresAt) {
+      return this.configCache.data;
+    }
+
+    const configs = await this.configRepository.find();
+    this.configCache = { data: configs, expiresAt: now + this.CONFIG_CACHE_TTL_MS };
+    return configs;
+  }
+
+  /**
+   * Invalidate the in-memory config cache
+   */
+  private invalidateConfigCache(): void {
+    this.configCache = null;
   }
 
   /**
    * Get configuration value by key
    */
   async getConfigValue(key: string): Promise<string | null> {
-    const config = await this.configRepository.findOne({ where: { key } });
+    const configs = await this.getAllConfigs();
+    const config = configs.find(c => c.key === key);
     return config?.value || null;
   }
 
@@ -328,10 +352,10 @@ export class CaptchaSolverService implements OnModuleInit {
         );
 
         return solution;
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
         this.logger.warn(
-          `Failed to solve with ${provider.getName()}: ${error.message}`,
+          `Failed to solve with ${provider.getName()}: ${lastError.message}`,
         );
         // Continue to next provider
       }
@@ -418,68 +442,22 @@ export class CaptchaSolverService implements OnModuleInit {
 
     const savedConfig = await this.configRepository.save(config);
 
-    // Update in-memory configuration
+    // Invalidate cache and reload in-memory configuration
+    this.invalidateConfigCache();
     await this.loadConfiguration();
 
     return savedConfig;
   }
 
   /**
-   * Validate configuration key and value
+   * Validate configuration key and value using Joi schemas
    */
   private validateConfigKey(key: string, value: string): void {
-    switch (key) {
-      case 'preferred_provider':
-        if (!['2captcha', 'anticaptcha'].includes(value)) {
-          throw new BadRequestException(
-            `Invalid preferred_provider value: ${value}. Must be '2captcha' or 'anticaptcha'`,
-          );
-        }
-        break;
-      case 'timeout_seconds':
-        const timeout = parseInt(value, 10);
-        if (isNaN(timeout) || timeout < 10 || timeout > 300) {
-          throw new BadRequestException(
-            `Invalid timeout_seconds value: ${value}. Must be between 10 and 300`,
-          );
-        }
-        break;
-      case 'max_retries':
-        const retries = parseInt(value, 10);
-        if (isNaN(retries) || retries < 0 || retries > 10) {
-          throw new BadRequestException(
-            `Invalid max_retries value: ${value}. Must be between 0 and 10`,
-          );
-        }
-        break;
-      case 'enable_auto_retry':
-        if (!['true', 'false'].includes(value.toLowerCase())) {
-          throw new BadRequestException(
-            `Invalid enable_auto_retry value: ${value}. Must be 'true' or 'false'`,
-          );
-        }
-        break;
-      case 'min_confidence_score':
-        const score = parseFloat(value);
-        if (isNaN(score) || score < 0 || score > 1) {
-          throw new BadRequestException(
-            `Invalid min_confidence_score value: ${value}. Must be between 0 and 1`,
-          );
-        }
-        break;
-      case 'fallback_enabled_recaptcha':
-      case 'fallback_enabled_hcaptcha':
-      case 'fallback_enabled_datadome':
-      case 'fallback_enabled_funcaptcha':
-        if (!['true', 'false'].includes(value.toLowerCase())) {
-          throw new BadRequestException(
-            `Invalid ${key} value: ${value}. Must be 'true' or 'false'`,
-          );
-        }
-        break;
-      default:
-        // Allow custom configuration keys
-        break;
+    try {
+      validateConfigKeyValue(key, value);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown validation error';
+      throw new BadRequestException(errorMessage);
     }
   }
 }

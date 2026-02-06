@@ -56,7 +56,12 @@ export class SsrfUrlValidationPipe implements PipeTransform<string, Promise<stri
     this.allowedDomains = allowedDomainsEnv
       ? allowedDomainsEnv.split(',').map((d) => d.trim().toLowerCase())
       : [];
+
+    this.dnsLookup = (hostname: string) =>
+      dns.promises.lookup(hostname, { family: 4 });
   }
+
+  private dnsLookup: (hostname: string) => Promise<{ address: string; family: number }>;
 
   async transform(value: string, metadata: ArgumentMetadata): Promise<string> {
     if (!value) {
@@ -122,7 +127,7 @@ export class SsrfUrlValidationPipe implements PipeTransform<string, Promise<stri
     // Step 5: Resolve DNS to get actual IP address (prevents DNS rebinding)
     let resolvedIp: string;
     try {
-      const lookupResult = await dns.promises.lookup(hostname, { family: 4 });
+      const lookupResult = await this.dnsLookup(hostname);
       resolvedIp = lookupResult.address;
     } catch (error) {
       // If DNS lookup fails, we can't verify the IP, so block it for safety

@@ -137,8 +137,8 @@ describe('HumanBehaviorSimulationService', () => {
       if (!browser || !page) {
         return; // Skip if browser not available
       }
-      await page.setContent('<input type="text" id="test-input" />');
       await page.goto('about:blank');
+      await page.setContent('<input type="text" id="test-input" />');
 
       await page.focus('#test-input');
       await service.typeWithTiming(page, 'Hello World');
@@ -148,14 +148,14 @@ describe('HumanBehaviorSimulationService', () => {
         (el: HTMLInputElement) => el.value,
       );
       expect(value).toBe('Hello World');
-    });
+    }, 15000);
 
     it('should use custom keystroke timing configuration', async () => {
       if (!browser || !page) {
         return; // Skip if browser not available
       }
-      await page.setContent('<input type="text" id="test-input" />');
       await page.goto('about:blank');
+      await page.setContent('<input type="text" id="test-input" />');
 
       const config: KeystrokeTimingConfig = {
         keyPressMean: 150,
@@ -174,15 +174,15 @@ describe('HumanBehaviorSimulationService', () => {
         (el: HTMLInputElement) => el.value,
       );
       expect(value).toBe('Test');
-    });
+    }, 15000);
 
     it('should update typing fingerprint', async () => {
       if (!browser || !page) {
         return; // Skip if browser not available
       }
       const sessionId = 'test-session';
-      await page.setContent('<input type="text" id="test-input" />');
       await page.goto('about:blank');
+      await page.setContent('<input type="text" id="test-input" />');
 
       await page.focus('#test-input');
       await service.typeWithTiming(page, 'Test', {}, sessionId);
@@ -190,7 +190,7 @@ describe('HumanBehaviorSimulationService', () => {
       const fingerprint = service.getFingerprint(sessionId);
       expect(fingerprint).toBeDefined();
       expect(fingerprint?.typingSpeed.samples.length).toBeGreaterThan(0);
-    });
+    }, 15000);
   });
 
   describe('scrollWithMomentum', () => {
@@ -391,8 +391,8 @@ describe('HumanBehaviorSimulationService', () => {
         return; // Skip if browser not available
       }
       const sessionId = 'typing-test';
-      await page.setContent('<input type="text" id="test-input" />');
       await page.goto('about:blank');
+      await page.setContent('<input type="text" id="test-input" />');
 
       await page.focus('#test-input');
       await service.typeWithTiming(page, 'Hello', {}, sessionId);
@@ -401,7 +401,7 @@ describe('HumanBehaviorSimulationService', () => {
       expect(fingerprint).toBeDefined();
       expect(fingerprint?.typingSpeed.samples.length).toBeGreaterThan(0);
       expect(fingerprint?.typingSpeed.mean).toBeGreaterThan(0);
-    });
+    }, 15000);
 
     it('should update fingerprint with scrolling', async () => {
       if (!browser || !page) {

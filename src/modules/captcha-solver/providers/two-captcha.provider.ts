@@ -149,8 +149,9 @@ export class TwoCaptchaProvider extends BaseCaptchaProvider {
       }
 
       return response.request;
-    } catch (error: any) {
-      await this.apiKeyManager.recordFailure('2captcha', apiKey, error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await this.apiKeyManager.recordFailure('2captcha', apiKey, errorMessage);
       throw error;
     }
   }
@@ -186,17 +187,18 @@ export class TwoCaptchaProvider extends BaseCaptchaProvider {
           response,
           { taskId },
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (attempt === maxAttempts - 1) {
-          await this.apiKeyManager.recordFailure('2captcha', apiKey, error.message);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          await this.apiKeyManager.recordFailure('2captcha', apiKey, errorMessage);
           if (error instanceof ProviderException || error instanceof NetworkException) {
             throw error;
           }
           throw new ProviderException(
-            `Failed to get result from 2Captcha: ${error.message}`,
+            `Failed to get result from 2Captcha: ${errorMessage}`,
             '2captcha',
             undefined,
-            { taskId, originalError: error.message },
+            { taskId, originalError: errorMessage },
           );
         }
         // Continue polling on transient errors

@@ -173,6 +173,8 @@ export class StealthService {
     if (scripts.length > 0) {
       const combinedScript = scripts.join('\n\n');
       await page.addInitScript(combinedScript);
+      // Also evaluate immediately on the current page
+      await page.evaluate(combinedScript);
     }
   }
 
@@ -277,16 +279,19 @@ export class StealthService {
   private getBatteryAPIMockingScript(): string {
     return `
       (function() {
-        if (navigator.getBattery) {
-          Object.defineProperty(navigator, 'getBattery', {
-            get: () => () => Promise.resolve({
-              charging: true,
-              level: 0.8,
-              chargingTime: 0,
-              dischargingTime: Infinity,
-            }),
-          });
-        }
+        Object.defineProperty(navigator, 'getBattery', {
+          value: () => Promise.resolve({
+            charging: true,
+            level: 0.8,
+            chargingTime: 0,
+            dischargingTime: Infinity,
+            addEventListener: function() {},
+            removeEventListener: function() {},
+            dispatchEvent: function() { return true; },
+          }),
+          configurable: true,
+          writable: true,
+        });
       })();
     `;
   }

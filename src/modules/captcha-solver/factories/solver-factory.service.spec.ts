@@ -4,6 +4,7 @@ import { SolverRegistry } from './solver-registry.service';
 import { SolverPerformanceTracker } from './solver-performance-tracker.service';
 import { CaptchaWidgetInteractionService } from '../services/captcha-widget-interaction.service';
 import { SolverCircuitBreakerService } from '../services/solver-circuit-breaker.service';
+import { CaptchaMetricsService } from '../metrics/captcha-metrics.service';
 import { ICaptchaSolver, CaptchaParams, CaptchaSolution } from '../interfaces/captcha-solver.interface';
 
 describe('SolverFactory', () => {
@@ -103,6 +104,17 @@ describe('SolverFactory', () => {
         {
           provide: SolverCircuitBreakerService,
           useValue: mockCircuitBreaker,
+        },
+        {
+          provide: CaptchaMetricsService,
+          useValue: {
+            recordSolveSuccess: jest.fn(),
+            recordSolveFailure: jest.fn(),
+            incrementActiveSolves: jest.fn(),
+            decrementActiveSolves: jest.fn(),
+            recordCircuitBreakerTrip: jest.fn(),
+            setProviderAvailable: jest.fn(),
+          },
         },
       ],
     }).compile();

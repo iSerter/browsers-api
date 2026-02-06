@@ -60,9 +60,9 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
           },
         },
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If last error is already a custom exception, rethrow it
-      if (error instanceof ProviderException || 
+      if (error instanceof ProviderException ||
           error instanceof NetworkException) {
         throw error;
       }
@@ -154,12 +154,13 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
       );
       clearTimeout(timeoutId);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+      const errorObj = error as any;
+      if (errorObj.name === 'AbortError' || errorObj.code === 'ECONNABORTED') {
         throw new NetworkException(
           `Request timeout after ${this.timeoutSeconds} seconds`,
-          error,
+          error instanceof Error ? error : undefined,
           {
             url,
             method,
@@ -170,38 +171,40 @@ export abstract class BaseCaptchaProvider implements ICaptchaSolver {
       }
       
       // If it's a network-related error, wrap in NetworkException
-      if (error.code === 'ECONNREFUSED' || 
-          error.code === 'ENOTFOUND' || 
-          error.code === 'ETIMEDOUT' ||
-          error.response?.status >= 500) {
+      if (errorObj.code === 'ECONNREFUSED' ||
+          errorObj.code === 'ENOTFOUND' ||
+          errorObj.code === 'ETIMEDOUT' ||
+          errorObj.response?.status >= 500) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         throw new NetworkException(
-          `Network error during request: ${error.message}`,
-          error,
+          `Network error during request: ${errorMessage}`,
+          error instanceof Error ? error : undefined,
           {
             url,
             method,
-            statusCode: error.response?.status,
+            statusCode: errorObj.response?.status,
             provider: this.getName(),
           },
         );
       }
-      
+
       // If it's already a custom exception, rethrow it
-      if (error instanceof ProviderException || 
+      if (error instanceof ProviderException ||
           error instanceof NetworkException) {
         throw error;
       }
-      
+
       // Otherwise, wrap in ProviderException
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ProviderException(
-        `Provider request failed: ${error.message}`,
+        `Provider request failed: ${errorMessage}`,
         this.getName(),
-        error.response?.data,
+        errorObj.response?.data,
         {
           url,
           method,
-          statusCode: error.response?.status,
-          originalError: error.message,
+          statusCode: errorObj.response?.status,
+          originalError: errorMessage,
         },
       );
     }

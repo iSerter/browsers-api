@@ -131,11 +131,11 @@ export class TurnstileSolver implements ICaptchaSolver {
           solvedAt: response.solvedAt,
           solverId: this.getName(),
         };
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
         const duration = Date.now() - startTime;
         this.metrics.failureCount++;
-        const errorMessage = error.message || 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.metrics.failureReasons[errorMessage] =
           (this.metrics.failureReasons[errorMessage] || 0) + 1;
         this.updateMetrics(duration);
@@ -180,8 +180,8 @@ export class TurnstileSolver implements ICaptchaSolver {
   /**
    * Determine if an error should not trigger a retry
    */
-  private shouldNotRetry(error: any): boolean {
-    const errorMessage = error?.message?.toLowerCase() || '';
+  private shouldNotRetry(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
 
     // Don't retry on widget not detected errors
     if (errorMessage.includes('widget not detected')) {
@@ -241,8 +241,9 @@ export class TurnstileSolver implements ICaptchaSolver {
           iframeSrc: widgetResult.iframeSrc,
         },
       };
-    } catch (error: any) {
-      this.logger.warn(`Error detecting Turnstile widget: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error detecting Turnstile widget: ${errorMessage}`);
       return {
         mode: TurnstileWidgetMode.UNKNOWN,
         iframe: null,
@@ -298,9 +299,10 @@ export class TurnstileSolver implements ICaptchaSolver {
       } else {
         return TurnstileWidgetMode.NON_INTERACTIVE;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(
-        `Error determining widget mode: ${error.message}, defaulting to managed`,
+        `Error determining widget mode: ${errorMessage}, defaulting to managed`,
       );
       return TurnstileWidgetMode.MANAGED;
     }
@@ -332,8 +334,9 @@ export class TurnstileSolver implements ICaptchaSolver {
           size: container.getAttribute('data-size') || undefined,
         };
       });
-    } catch (error: any) {
-      this.logger.debug(`Error extracting widget details: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.debug(`Error extracting widget details: ${errorMessage}`);
       return {};
     }
   }
@@ -409,9 +412,10 @@ export class TurnstileSolver implements ICaptchaSolver {
         mode: TurnstileWidgetMode.MANAGED,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(
-        `Failed to solve managed Turnstile challenge: ${error.message}`,
+        `Failed to solve managed Turnstile challenge: ${errorMessage}`,
       );
     }
   }
@@ -443,9 +447,10 @@ export class TurnstileSolver implements ICaptchaSolver {
         mode: TurnstileWidgetMode.NON_INTERACTIVE,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(
-        `Failed to solve non-interactive Turnstile challenge: ${error.message}`,
+        `Failed to solve non-interactive Turnstile challenge: ${errorMessage}`,
       );
     }
   }
@@ -477,9 +482,10 @@ export class TurnstileSolver implements ICaptchaSolver {
         mode: TurnstileWidgetMode.INVISIBLE,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(
-        `Failed to solve invisible Turnstile challenge: ${error.message}`,
+        `Failed to solve invisible Turnstile challenge: ${errorMessage}`,
       );
     }
   }

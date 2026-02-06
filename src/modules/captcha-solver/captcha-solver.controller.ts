@@ -9,6 +9,7 @@ import {
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -25,6 +26,7 @@ import { SsrfProtectionGuard } from './guards/ssrf-protection.guard';
 
 @ApiTags('captcha-solver')
 @Controller('captcha-solver')
+@UseGuards(ThrottlerGuard)
 export class CaptchaSolverController {
   constructor(
     private readonly captchaSolverService: CaptchaSolverService,
@@ -83,6 +85,7 @@ export class CaptchaSolverController {
 
   @Post('test')
   @UseGuards(SsrfProtectionGuard)
+  @Throttle({ short: { limit: 2, ttl: 1000 }, medium: { limit: 10, ttl: 10000 }, long: { limit: 30, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Test captcha solving',
@@ -153,9 +156,10 @@ export class CaptchaSolverController {
           solverId: solution.solverId,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to solve captcha: ${error.message}`,
+        `Failed to solve captcha: ${errorMessage}`,
       );
     }
   }

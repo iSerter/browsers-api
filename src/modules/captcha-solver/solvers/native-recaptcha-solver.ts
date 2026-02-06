@@ -194,7 +194,7 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
           },
         },
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If last error is already a custom exception, rethrow it
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
@@ -205,7 +205,7 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
 
       throw new InternalException(
         `Failed to solve reCAPTCHA challenge after ${this.config.maxRetries} attempts: ${formatError(error)}`,
-        error || undefined,
+        error instanceof Error ? error : undefined,
         {
           maxRetries: this.config.maxRetries,
           attempts: this.config.maxRetries,
@@ -218,8 +218,8 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
   /**
    * Determine if an error should not trigger a retry
    */
-  private shouldNotRetry(error: any): boolean {
-    const errorMessage = error?.message?.toLowerCase() || '';
+  private shouldNotRetry(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
 
     // Don't retry on widget not detected errors
     if (errorMessage.includes('widget not detected')) {
@@ -288,8 +288,9 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
           challengeIframeSrc: challengeIframe?.url(),
         },
       };
-    } catch (error: any) {
-      this.logger.warn(`Error detecting reCAPTCHA widget: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error detecting reCAPTCHA widget: ${errorMessage}`);
       // Try to preserve confidence from widget detection if available
       let confidence = 0;
       try {
@@ -362,9 +363,10 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
             : RecaptchaVersion.V2,
         details: versionInfo,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(
-        `Error determining version: ${error.message}, defaulting to v2`,
+        `Error determining version: ${errorMessage}, defaulting to v2`,
       );
       return { version: RecaptchaVersion.V2, details: {} };
     }
@@ -406,9 +408,10 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
       return challengeInfo.type === 'invisible'
         ? RecaptchaV2ChallengeType.INVISIBLE
         : RecaptchaV2ChallengeType.CHECKBOX;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(
-        `Error determining challenge type: ${error.message}, defaulting to checkbox`,
+        `Error determining challenge type: ${errorMessage}, defaulting to checkbox`,
       );
       return RecaptchaV2ChallengeType.CHECKBOX;
     }
@@ -444,8 +447,9 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
           size: container.getAttribute('data-size') || undefined,
         };
       });
-    } catch (error: any) {
-      this.logger.debug(`Error extracting widget details: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.debug(`Error extracting widget details: ${errorMessage}`);
       return {};
     }
   }
@@ -485,8 +489,9 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
       }
 
       return { anchorIframe, challengeIframe };
-    } catch (error: any) {
-      this.logger.warn(`Error finding iframes: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error finding iframes: ${errorMessage}`);
       return { anchorIframe: null, challengeIframe: null };
     }
   }
@@ -584,16 +589,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         challengeType: RecaptchaV2ChallengeType.CHECKBOX,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
           error instanceof InternalException ||
           error instanceof ProviderException) {
         throw error;
       }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalException(
-        `Failed to solve v2 checkbox challenge: ${error.message}`,
-        error,
+        `Failed to solve v2 checkbox challenge: ${errorMessage}`,
+        error instanceof Error ? error : undefined,
         { method: 'solveV2CheckboxChallenge' },
       );
     }
@@ -633,16 +639,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         challengeType: RecaptchaV2ChallengeType.INVISIBLE,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
           error instanceof InternalException ||
           error instanceof ProviderException) {
         throw error;
       }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalException(
-        `Failed to solve v2 invisible challenge: ${error.message}`,
-        error,
+        `Failed to solve v2 invisible challenge: ${errorMessage}`,
+        error instanceof Error ? error : undefined,
         { method: 'solveV2InvisibleChallenge' },
       );
     }
@@ -723,16 +730,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         challengeType: RecaptchaV2ChallengeType.AUDIO,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
           error instanceof InternalException ||
           error instanceof ProviderException) {
         throw error;
       }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalException(
-        `Failed to solve v2 audio challenge: ${error.message}`,
-        error,
+        `Failed to solve v2 audio challenge: ${errorMessage}`,
+        error instanceof Error ? error : undefined,
         { method: 'solveV2AudioChallenge' },
       );
     }
@@ -814,16 +822,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         challengeType: RecaptchaV2ChallengeType.IMAGE,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
           error instanceof InternalException ||
           error instanceof ProviderException) {
         throw error;
       }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalException(
-        `Failed to solve v2 image challenge: ${error.message}`,
-        error,
+        `Failed to solve v2 image challenge: ${errorMessage}`,
+        error instanceof Error ? error : undefined,
         { method: 'solveV2ImageChallenge' },
       );
     }
@@ -861,16 +870,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         version: RecaptchaVersion.V3,
         duration: Date.now() - solveStartTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
           error instanceof InternalException ||
           error instanceof ProviderException) {
         throw error;
       }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalException(
-        `Failed to solve v3 challenge: ${error.message}`,
-        error,
+        `Failed to solve v3 challenge: ${errorMessage}`,
+        error instanceof Error ? error : undefined,
         { method: 'solveV3Challenge' },
       );
     }
@@ -922,8 +932,9 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
 
         return null;
       });
-    } catch (error) {
-      this.logger.warn(`Failed to extract audio URL: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to extract audio URL: ${errorMessage}`);
       return null;
     }
   }
@@ -941,16 +952,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
       await input.fill(transcription);
       await input.press('Enter');
       this.logger.debug(`Submitted audio transcription: ${transcription}`);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
           error instanceof InternalException ||
           error instanceof ProviderException) {
         throw error;
       }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalException(
-        `Failed to submit audio transcription: ${error.message}`,
-        error,
+        `Failed to submit audio transcription: ${errorMessage}`,
+        error instanceof Error ? error : undefined,
         { method: 'submitAudioTranscription' },
       );
     }
@@ -1040,16 +1052,17 @@ export class NativeRecaptchaSolver implements ICaptchaSolver {
         await tile.click({ timeout: 2000 });
         await this.sleep(500); // Small delay between clicks
       }
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof SolverUnavailableException ||
           error instanceof ValidationException ||
           error instanceof InternalException ||
           error instanceof ProviderException) {
         throw error;
       }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalException(
-        `Failed to select image tiles: ${error.message}`,
-        error,
+        `Failed to select image tiles: ${errorMessage}`,
+        error instanceof Error ? error : undefined,
         { method: 'selectImageTiles' },
       );
     }

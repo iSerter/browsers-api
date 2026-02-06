@@ -166,11 +166,11 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
           solvedAt: response.solvedAt,
           solverId: this.getName(),
         };
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
         const duration = Date.now() - startTime;
         this.metrics.failureCount++;
-        const errorMessage = error.message || 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.metrics.failureReasons[errorMessage] =
           (this.metrics.failureReasons[errorMessage] || 0) + 1;
         this.updateMetrics(duration);
@@ -242,8 +242,8 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
   /**
    * Determine if an error should not trigger a retry
    */
-  private shouldNotRetry(error: any): boolean {
-    const errorMessage = error?.message?.toLowerCase() || '';
+  private shouldNotRetry(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
 
     // Don't retry on widget not detected errors
     if (errorMessage.includes('widget not detected')) {
@@ -308,8 +308,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
           challengeIframeSrc: challengeIframe?.url(),
         },
       };
-    } catch (error: any) {
-      this.logger.warn(`Error detecting hCAPTCHA widget: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error detecting hCAPTCHA widget: ${errorMessage}`);
       return {
         anchorIframe: null,
         challengeIframe: null,
@@ -348,8 +349,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
           size: hcaptchaElement.getAttribute('data-size') || undefined,
         };
       });
-    } catch (error: any) {
-      this.logger.warn(`Failed to extract widget details: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to extract widget details: ${errorMessage}`);
       return {};
     }
   }
@@ -384,8 +386,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
       }
 
       return { anchorIframe, challengeIframe };
-    } catch (error: any) {
-      this.logger.warn(`Failed to find iframes: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to find iframes: ${errorMessage}`);
       return { anchorIframe: null, challengeIframe: null };
     }
   }
@@ -432,8 +435,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
       }
 
       return HcaptchaChallengeType.CHECKBOX;
-    } catch (error: any) {
-      this.logger.warn(`Error determining challenge type: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error determining challenge type: ${errorMessage}`);
       return HcaptchaChallengeType.CHECKBOX;
     }
   }
@@ -490,8 +494,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
       } else {
         return HcaptchaDifficulty.EASY;
       }
-    } catch (error: any) {
-      this.logger.debug(`Error detecting difficulty: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.debug(`Error detecting difficulty: ${errorMessage}`);
       return HcaptchaDifficulty.UNKNOWN;
     }
   }
@@ -575,8 +580,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
         difficulty: detection.details?.difficulty,
       };
-    } catch (error: any) {
-      throw new Error(`Failed to solve checkbox challenge: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to solve checkbox challenge: ${errorMessage}`);
     }
   }
 
@@ -636,8 +642,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
         difficulty: detection.details?.difficulty,
       };
-    } catch (error: any) {
-      throw new Error(`Failed to solve invisible challenge: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to solve invisible challenge: ${errorMessage}`);
     }
   }
 
@@ -720,8 +727,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
         difficulty: detection.details?.difficulty,
       };
-    } catch (error: any) {
-      throw new Error(`Failed to solve audio challenge: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to solve audio challenge: ${errorMessage}`);
     }
   }
 
@@ -784,8 +792,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
         duration: Date.now() - solveStartTime,
         difficulty: detection.details?.difficulty,
       };
-    } catch (error: any) {
-      throw new Error(`Failed to solve accessibility challenge: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to solve accessibility challenge: ${errorMessage}`);
     }
   }
 
@@ -814,8 +823,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
 
         return null;
       });
-    } catch (error: any) {
-      this.logger.warn(`Failed to extract audio URL: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to extract audio URL: ${errorMessage}`);
       return null;
     }
   }
@@ -835,8 +845,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
       await input.fill(transcription);
       await input.press('Enter');
       this.logger.debug(`Submitted audio transcription: ${transcription}`);
-    } catch (error: any) {
-      throw new Error(`Failed to submit audio transcription: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to submit audio transcription: ${errorMessage}`);
     }
   }
 
@@ -960,8 +971,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
         }
       }, callbackName);
       this.logger.debug(`Triggered callback: ${callbackName}`);
-    } catch (error: any) {
-      this.logger.warn(`Failed to trigger callback: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to trigger callback: ${errorMessage}`);
     }
   }
 
@@ -977,8 +989,9 @@ export class NativeHcaptchaSolver implements ICaptchaSolver {
         }
       });
       this.logger.debug('Submitted form automatically');
-    } catch (error: any) {
-      this.logger.warn(`Failed to submit form: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to submit form: ${errorMessage}`);
     }
   }
 

@@ -10,6 +10,7 @@ import {
   ProviderException,
 } from '../exceptions';
 import { SolverCircuitBreakerService, CircuitState } from '../services/solver-circuit-breaker.service';
+import { CaptchaMetricsService } from '../metrics/captcha-metrics.service';
 
 /**
  * Type for solver creation strategy function
@@ -46,6 +47,7 @@ export class SolverFactory {
     private readonly registry: SolverRegistry,
     private readonly performanceTracker: SolverPerformanceTracker,
     private readonly circuitBreaker: SolverCircuitBreakerService,
+    private readonly captchaMetrics?: CaptchaMetricsService,
     private readonly widgetInteraction?: CaptchaWidgetInteractionService,
   ) {}
 
@@ -74,9 +76,10 @@ export class SolverFactory {
 
       // For solvers not in the strategy map, use standard instantiation
       return this.createStandardSolver(metadata, args);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to create solver ${solverType}: ${error.message}`,
+        `Failed to create solver ${solverType}: ${errorMessage}`,
       );
       return null;
     }
@@ -272,7 +275,157 @@ export class SolverFactory {
   }
 
   /**
-   * Solve a challenge using the best available solver with fallback chain
+   * Try a single solver and return the result with tracking
+   */
+  private async trySingleSolver(
+    solverType: string,
+    params: CaptchaParams,
+    solverArgs: any[],
+    correlationId: string,
+  ): Promise<CaptchaSolution> {
+    const attemptStartTime = Date.now();
+    const challengeType = params.type;
+
+    this.logger.log(
+      `Attempting to solve ${challengeType} with ${solverType} [correlationId: ${correlationId}]`,
+    );
+
+    const solver = this.createSolver(solverType, ...solverArgs);
+    if (!solver) {
+      throw new SolverUnavailableException(
+        `Failed to create solver ${solverType}`,
+        'native',
+        'solver_creation_failed',
+        { solverType, correlationId },
+      );
+    }
+
+    this.captchaMetrics?.incrementActiveSolves(solverType);
+
+    try {
+      const solution = await solver.solve(params);
+      const duration = Date.now() - attemptStartTime;
+
+      // Record success with circuit breaker
+      const stateBeforeSuccess = this.circuitBreaker.getState(solverType);
+      this.circuitBreaker.recordSuccess(solverType);
+      const stateAfterSuccess = this.circuitBreaker.getState(solverType);
+
+      if (stateBeforeSuccess !== stateAfterSuccess) {
+        this.logger.log(
+          `Circuit breaker for solver '${solverType}' transitioned from ${stateBeforeSuccess} to ${stateAfterSuccess} after successful solve [correlationId: ${correlationId}]`,
+        );
+      }
+
+      this.registry.recordSuccess(solverType);
+      this.performanceTracker.recordAttempt(solverType, challengeType, duration, true);
+      this.captchaMetrics?.recordSolveSuccess(solverType, challengeType, duration);
+
+      this.logger.log(
+        `Successfully solved ${challengeType} with ${solverType} in ${duration}ms [correlationId: ${correlationId}]`,
+      );
+
+      return solution;
+    } catch (error: unknown) {
+      const wrappedError = error instanceof Error ? error : new Error(String(error));
+
+      const stateBeforeFailure = this.circuitBreaker.getState(solverType);
+      this.circuitBreaker.recordFailure(solverType);
+      const stateAfterFailure = this.circuitBreaker.getState(solverType);
+
+      if (stateBeforeFailure !== stateAfterFailure) {
+        this.logger.warn(
+          `Circuit breaker for solver '${solverType}' transitioned from ${stateBeforeFailure} to ${stateAfterFailure} after failure [correlationId: ${correlationId}]`,
+        );
+        if (stateAfterFailure === CircuitState.OPEN) {
+          this.captchaMetrics?.recordCircuitBreakerTrip(solverType);
+        }
+      }
+
+      const failureDuration = Date.now() - attemptStartTime;
+      const isCircuitBroken = !this.circuitBreaker.isAvailable(solverType);
+
+      let errorMessage = wrappedError.message || 'Unknown error';
+      if (isCircuitBroken) {
+        errorMessage = `Solver ${solverType} failed and circuit breaker is now ${stateAfterFailure}: ${errorMessage}`;
+      }
+
+      this.logger.warn(
+        `Failed to solve with ${solverType}: ${errorMessage} [correlationId: ${correlationId}]`,
+        { solverType, challengeType, duration: failureDuration, circuitBreakerState: stateAfterFailure, isCircuitBroken },
+      );
+
+      this.registry.recordFailure(solverType);
+      this.performanceTracker.recordAttempt(solverType, challengeType, failureDuration, false, errorMessage);
+      this.captchaMetrics?.recordSolveFailure(solverType, challengeType, failureDuration);
+
+      throw wrappedError;
+    } finally {
+      this.captchaMetrics?.decrementActiveSolves(solverType);
+    }
+  }
+
+  /**
+   * Race multiple solvers in parallel — first success wins, all-fail rejects
+   */
+  async solveInParallel(
+    params: CaptchaParams,
+    solverTypes: string[],
+    solverArgs: any[] = [],
+    correlationId: string = uuidv4(),
+  ): Promise<CaptchaSolution> {
+    if (solverTypes.length === 0) {
+      throw new SolverUnavailableException(
+        'No solvers provided for parallel execution',
+        'native',
+        'no_solvers_for_parallel',
+        { correlationId },
+      );
+    }
+
+    if (solverTypes.length === 1) {
+      return this.trySingleSolver(solverTypes[0], params, solverArgs, correlationId);
+    }
+
+    this.logger.log(
+      `Starting parallel solve for ${params.type} with ${solverTypes.length} solvers [correlationId: ${correlationId}]`,
+    );
+
+    // Race-to-success: first settled promise that fulfills wins
+    const results = await Promise.allSettled(
+      solverTypes.map(solverType =>
+        this.trySingleSolver(solverType, params, solverArgs, correlationId),
+      ),
+    );
+
+    // Return first successful result
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      }
+    }
+
+    // All failed — collect errors
+    const errors = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map(r => r.reason instanceof Error ? r.reason.message : String(r.reason));
+
+    throw new SolverUnavailableException(
+      `All ${solverTypes.length} parallel solvers failed for ${params.type}: ${errors.join('; ')}`,
+      'native',
+      'all_parallel_solvers_failed',
+      {
+        challengeType: params.type,
+        correlationId,
+        attemptedSolvers: solverTypes,
+        errors,
+      },
+    );
+  }
+
+  /**
+   * Solve a challenge using the best available solver with fallback chain.
+   * Tries top 3 candidates in parallel first, then falls back to sequential for remaining.
    */
   async solveWithFallback(
     params: CaptchaParams,
@@ -283,7 +436,6 @@ export class SolverFactory {
     const candidates = this.registry.getSolversByPriority(challengeType);
 
     if (candidates.length === 0) {
-      // Check if there are any solvers registered but circuit-broken
       const allSolvers = this.registry.getSolversForChallengeType(challengeType);
       if (allSolvers.length > 0) {
         const circuitBrokenSolvers = allSolvers
@@ -292,7 +444,7 @@ export class SolverFactory {
             solverType: m.solverType,
             state: this.circuitBreaker.getState(m.solverType),
           }));
-        
+
         throw new SolverUnavailableException(
           `No available solvers for challenge type: ${challengeType} - all ${allSolvers.length} solvers are circuit-broken or unavailable`,
           'native',
@@ -314,134 +466,92 @@ export class SolverFactory {
       }
     }
 
-    let lastError: Error | null = null;
-    const startTime = Date.now();
+    // Filter to available solvers (circuit breaker check)
+    const availableCandidates = candidates.filter(metadata => {
+      const isAvailable = this.circuitBreaker.isAvailable(metadata.solverType);
+      if (!isAvailable) {
+        const previousState = this.circuitBreaker.getState(metadata.solverType);
+        this.logger.warn(
+          `Skipping solver ${metadata.solverType} - circuit breaker is ${previousState} [correlationId: ${correlationId}]`,
+        );
+      }
+      return isAvailable;
+    });
+
+    if (availableCandidates.length === 0) {
+      throw new SolverUnavailableException(
+        `All solvers for ${challengeType} are circuit-broken`,
+        'native',
+        'all_solvers_circuit_broken',
+        { challengeType, correlationId },
+      );
+    }
 
     this.logger.log(
-      `Starting solve attempt for ${challengeType} [correlationId: ${correlationId}]`,
+      `Starting solve attempt for ${challengeType} with ${availableCandidates.length} available solvers [correlationId: ${correlationId}]`,
     );
 
-    // Try each solver in priority order
-    for (const metadata of candidates) {
-      const attemptStartTime = Date.now();
-      const solverType = metadata.solverType;
-      
-      // Check circuit breaker state before attempting
-      const previousState = this.circuitBreaker.getState(solverType);
-      const isAvailable = this.circuitBreaker.isAvailable(solverType);
-      
-      if (!isAvailable) {
-        const stateDetails = this.circuitBreaker.getStateDetails(solverType);
-        this.logger.warn(
-          `Skipping solver ${solverType} - circuit breaker is ${previousState} [correlationId: ${correlationId}]`,
-          { solverType, state: previousState, stateDetails },
+    // Phase 1: Try top candidates in parallel (up to 3)
+    const parallelCount = Math.min(3, availableCandidates.length);
+    const parallelCandidates = availableCandidates.slice(0, parallelCount);
+    const remainingCandidates = availableCandidates.slice(parallelCount);
+
+    try {
+      return await this.solveInParallel(
+        params,
+        parallelCandidates.map(m => m.solverType),
+        solverArgs,
+        correlationId,
+      );
+    } catch (parallelError: unknown) {
+      if (remainingCandidates.length === 0) {
+        // No remaining candidates — rethrow
+        if (parallelError instanceof SolverUnavailableException ||
+            parallelError instanceof ProviderException ||
+            parallelError instanceof InternalException) {
+          throw parallelError;
+        }
+        const errorMessage = parallelError instanceof Error ? parallelError.message : 'Unknown error';
+        throw new SolverUnavailableException(
+          `All solvers failed to solve ${challengeType}: ${errorMessage}`,
+          'native',
+          'all_solvers_failed',
+          { challengeType, correlationId },
         );
+      }
+
+      this.logger.warn(
+        `Parallel phase failed, falling back to sequential for ${remainingCandidates.length} remaining solvers [correlationId: ${correlationId}]`,
+      );
+    }
+
+    // Phase 2: Sequential fallback for remaining candidates
+    let lastError: Error | null = null;
+
+    for (const metadata of remainingCandidates) {
+      const solverType = metadata.solverType;
+
+      if (!this.circuitBreaker.isAvailable(solverType)) {
         continue;
       }
 
       try {
-        this.logger.log(
-          `Attempting to solve ${challengeType} with ${solverType} [correlationId: ${correlationId}]`,
-        );
-
-        const solver = this.createSolver(solverType, ...solverArgs);
-        if (!solver) {
-          this.logger.warn(
-            `Failed to create solver ${solverType} [correlationId: ${correlationId}]`,
-          );
-          continue;
-        }
-
-        const solution = await solver.solve(params);
-        const duration = Date.now() - attemptStartTime;
-
-        // Record success with circuit breaker
-        const stateBeforeSuccess = this.circuitBreaker.getState(solverType);
-        this.circuitBreaker.recordSuccess(solverType);
-        const stateAfterSuccess = this.circuitBreaker.getState(solverType);
-        
-        // Log state transition if it occurred
-        if (stateBeforeSuccess !== stateAfterSuccess) {
-          this.logger.log(
-            `Circuit breaker for solver '${solverType}' transitioned from ${stateBeforeSuccess} to ${stateAfterSuccess} after successful solve [correlationId: ${correlationId}]`,
-          );
-        }
-
-        // Record success with registry and performance tracker
-        this.registry.recordSuccess(solverType);
-        this.performanceTracker.recordAttempt(
-          solverType,
-          challengeType,
-          duration,
-          true,
-        );
-
-        this.logger.log(
-          `Successfully solved ${challengeType} with ${solverType} in ${duration}ms [correlationId: ${correlationId}]`,
-        );
-
-        return solution;
-      } catch (error: any) {
-        lastError = error;
-        
-        // Record failure with circuit breaker
-        const stateBeforeFailure = this.circuitBreaker.getState(solverType);
-        this.circuitBreaker.recordFailure(solverType);
-        const stateAfterFailure = this.circuitBreaker.getState(solverType);
-        
-        // Log state transition if it occurred
-        if (stateBeforeFailure !== stateAfterFailure) {
-          this.logger.warn(
-            `Circuit breaker for solver '${solverType}' transitioned from ${stateBeforeFailure} to ${stateAfterFailure} after failure [correlationId: ${correlationId}]`,
-          );
-        }
-
-        const failureDuration = Date.now() - attemptStartTime;
-        const isCircuitBroken = !this.circuitBreaker.isAvailable(solverType);
-        
-        // Update error message to indicate circuit breaker state
-        let errorMessage = error.message || 'Unknown error';
-        if (isCircuitBroken) {
-          errorMessage = `Solver ${solverType} failed and circuit breaker is now ${stateAfterFailure}: ${errorMessage}`;
-        }
-
-        this.logger.warn(
-          `Failed to solve with ${solverType}: ${errorMessage} [correlationId: ${correlationId}]`,
-          {
-            solverType,
-            challengeType,
-            duration: failureDuration,
-            circuitBreakerState: stateAfterFailure,
-            isCircuitBroken,
-          },
-        );
-
-        // Record failure with registry and performance tracker
-        this.registry.recordFailure(solverType);
-        this.performanceTracker.recordAttempt(
-          solverType,
-          challengeType,
-          failureDuration,
-          false,
-          errorMessage,
-        );
-
-        // Continue to next solver
+        return await this.trySingleSolver(solverType, params, solverArgs, correlationId);
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
       }
     }
 
-    // If last error is already a custom exception, enhance it with correlation ID
+    // All solvers failed
     if (lastError instanceof SolverUnavailableException ||
         lastError instanceof ProviderException ||
         lastError instanceof InternalException) {
-      // Add correlation ID to context if not already present
       if (lastError.context && !lastError.context.correlationId) {
         lastError.context.correlationId = correlationId;
       }
       throw lastError;
     }
 
-    // Wrap in SolverUnavailableException with correlation ID
     throw new SolverUnavailableException(
       `All solvers failed to solve ${challengeType}: ${lastError?.message || 'Unknown error'}`,
       'native',

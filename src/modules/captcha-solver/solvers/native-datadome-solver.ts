@@ -101,8 +101,9 @@ export class NativeDataDomeSolver implements ICaptchaSolver {
         const context = this.page.context();
         this.cdpSession = await context.newCDPSession(this.page);
         this.logger.debug('CDP session initialized');
-      } catch (error: any) {
-        this.logger.warn(`Failed to initialize CDP session: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`Failed to initialize CDP session: ${errorMessage}`);
       }
     }
   }
@@ -176,11 +177,11 @@ export class NativeDataDomeSolver implements ICaptchaSolver {
           solvedAt: response.solvedAt,
           solverId: this.getName(),
         };
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
         const duration = Date.now() - startTime;
         this.metrics.failureCount++;
-        const errorMessage = error.message || 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.metrics.failureReasons[errorMessage] =
           (this.metrics.failureReasons[errorMessage] || 0) + 1;
         this.updateMetrics(duration);
@@ -295,8 +296,9 @@ export class NativeDataDomeSolver implements ICaptchaSolver {
           cookieNames: datadomeCookies.map((c) => c.name),
         },
       };
-    } catch (error: any) {
-      this.logger.warn(`Error detecting DataDome widget: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error detecting DataDome widget: ${errorMessage}`);
       return {
         container: null,
         captchaIframe: null,
@@ -651,8 +653,9 @@ export class NativeDataDomeSolver implements ICaptchaSolver {
 
       // Default to sensor validation
       return DataDomeChallengeType.SENSOR_VALIDATION;
-    } catch (error: any) {
-      this.logger.warn(`Error determining challenge type: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error determining challenge type: ${errorMessage}`);
       return DataDomeChallengeType.SENSOR_VALIDATION;
     }
   }
@@ -857,8 +860,9 @@ export class NativeDataDomeSolver implements ICaptchaSolver {
       }
 
       throw new Error('Slider challenge not completed');
-    } catch (error: any) {
-      throw new Error(`Failed to solve slider challenge: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to solve slider challenge: ${errorMessage}`);
     }
   }
 
@@ -907,8 +911,8 @@ export class NativeDataDomeSolver implements ICaptchaSolver {
   /**
    * Determine if an error should not trigger a retry
    */
-  private shouldNotRetry(error: any): boolean {
-    const errorMessage = error?.message?.toLowerCase() || '';
+  private shouldNotRetry(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
 
     // Don't retry on widget not detected errors
     if (errorMessage.includes('widget not detected')) {

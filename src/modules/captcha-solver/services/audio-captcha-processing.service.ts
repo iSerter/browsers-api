@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Page } from 'playwright';
 import * as fs from 'fs/promises';
@@ -17,7 +17,7 @@ import {
   AudioPreprocessingOptions,
 } from './interfaces/audio-captcha.interface';
 import { CaptchaWidgetInteractionService } from './captcha-widget-interaction.service';
-import {
+import type {
   GoogleCloudSpeechProvider,
   OpenAIWhisperProvider,
   AzureSpeechProvider,
@@ -85,9 +85,6 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly widgetInteraction: CaptchaWidgetInteractionService,
-    private readonly googleProvider?: GoogleCloudSpeechProvider,
-    private readonly openaiProvider?: OpenAIWhisperProvider,
-    private readonly azureProvider?: AzureSpeechProvider,
   ) {
     this.config = { ...DEFAULT_CONFIG };
   }
@@ -175,31 +172,60 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
   }
 
   /**
-   * Initialize speech-to-text providers
+   * Initialize speech-to-text providers via lazy loading.
+   * Providers are dynamically imported only when their API keys are configured,
+   * reducing startup time and memory usage when providers aren't needed.
    */
   private async initializeProviders(): Promise<void> {
-    // Register available providers
-    if (this.googleProvider) {
-      const isAvailable = await this.googleProvider.isAvailable();
-      if (isAvailable) {
-        this.registerProvider(this.googleProvider);
-        this.logger.debug('Google Cloud Speech provider registered');
-      }
-    }
+    const providerConfigs: Array<{
+      name: string;
+      envKey: string;
+      importPath: string;
+      exportName: string;
+      providerEnum: SpeechToTextProvider;
+    }> = [
+      {
+        name: 'Google Cloud Speech',
+        envKey: 'GOOGLE_SPEECH_API_KEY',
+        importPath: './providers',
+        exportName: 'GoogleCloudSpeechProvider',
+        providerEnum: SpeechToTextProvider.GOOGLE_CLOUD,
+      },
+      {
+        name: 'OpenAI Whisper',
+        envKey: 'OPENAI_API_KEY',
+        importPath: './providers',
+        exportName: 'OpenAIWhisperProvider',
+        providerEnum: SpeechToTextProvider.OPENAI_WHISPER,
+      },
+      {
+        name: 'Azure Speech',
+        envKey: 'AZURE_SPEECH_KEY',
+        importPath: './providers',
+        exportName: 'AzureSpeechProvider',
+        providerEnum: SpeechToTextProvider.AZURE_SPEECH,
+      },
+    ];
 
-    if (this.openaiProvider) {
-      const isAvailable = await this.openaiProvider.isAvailable();
-      if (isAvailable) {
-        this.registerProvider(this.openaiProvider);
-        this.logger.debug('OpenAI Whisper provider registered');
+    for (const config of providerConfigs) {
+      const apiKey = this.configService.get<string>(config.envKey);
+      if (!apiKey) {
+        this.logger.debug(`${config.name} provider skipped (no API key configured)`);
+        continue;
       }
-    }
 
-    if (this.azureProvider) {
-      const isAvailable = await this.azureProvider.isAvailable();
-      if (isAvailable) {
-        this.registerProvider(this.azureProvider);
-        this.logger.debug('Azure Speech provider registered');
+      try {
+        const module = await import(config.importPath);
+        const ProviderClass = module[config.exportName];
+        const provider: ISpeechToTextProvider = new ProviderClass(this.configService);
+        const isAvailable = await provider.isAvailable();
+        if (isAvailable) {
+          this.registerProvider(provider);
+          this.logger.debug(`${config.name} provider registered (lazy loaded)`);
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`Failed to lazy-load ${config.name} provider: ${errorMessage}`);
       }
     }
 
@@ -213,6 +239,31 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
   }
 
   /**
+   * Validate that a file path stays within the configured temp directory.
+   * Prevents path traversal attacks.
+   */
+  private validateFilePath(filePath: string): void {
+    const resolvedPath = path.resolve(filePath);
+    const resolvedTempDir = path.resolve(this.config.tempDirectory);
+    if (!resolvedPath.startsWith(resolvedTempDir + path.sep) && resolvedPath !== resolvedTempDir) {
+      throw new InternalException(
+        'Path traversal detected: file path escapes temp directory',
+        undefined,
+        { filePath, tempDirectory: this.config.tempDirectory },
+      );
+    }
+  }
+
+  /**
+   * Write a file securely with restricted permissions (owner-only read/write)
+   */
+  private async secureWriteFile(filePath: string, data: Buffer): Promise<void> {
+    this.validateFilePath(filePath);
+    await fs.writeFile(filePath, data);
+    await fs.chmod(filePath, 0o600);
+  }
+
+  /**
    * Ensure temporary directory exists
    */
   private async ensureTempDirectory(): Promise<void> {
@@ -222,9 +273,10 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
     }
     try {
       await fs.mkdir(this.config.tempDirectory, { recursive: true });
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(
-        `Failed to create temp directory: ${error.message}`,
+        `Failed to create temp directory: ${errorMessage}`,
       );
     }
   }
@@ -275,8 +327,9 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
       }
 
       return { found: false };
-    } catch (error) {
-      this.logger.warn(`Error detecting audio challenge: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Error detecting audio challenge: ${errorMessage}`);
       return { found: false };
     }
   }
@@ -332,7 +385,7 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
           this.config.tempDirectory,
           `${crypto.randomUUID()}.${format}`,
         );
-        await fs.writeFile(filePath, audioBuffer);
+        await this.secureWriteFile(filePath, audioBuffer);
       }
 
       const duration = Date.now() - startTime;
@@ -341,8 +394,9 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
       );
 
       return { buffer: audioBuffer, format, filePath };
-    } catch (error) {
-      this.logger.error(`Failed to download audio: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to download audio: ${errorMessage}`);
       throw error;
     }
   }
@@ -416,12 +470,12 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
     page?: Page,
   ): Promise<AudioCaptchaResponse> {
     const startTime = Date.now();
+    let tempFilePath: string | undefined;
 
     try {
       // Step 1: Download audio
       let audioBuffer: Buffer;
       let format: AudioFormat;
-      let tempFilePath: string | undefined;
 
       if (page && !request.audioUrl) {
         // Extract audio URL from page
@@ -450,10 +504,6 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
         const cached = this.cache.get(cacheKey);
         if (cached && Date.now() < cached.expiresAt) {
           this.logger.debug('Returning cached transcription');
-          // Cleanup temp file
-          if (tempFilePath) {
-            await this.cleanupTempFile(tempFilePath).catch(() => {});
-          }
           return {
             transcription: cached.transcription,
             confidence: cached.confidence,
@@ -493,11 +543,6 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
         });
       }
 
-      // Step 6: Cleanup
-      if (tempFilePath) {
-        await this.cleanupTempFile(tempFilePath).catch(() => {});
-      }
-
       const duration = Date.now() - startTime;
       this.logger.debug(
         `Audio captcha processed in ${duration}ms (confidence: ${transcriptionResult.confidence})`,
@@ -511,9 +556,15 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
         duration,
         metadata: transcriptionResult.metadata,
       };
-    } catch (error) {
-      this.logger.error(`Failed to process audio captcha: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to process audio captcha: ${errorMessage}`);
       throw error;
+    } finally {
+      // Guaranteed temp file cleanup
+      if (tempFilePath) {
+        await this.cleanupTempFile(tempFilePath).catch(() => {});
+      }
     }
   }
 
@@ -551,8 +602,9 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
       });
 
       return audioUrl;
-    } catch (error) {
-      this.logger.warn(`Failed to extract audio URL: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to extract audio URL: ${errorMessage}`);
       return null;
     }
   }
@@ -577,7 +629,7 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
         this.config.tempDirectory,
         `${crypto.randomUUID()}.${format}`,
       );
-      await fs.writeFile(filePath, buffer);
+      await this.secureWriteFile(filePath, buffer);
     }
 
     return { buffer, format, filePath };
@@ -664,9 +716,10 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
           );
           return await this.transcribeWithRetry(enhancedBuffer, options, attempt + 1);
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.logger.warn(
-          `Transcription failed with ${providerType}: ${error.message}`,
+          `Transcription failed with ${providerType}: ${errorMessage}`,
         );
         // Try next provider
         continue;
@@ -749,8 +802,9 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
     if (request) {
       try {
         await request();
-      } catch (error) {
-        this.logger.error(`Queued request failed: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Queued request failed: ${errorMessage}`);
       }
     }
 
@@ -773,8 +827,9 @@ export class AudioCaptchaProcessingService implements OnModuleInit {
   private async cleanupTempFile(filePath: string): Promise<void> {
     try {
       await fs.unlink(filePath);
-    } catch (error) {
-      this.logger.debug(`Failed to cleanup temp file: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.debug(`Failed to cleanup temp file: ${errorMessage}`);
     }
   }
 

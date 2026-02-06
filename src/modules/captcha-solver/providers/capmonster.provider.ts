@@ -16,12 +16,13 @@ import {
 import { CaptchaSolverConfigService } from '../config';
 
 /**
- * Anti-Captcha provider implementation
+ * CapMonster provider implementation
+ * Uses the same API format as Anti-Captcha but with a different base URL
  * Supports reCAPTCHA v2/v3, hCAPTCHA, and DataDome
  */
 @Injectable()
-export class AntiCaptchaProvider extends BaseCaptchaProvider {
-  private readonly baseUrl = 'https://api.anti-captcha.com';
+export class CapMonsterProvider extends BaseCaptchaProvider {
+  private readonly baseUrl = 'https://api.capmonster.cloud';
 
   constructor(
     httpService: HttpService,
@@ -34,21 +35,21 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
   }
 
   getName(): string {
-    return 'anticaptcha';
+    return 'capmonster';
   }
 
   async isAvailable(): Promise<boolean> {
-    return this.apiKeyManager.isProviderAvailable('anticaptcha');
+    return this.apiKeyManager.isProviderAvailable('capmonster');
   }
 
   protected async solveCaptcha(params: CaptchaParams): Promise<CaptchaSolution> {
-    const apiKey = this.apiKeyManager.getApiKey('anticaptcha');
+    const apiKey = this.apiKeyManager.getApiKey('capmonster');
     if (!apiKey) {
       throw new SolverUnavailableException(
-        'Anti-Captcha API key not available',
-        'anticaptcha',
+        'CapMonster API key not available',
+        'capmonster',
         'api_key_not_configured',
-        { provider: 'anticaptcha' },
+        { provider: 'capmonster' },
       );
     }
 
@@ -62,12 +63,12 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
     const token = await this.getTaskResult(apiKey, taskId);
 
     // Record success
-    await this.apiKeyManager.recordSuccess('anticaptcha', apiKey);
+    await this.apiKeyManager.recordSuccess('capmonster', apiKey);
 
     return {
       token,
       solvedAt: new Date(),
-      solverId: `anticaptcha-${taskId}`,
+      solverId: `capmonster-${taskId}`,
     };
   }
 
@@ -114,7 +115,7 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
         throw new ValidationException(
           `Unsupported captcha type: ${params.type}`,
           [{ field: 'type', message: `Unsupported captcha type: ${params.type}`, code: 'UNSUPPORTED_TYPE' }],
-          { captchaType: params.type, provider: 'anticaptcha' },
+          { captchaType: params.type, provider: 'capmonster' },
         );
     }
 
@@ -149,8 +150,8 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
 
       if (response.errorId !== 0) {
         throw new ProviderException(
-          `Anti-Captcha error: ${response.errorCode} - ${response.errorDescription}`,
-          'anticaptcha',
+          `CapMonster error: ${response.errorCode} - ${response.errorDescription}`,
+          'capmonster',
           response,
           {
             errorCode: response.errorCode,
@@ -163,7 +164,7 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
       return response.taskId;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      await this.apiKeyManager.recordFailure('anticaptcha', apiKey, errorMessage);
+      await this.apiKeyManager.recordFailure('capmonster', apiKey, errorMessage);
       throw error;
     }
   }
@@ -193,7 +194,7 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
 
         if (response.errorId !== 0) {
           throw new Error(
-            `Anti-Captcha error: ${response.errorCode} - ${response.errorDescription}`,
+            `CapMonster error: ${response.errorCode} - ${response.errorDescription}`,
           );
         }
 
@@ -208,20 +209,20 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
 
         throw new ProviderException(
           `Unexpected task status: ${response.status}`,
-          'anticaptcha',
+          'capmonster',
           response,
           { taskId },
         );
       } catch (error: unknown) {
         if (attempt === maxAttempts - 1) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          await this.apiKeyManager.recordFailure('anticaptcha', apiKey, errorMessage);
+          await this.apiKeyManager.recordFailure('capmonster', apiKey, errorMessage);
           if (error instanceof ProviderException || error instanceof NetworkException) {
             throw error;
           }
           throw new ProviderException(
-            `Failed to wait for Anti-Captcha task: ${errorMessage}`,
-            'anticaptcha',
+            `Failed to wait for CapMonster task: ${errorMessage}`,
+            'capmonster',
             undefined,
             { taskId, originalError: errorMessage },
           );
@@ -231,13 +232,13 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
     }
 
     throw new NetworkException(
-      'Timeout waiting for Anti-Captcha task',
+      'Timeout waiting for CapMonster task',
       undefined,
       {
         taskId,
         maxAttempts,
         pollInterval,
-        provider: 'anticaptcha',
+        provider: 'capmonster',
       },
     );
   }
@@ -260,8 +261,8 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
 
     if (response.errorId !== 0) {
       throw new ProviderException(
-        `Anti-Captcha error: ${response.errorCode} - ${response.errorDescription}`,
-        'anticaptcha',
+        `CapMonster error: ${response.errorCode} - ${response.errorDescription}`,
+        'capmonster',
         response,
         {
           errorCode: response.errorCode,
@@ -274,7 +275,7 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
     if (response.status !== 'ready') {
       throw new ProviderException(
         `Task not ready: ${response.status}`,
-        'anticaptcha',
+        'capmonster',
         response,
         { taskId },
       );
@@ -293,15 +294,15 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
     }
 
     throw new ProviderException(
-      'Unable to extract token from Anti-Captcha response',
-      'anticaptcha',
+      'Unable to extract token from CapMonster response',
+      'capmonster',
       response,
       { taskId, solution },
     );
   }
 
   /**
-   * Get Anti-Captcha task type
+   * Get CapMonster task type
    */
   private getTaskType(type: CaptchaParams['type']): string {
     switch (type) {
@@ -317,9 +318,8 @@ export class AntiCaptchaProvider extends BaseCaptchaProvider {
         throw new ValidationException(
           `Unsupported captcha type: ${type}`,
           [{ field: 'type', message: `Unsupported captcha type: ${type}`, code: 'UNSUPPORTED_TYPE' }],
-          { captchaType: type, provider: 'anticaptcha' },
+          { captchaType: type, provider: 'capmonster' },
         );
     }
   }
 }
-

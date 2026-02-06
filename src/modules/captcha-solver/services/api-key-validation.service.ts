@@ -51,11 +51,12 @@ export class ApiKeyValidationService {
           validatedAt: new Date(),
         };
       }
-    } catch (error: any) {
-      this.logger.error(`Error validating 2Captcha key: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error validating 2Captcha key: ${errorMessage}`);
       return {
         isValid: false,
-        error: error.message || 'Network error during validation',
+        error: errorMessage || 'Network error during validation',
         validatedAt: new Date(),
       };
     }
@@ -98,11 +99,12 @@ export class ApiKeyValidationService {
           validatedAt: new Date(),
         };
       }
-    } catch (error: any) {
-      this.logger.error(`Error validating Anti-Captcha key: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error validating Anti-Captcha key: ${errorMessage}`);
       return {
         isValid: false,
-        error: error.message || 'Network error during validation',
+        error: errorMessage || 'Network error during validation',
         validatedAt: new Date(),
       };
     }

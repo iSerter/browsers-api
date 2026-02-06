@@ -11,11 +11,6 @@ import { HumanBehaviorSimulationService } from './services/human-behavior-simula
 import { CaptchaWidgetInteractionService } from './services/captcha-widget-interaction.service';
 import { AudioCaptchaProcessingService } from './services/audio-captcha-processing.service';
 import { ApiKeyValidationService } from './services/api-key-validation.service';
-import {
-  GoogleCloudSpeechProvider,
-  OpenAIWhisperProvider,
-  AzureSpeechProvider,
-} from './services/providers';
 import { ApiKeyManagerService } from './services/api-key-manager.service';
 import { ProviderRegistryService } from './services/provider-registry.service';
 import { CostTrackingService } from './services/cost-tracking.service';
@@ -39,6 +34,8 @@ import { ErrorContextService } from './services/error-context.service';
 import { ErrorAggregationService } from './services/error-aggregation.service';
 import { SsrfProtectionGuard } from './guards/ssrf-protection.guard';
 import { SsrfUrlValidationPipe } from './pipes/ssrf-url-validation.pipe';
+import { CaptchaMetricsService } from './metrics/captcha-metrics.service';
+import { CapMonsterProvider } from './providers';
 
 @Module({
   imports: [
@@ -59,9 +56,6 @@ import { SsrfUrlValidationPipe } from './pipes/ssrf-url-validation.pipe';
     HumanBehaviorSimulationService,
     CaptchaWidgetInteractionService,
     AudioCaptchaProcessingService,
-    GoogleCloudSpeechProvider,
-    OpenAIWhisperProvider,
-    AzureSpeechProvider,
     ApiKeyValidationService,
     ApiKeyManagerService,
     ProviderRegistryService,
@@ -84,6 +78,8 @@ import { SsrfUrlValidationPipe } from './pipes/ssrf-url-validation.pipe';
     ErrorAggregationService,
     SsrfProtectionGuard,
     SsrfUrlValidationPipe,
+    CaptchaMetricsService,
+    CapMonsterProvider,
   ],
   exports: [
     CaptchaSolverService,
@@ -107,6 +103,8 @@ import { SsrfUrlValidationPipe } from './pipes/ssrf-url-validation.pipe';
     DetectionCacheService,
     ErrorContextService,
     ErrorAggregationService,
+    CaptchaMetricsService,
+    CapMonsterProvider,
   ],
 })
 export class CaptchaSolverModule {}

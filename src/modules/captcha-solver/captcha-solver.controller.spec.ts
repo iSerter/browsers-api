@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { CaptchaSolverController } from './captcha-solver.controller';
 import { CaptchaSolverService } from './captcha-solver.service';
 import { ProviderRegistryService } from './services/provider-registry.service';
@@ -41,6 +42,7 @@ describe('CaptchaSolverController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }])],
       controllers: [CaptchaSolverController],
       providers: [
         {
