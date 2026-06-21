@@ -1,0 +1,17 @@
+# Local development overrides — applied automatically by the `docker compose`
+# CLI (e.g. `docker compose up`, or via ./scripts/docker-dev.sh).
+#
+# Publishes container ports to the host so the API, metrics endpoint, and the
+# bundled PostgreSQL are reachable on localhost during development.
+#
+# Coolify (and any `docker compose -f docker-compose.yml ...` invocation) does
+# NOT merge this file, so production stays proxy-only with no host port bindings.
+services:
+  api:
+    ports:
+      - "${PORT:-3333}:${PORT:-3333}"   # HTTP API
+      - "9091:9090"                     # Metrics (host 9091 -> container 9090)
+
+  postgres:
+    ports:
+      - "${DB_FORWARD_PORT:-5432}:5432"

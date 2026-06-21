@@ -27,6 +27,12 @@ Browser Automation API that provides HTTP endpoints for browser tasks using Play
 # Metrics available at http://localhost:9090/metrics
 ```
 
+> The helper script starts a **bundled PostgreSQL** for local development (the
+> `with-db` compose profile) and publishes ports via `docker-compose.override.yml`.
+> In production the bundled database is disabled by default — point `DB_HOST` at
+> your own PostgreSQL. See [Building & Deployment](#building--deployment) and
+> [docs/DOCKER.md](docs/DOCKER.md) for the Coolify / external-database setup.
+
 For detailed Docker setup, see [docs/DOCKER.md](docs/DOCKER.md).
 
 ### Local Development
@@ -572,8 +578,8 @@ See `.env.example` for complete list. Key variables:
 
 **Tests failing with database errors:**
 ```bash
-# Ensure PostgreSQL is running
-docker-compose up -d postgres
+# Ensure the bundled PostgreSQL is running (it lives behind the with-db profile)
+docker compose --profile with-db up -d postgres
 
 # Run migrations
 npm run migration:run

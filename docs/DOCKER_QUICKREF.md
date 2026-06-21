@@ -33,7 +33,11 @@ docker run --rm -p 8080:8080 -e PORT=8080 --env-file ./.env browsers-api:latest
 ### Docker Compose
 
 ```bash
-# Start stack (migrations run automatically on startup)
+# Start app + bundled PostgreSQL (migrations run automatically on startup).
+# The bundled DB is opt-in via the "with-db" profile:
+COMPOSE_PROFILES=with-db docker compose up -d
+
+# App only, against an external DB (set DB_HOST/DB_* first):
 docker compose up -d
 
 # Stop stack
@@ -123,15 +127,19 @@ Key environment variables (see `.env.example`):
 ## Ports
 
 - `3333` - API server (default, configurable via `PORT` env variable)
-- `9090` - Metrics endpoint
-- `5432` - PostgreSQL (when using docker-compose)
+- `9090` - Metrics endpoint (published on host `9091` in local dev)
+- `5432` - PostgreSQL (bundled DB only, with the `with-db` profile)
+
+> Host ports are published only for local development via
+> `docker-compose.override.yml`. Production (base compose only) exposes ports
+> internally and routes through a reverse proxy.
 
 ## Volumes
 
-When using docker-compose:
-- `postgres_data` - Database persistence
-- `./artifacts` - Job artifacts
-- `./screenshots` - Screenshots
+When using docker-compose (named volumes managed by Docker):
+- `postgres_data` - Database persistence (bundled DB)
+- `artifacts` - Job artifacts
+- `screenshots` - Screenshots
 
 ## Health Check
 
@@ -159,11 +167,11 @@ docker run -p 8080:8080 -e PORT=8080 ...
 
 ### Database connection failed
 ```bash
-# Check database is running
-docker compose ps postgres
+# Check the bundled database is running (lives behind the with-db profile)
+docker compose --profile with-db ps postgres
 
 # Check database logs
-docker compose logs postgres
+docker compose --profile with-db logs postgres
 ```
 
 ### Out of memory

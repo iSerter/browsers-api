@@ -56,34 +56,34 @@ docker run --rm browsers-api-test npm test -- test/job-workflow-captcha.e2e-spec
 #### Start Services (PostgreSQL)
 
 ```bash
-# Start PostgreSQL in background
-docker-compose up -d postgres
+# Start PostgreSQL in background (bundled DB lives behind the with-db profile)
+docker compose --profile with-db up -d postgres
 
 # Wait for PostgreSQL to be healthy
-docker-compose ps
+docker compose --profile with-db ps
 ```
 
 #### Run Tests
 
+The `test` and `postgres` services are both gated behind profiles, so enable
+both when running the test stack:
+
 ```bash
 # Run all tests
-docker-compose --profile test run --rm test npm test
+docker compose --profile test --profile with-db run --rm test npm test
 
 # Run E2E tests
-docker-compose --profile test run --rm test npm run test:e2e
+docker compose --profile test --profile with-db run --rm test npm run test:e2e
 
 # Run specific test file
-docker-compose --profile test run --rm test npm test -- test/job-workflow-captcha.e2e-spec.ts
+docker compose --profile test --profile with-db run --rm test npm test -- test/job-workflow-captcha.e2e-spec.ts
 ```
 
 #### Cleanup
 
 ```bash
-# Stop and remove containers
-docker-compose --profile test down
-
-# Stop all services
-docker-compose down
+# Stop and remove all containers (any profile)
+docker compose --profile test --profile with-db down
 ```
 
 ## Dockerfile Stages
@@ -155,8 +155,8 @@ test:
 Make sure PostgreSQL is running and healthy:
 
 ```bash
-docker-compose up -d postgres
-docker-compose ps  # Check health status
+docker compose --profile with-db up -d postgres
+docker compose --profile with-db ps  # Check health status
 ```
 
 ### TypeScript Compilation Errors

@@ -13,17 +13,25 @@
 - Exposes port 3333 for API (configurable via PORT env variable) and includes Prometheus metrics support
 
 #### docker-compose.yml
-- Complete orchestration for local development
+- Orchestration that works for both local development and production (Coolify)
 - **Services**:
-  - `postgres`: PostgreSQL 15 database with health checks
-  - `api`: Browsers API application
+  - `api`: Browsers API application (always runs; ports exposed internally)
+  - `postgres`: PostgreSQL 15 database — **optional**, gated behind the
+    `with-db` compose profile so production can use an external database
+  - `test`: test runner, gated behind the `test` profile
 - **Features**:
-  - Automatic dependency management (API waits for DB)
-  - Volume persistence for database data
-  - Volume mounts for artifacts and screenshots
-  - Complete environment variable configuration
-  - Network isolation
+  - Database readiness handled by the entrypoint (polls `DB_HOST` before
+    running migrations) — no hard `depends_on`, so the optional DB stays optional
+  - Named volumes for database data, artifacts, and screenshots
+  - Fully parameterized environment (`${VAR:-default}`) for platform overrides
+  - No fixed `container_name` or custom networks — the platform (e.g. Coolify's
+    predefined network) manages naming and connectivity
   - Restart policy for production use
+
+#### docker-compose.override.yml
+- Local-development overrides, merged automatically by the `docker compose` CLI
+- Publishes host ports (`3333`, `9091`→9090, `5432`) for localhost access
+- Ignored in production (Coolify runs with an explicit `-f docker-compose.yml`)
 
 #### .dockerignore
 - Optimized to exclude unnecessary files from Docker context
@@ -82,19 +90,14 @@ Quick reference card with:
 
 ### 4. CI/CD Integration ✓
 
-#### .github/workflows/docker-publish.yml
-GitHub Actions workflow for automated builds:
-- Triggers on:
-  - Tag pushes (v*)
-  - Main branch pushes
-  - Pull requests
-- **Features**:
-  - Multi-platform build support via Buildx
-  - Docker Hub authentication
-  - Semantic versioning with multiple tags
-  - Build caching for faster builds
-  - Automatic image labeling
-  - PR validation without pushing
+#### .github/workflows/release-please.yml
+Automated release management via release-please (conventional commits):
+- Maintains a release PR, bumps `package.json`, updates `CHANGELOG.md`
+- Tags releases (`v*`) and creates GitHub Releases
+
+> Docker images are currently built and pushed **manually** — there is no
+> automated image-publishing workflow. Build locally with
+> `docker build -t <user>/browsers-api:<tag> .` and `docker push` when needed.
 
 ### 5. Configuration & Best Practices ✓
 
@@ -102,8 +105,8 @@ GitHub Actions workflow for automated builds:
 - Multi-stage builds for optimized image size
 - Production environment variables properly configured
 - Health checks for container orchestration
-- Volume mounts for data persistence
-- Network isolation for security
+- Named volumes for data persistence
+- Networking delegated to the deployment platform (e.g. Coolify shared network)
 - Resource limits ready for production
 - Secrets management guidelines
 
@@ -112,17 +115,17 @@ GitHub Actions workflow for automated builds:
 ```
 .
 ├── Dockerfile                              # Multi-stage Docker build
-├── docker-compose.yml                      # Local development stack
+├── docker-compose.yml                      # Base stack (production / Coolify)
+├── docker-compose.override.yml             # Local-dev host port publishing
 ├── .dockerignore                           # Build optimization
 ├── scripts/
 │   └── docker-dev.sh                      # Helper script (executable)
 ├── docs/
 │   ├── DOCKER.md                          # Full documentation
-│   ├── DOCKER_QUICKREF.md                 # Quick reference
-│   └── task_docker.md                     # Original plan (preserved)
+│   └── DOCKER_QUICKREF.md                 # Quick reference
 ├── .github/
 │   └── workflows/
-│       └── docker-publish.yml             # CI/CD automation
+│       └── release-please.yml             # Automated releases
 └── README.md                               # Updated with Docker info
 ```
 
@@ -174,23 +177,22 @@ docker push username/browsers-api:v1.0.0
 1. **Review `.env.example`** and create `.env` with actual credentials
 2. **Test locally**: `./scripts/docker-dev.sh start`
 3. **Run migrations**: `./scripts/docker-dev.sh migrate`
-4. **Configure secrets** for CI/CD:
-   - `DOCKER_USERNAME` - Docker Hub username
-   - `DOCKER_PASSWORD` - Docker Hub token/password
-5. **Tag and publish** when ready for deployment
+4. **Deploy** via Coolify (external DB) — see the Production Deployment section
+   of [DOCKER.md](DOCKER.md)
+5. **Build and push images manually** when needed (`docker build` / `docker push`)
 
 ## Key Features Implemented
 
 ✓ Deterministic builds with locked dependencies  
 ✓ Complete local development environment  
 ✓ Production-ready configuration  
-✓ Automated CI/CD pipeline  
+✓ Automated releases (release-please)  
 ✓ Comprehensive documentation  
 ✓ Easy-to-use helper scripts  
 ✓ Health monitoring  
 ✓ Data persistence  
 ✓ Security best practices  
-✓ Docker Hub publishing ready  
+✓ Manual Docker Hub publishing (build & push)  
 
 ## Notes
 
@@ -199,4 +201,4 @@ docker push username/browsers-api:v1.0.0
 - PostgreSQL 15 for production stability
 - All scripts are cross-platform compatible
 - Documentation includes troubleshooting and common issues
-- CI/CD ready with GitHub Actions workflow
+- Releases automated via release-please; image publishing is manual

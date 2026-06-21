@@ -1,141 +1,135 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (OPTIONAL)
+  # ---------------------------------------------------------------------------
+  # This bundled database is DISABLED by default so the app can use an external
+  # PostgreSQL (e.g. a Coolify-managed Postgres service on a shared network).
+  # To run the bundled database instead, enable the "with-db" profile:
+  #   COMPOSE_PROFILES=with-db
+  # (set it in the Coolify environment variables, or `.env` for local runs)
   postgres:
     image: postgres:15-alpine
-    container_name: browsers-api-postgres
+    profiles:
+      - with-db
     environment:
-      POSTGRES_DB: browser_automation
-      POSTGRES_USER: automation_user
-      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: ${DB_DATABASE:-browser_automation}
+      POSTGRES_USER: ${DB_USERNAME:-automation_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password}
     command: >
       postgres
       -c log_min_messages=warning
       -c log_connections=off
       -c log_disconnections=off
-    ports:
-      - "${DB_FORWARD_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U automation_user -d browser_automation"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-automation_user} -d ${DB_DATABASE:-browser_automation}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - browsers-api-network
+    restart: unless-stopped
 
   # Browsers API Application
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: browsers-api
-    ports:
-      - "${PORT:-3333}:${PORT:-3333}"
-      - "9091:9090"  # Metrics port (host:container)
+    # Internal ports only. Coolify's proxy (Traefik) routes your domain to the
+    # app port; nothing is bound to the host, avoiding port conflicts.
+    # Configure the domain + port (3333) in the Coolify UI.
+    expose:
+      - "${PORT:-3333}"   # HTTP API
+      - "9090"            # Prometheus metrics
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3333}
       API_PREFIX: api/v1
-      
+
       # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USERNAME: automation_user
-      DB_PASSWORD: secure_password
-      DB_DATABASE: browser_automation
+      # Point these at your PostgreSQL. To reach an external Coolify Postgres
+      # service, set DB_HOST to that service's name and connect this resource to
+      # the shared/predefined network in the Coolify UI.
+      # The defaults below target the bundled `postgres` service (with-db profile).
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USERNAME: ${DB_USERNAME:-automation_user}
+      DB_PASSWORD: ${DB_PASSWORD:-secure_password}
+      DB_DATABASE: ${DB_DATABASE:-browser_automation}
       DB_POOL_MIN: ${DB_POOL_MIN:-1}  # Reduced to prevent transaction conflicts on startup
       DB_POOL_MAX: ${DB_POOL_MAX:-20}
-      
+
       # Worker Configuration
-      WORKER_POLL_INTERVAL_MS: 1000
-      WORKER_MAX_CONCURRENT_JOBS: 10
-      BROWSER_POOL_MIN_SIZE: 1
-      BROWSER_POOL_MAX_SIZE: 5
-      BROWSER_IDLE_TIMEOUT_MS: 300000
-      
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      WORKER_MAX_CONCURRENT_JOBS: ${WORKER_MAX_CONCURRENT_JOBS:-10}
+      BROWSER_POOL_MIN_SIZE: ${BROWSER_POOL_MIN_SIZE:-1}
+      BROWSER_POOL_MAX_SIZE: ${BROWSER_POOL_MAX_SIZE:-5}
+      BROWSER_IDLE_TIMEOUT_MS: ${BROWSER_IDLE_TIMEOUT_MS:-300000}
+
       # Job Configuration
-      DEFAULT_JOB_TIMEOUT_MS: 30000
-      MAX_JOB_RETRIES: 3
-      JOB_CLEANUP_AFTER_DAYS: 7
-      
+      DEFAULT_JOB_TIMEOUT_MS: ${DEFAULT_JOB_TIMEOUT_MS:-30000}
+      MAX_JOB_RETRIES: ${MAX_JOB_RETRIES:-3}
+      JOB_CLEANUP_AFTER_DAYS: ${JOB_CLEANUP_AFTER_DAYS:-7}
+
       # Storage
-      ARTIFACT_STORAGE_TYPE: filesystem
+      ARTIFACT_STORAGE_TYPE: ${ARTIFACT_STORAGE_TYPE:-filesystem}
       ARTIFACT_STORAGE_PATH: /app/artifacts
-      MAX_ARTIFACT_SIZE_MB: 50
-      
+      MAX_ARTIFACT_SIZE_MB: ${MAX_ARTIFACT_SIZE_MB:-50}
+
       # Playwright
-      PLAYWRIGHT_HEADLESS: "true"
-      PLAYWRIGHT_TIMEOUT_MS: 30000
+      PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-true}
+      PLAYWRIGHT_TIMEOUT_MS: ${PLAYWRIGHT_TIMEOUT_MS:-30000}
       PLAYWRIGHT_SCREENSHOTS_DIR: /app/screenshots
-      
+
+      # Virtual display (needed when running browsers headful)
+      XVFB_ENABLED: ${XVFB_ENABLED:-false}
+
       # Security
-      API_KEY_HEADER: X-API-Key
-      RATE_LIMIT_MAX: 100
-      RATE_LIMIT_WINDOW_MS: 60000
-      
+      API_KEY_HEADER: ${API_KEY_HEADER:-X-API-Key}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+
       # Monitoring
-      ENABLE_METRICS: "true"
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
       METRICS_PORT: 9090
-      LOG_LEVEL: info
-      
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
       # Feature Flags
-      ENABLE_EXECUTE_SCRIPT: "true"
-      
+      ENABLE_EXECUTE_SCRIPT: ${ENABLE_EXECUTE_SCRIPT:-true}
+
       # Proxy Configuration
       DEFAULT_PROXY: ${DEFAULT_PROXY:-}  # Optional: Default proxy for all browsers
-      
+
       # Captcha Solver
       TWOCAPTCHA_API_KEY: ${TWOCAPTCHA_API_KEY:-}
       ANTICAPTCHA_API_KEY: ${ANTICAPTCHA_API_KEY:-}
-      
+
       # Database Migrations
-      RUN_MIGRATIONS: "true"  # Set to "false" to skip automatic migrations on startup
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}  # Set to "false" to skip automatic migrations on startup
     volumes:
-      - ./artifacts:/app/artifacts
-      - ./screenshots:/app/screenshots
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - browsers-api-network
-      - sg-network
+      - artifacts:/app/artifacts
+      - screenshots:/app/screenshots
     restart: unless-stopped
 
-  # Test Service - for running tests in Docker
+  # Test Service - for running tests in Docker (local/CI only, never deployed)
+  # Usage: docker compose --profile test --profile with-db run --rm test npm test
   test:
     build:
       context: .
       dockerfile: Dockerfile
       target: test
-    container_name: browsers-api-test
     environment:
       NODE_ENV: test
-      # Database connection for E2E tests (if needed)
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USERNAME: automation_user
-      DB_PASSWORD: secure_password
-      DB_DATABASE: browser_automation
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USERNAME: ${DB_USERNAME:-automation_user}
+      DB_PASSWORD: ${DB_PASSWORD:-secure_password}
+      DB_DATABASE: ${DB_DATABASE:-browser_automation}
     volumes:
       - .:/app
       - /app/node_modules
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - browsers-api-network
     profiles:
       - test
-    # Override CMD to run specific test command
-    # Usage: docker-compose --profile test run --rm test npm test
-    # Or: docker-compose --profile test run --rm test npm run test:e2e
 
 volumes:
   postgres_data:
-
-networks:
-  browsers-api-network:
-    driver: bridge
-  sg-network:
-    external: true
+  artifacts:
+  screenshots:

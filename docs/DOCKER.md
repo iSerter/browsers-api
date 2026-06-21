@@ -32,22 +32,40 @@ This guide covers Docker containerization for the Browsers API project, includin
 
 2. **Using Docker Commands Directly**
    ```bash
-   # Start with docker-compose (default port 3333)
-   docker-compose up -d
-   
+   # Start the app + bundled PostgreSQL (default port 3333).
+   # The bundled DB is gated behind the "with-db" profile; the helper script
+   # enables it automatically, but with raw compose you opt in explicitly:
+   COMPOSE_PROFILES=with-db docker compose up -d
+
+   # App only, using an external database (set DB_HOST/DB_* first):
+   docker compose up -d
+
    # Start with custom port (set PORT in .env or export before running)
-   PORT=8080 docker-compose up -d
-   
+   PORT=8080 COMPOSE_PROFILES=with-db docker compose up -d
+
    # Stop services
-   docker-compose down
-   
+   docker compose down
+
    # View logs
-   docker-compose logs -f api
+   docker compose logs -f api
    ```
+
+   > Host ports (`3333`, `9091`, `5432`) are published only for local
+   > development, via `docker-compose.override.yml` — which the `docker compose`
+   > CLI merges automatically. Production deployments use the base
+   > `docker-compose.yml` only (no host port bindings; the reverse proxy routes
+   > traffic). See [Production Deployment](#production-deployment).
 
 ## Environment Variables
 
-The application requires the following environment variables. These are configured in `docker-compose.yml` by default, but can be overridden using a `.env` file.
+The application requires the following environment variables. Sensible defaults
+live in `docker-compose.yml`, but every value can be overridden via a `.env`
+file (local) or your platform's environment settings (e.g. Coolify).
+
+> **Database:** the `DB_*` defaults target the bundled `postgres` service. To
+> use an external PostgreSQL, set `DB_HOST` (and the other `DB_*` values) and
+> leave the bundled database disabled (the default — it only starts with the
+> `with-db` compose profile).
 
 ### Required Variables
 
@@ -281,11 +299,15 @@ docker-compose logs api
 
 ### Database Connection Issues
 ```bash
-# Verify database is running
-docker-compose ps postgres
+# Verify the bundled database is running (it lives behind the with-db profile)
+docker compose --profile with-db ps postgres
 
 # Check database health
-docker-compose exec postgres pg_isready -U automation_user
+docker compose --profile with-db exec postgres pg_isready -U automation_user
+
+# Using an external database? Confirm DB_HOST/DB_PORT are reachable from the
+# api container instead:
+docker compose exec api node -e "require('net').connect(Number(process.env.DB_PORT||5432), process.env.DB_HOST).on('connect',()=>{console.log('ok');process.exit(0)}).on('error',e=>{console.error(e.message);process.exit(1)})"
 ```
 
 ### Port Already in Use
@@ -313,6 +335,28 @@ docker-compose exec api npx playwright --version
 ```
 
 ## Production Deployment
+
+In production the `docker-compose.yml` runs **only the `api` service** — the
+bundled PostgreSQL stays disabled (`with-db` profile) and no host ports are
+published (`docker-compose.override.yml` is not merged when you pass an explicit
+`-f`). Provide a database via `DB_*` environment variables and let your reverse
+proxy route to the container's exposed port `3333`.
+
+### Using Coolify (v4)
+
+1. Create a **Docker Compose** resource pointing at this repository.
+2. Set **environment variables**: `DB_HOST`, `DB_PORT`, `DB_USERNAME`,
+   `DB_PASSWORD`, `DB_DATABASE` (your external PostgreSQL), plus any captcha /
+   proxy keys. Leave `COMPOSE_PROFILES` empty to keep the bundled DB off.
+3. Enable **Connect to Predefined Network** so the container can reach your
+   PostgreSQL service (make sure that DB is attached to the same network).
+4. Set the **domain** for the `api` service, mapped to container port `3333`.
+   Coolify's proxy handles TLS and routing — no host port binding required.
+5. Migrations run automatically on boot (`RUN_MIGRATIONS=true`); set it to
+   `false` to manage them manually.
+
+To run the bundled PostgreSQL on the same stack instead of an external one, set
+`COMPOSE_PROFILES=with-db` and keep the default `DB_HOST=postgres`.
 
 ### Using Docker Swarm
 ```bash
@@ -363,36 +407,19 @@ services:
 
 ## CI/CD Integration
 
-### GitHub Actions Example
-```yaml
-name: Build and Push Docker Image
+Image publishing is **manual** — there is no automated Docker build/push
+workflow. Release tagging is handled by `.github/workflows/release-please.yml`
+(conventional commits → version bump, `CHANGELOG.md`, and a `v*` tag). To ship
+an image, build and push it yourself:
 
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/browsers-api:latest
-            ${{ secrets.DOCKER_USERNAME }}/browsers-api:${{ github.ref_name }}
+```bash
+docker build -t <dockerhub-username>/browsers-api:<tag> .
+docker push <dockerhub-username>/browsers-api:<tag>
 ```
+
+If you later want this automated, add a workflow that triggers on `v*` tags and
+runs `docker/build-push-action` with `DOCKER_USERNAME` / `DOCKER_PASSWORD`
+secrets.
 
 ## Helper Scripts
 

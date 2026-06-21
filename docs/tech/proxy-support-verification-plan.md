@@ -5,8 +5,13 @@ This document outlines the steps to build, run, and verify the proxy support imp
 ## Prerequisites
 
 - Docker and Docker Compose installed
-- Access to the `sg-network` Docker network (where Tor proxy is running)
-- Tor proxy container running at `tor_general:9050` on the `sg-network`
+- A shared Docker network that the API container and the Tor proxy both join.
+  The compose files no longer define an `sg-network` — connectivity to other
+  services (such as the Tor proxy) is now provided by the deployment platform
+  (e.g. Coolify's predefined network) or by manually attaching the container to
+  an external network.
+- Tor proxy container reachable at `socks5://tor_general:9050` on that shared
+  network
 - API key for authentication (or create one during setup)
 
 ## Step-by-Step Verification Plan
@@ -38,28 +43,32 @@ docker images | grep browsers-api
 
 #### 1.2 Verify Network Connectivity
 
-Ensure the API container can reach the Tor proxy:
+Ensure the API container shares a network with the Tor proxy. The compose files
+no longer attach to a predefined `sg-network`, so connect the API container to
+the same network as the proxy using one of the following:
 
 ```bash
-# Check if sg-network exists
-docker network ls | grep sg-network
+# Inspect the network the Tor proxy is attached to
+docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' tor_general
 
-# If sg-network doesn't exist, create it (if you have permissions)
-# docker network create sg-network
+# Attach the running API container to that network (replace <network> / <api>)
+docker network connect <network> <api-container>
 ```
 
-**Note:** The `docker-compose.yml` already includes `sg-network` as an external network, so it should be available.
+**Note:** On Coolify, enable **Connect to Predefined Network** for the resource
+so it can reach the proxy service; no `networks:` entry in the compose file is
+required.
 
 ### Phase 2: Database Setup
 
 #### 2.1 Start PostgreSQL (if not already running)
 
 ```bash
-# Start only PostgreSQL
-docker-compose up -d postgres
+# Start only PostgreSQL (bundled DB lives behind the with-db profile)
+docker compose --profile with-db up -d postgres
 
 # Wait for PostgreSQL to be healthy
-docker-compose ps postgres
+docker compose --profile with-db ps postgres
 ```
 
 **Verification:**
@@ -489,8 +498,8 @@ docker-compose exec postgres psql -U automation_user -d browser_automation -c \
 # Verify Tor proxy is accessible from API container
 docker-compose exec api ping -c 1 tor_general
 
-# Check if Tor proxy is on the same network
-docker network inspect sg-network | grep tor_general
+# Check that the API and Tor proxy share a network (replace <network>)
+docker network inspect <network> | grep tor_general
 
 # Test proxy connection manually
 docker-compose exec api curl -x socks5://tor_general:9050 https://httpbin.org/ip

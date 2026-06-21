@@ -21,6 +21,11 @@ else
     exit 1
 fi
 
+# The bundled PostgreSQL is gated behind the "with-db" compose profile so that
+# production deployments (e.g. Coolify) can point at an external database. For
+# local development this helper enables it by default to bring up the full stack.
+export COMPOSE_PROFILES="${COMPOSE_PROFILES:-with-db}"
+
 # Functions
 print_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
