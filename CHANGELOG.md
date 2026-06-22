@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0](https://github.com/iSerter/browsers-api/compare/v0.1.0...v0.2.0) (2026-06-22)
+
+
+### Features
+
+* **auth:** seed default credentials and lock down job & admin APIs ([9276661](https://github.com/iSerter/browsers-api/commit/9276661d2d13fd160f47153606ecd59eccea94d0))
+
 ## 0.1.0 (2026-06-21)
 
 
