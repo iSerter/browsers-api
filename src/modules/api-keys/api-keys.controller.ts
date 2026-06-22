@@ -10,8 +10,10 @@ import {
 import { ApiKeysService } from './api-keys.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { CreateUrlPolicyDto } from './dto/create-url-policy.dto';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
 @Controller('admin/api-keys')
+@UseGuards(AdminGuard)
 export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 

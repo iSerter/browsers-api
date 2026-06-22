@@ -45,6 +45,19 @@ export const validationSchema = Joi.object({
   RATE_LIMIT_WINDOW_MS: Joi.number().default(60000),
   ENABLE_EXECUTE_SCRIPT: Joi.boolean().default(false),
 
+  // Admin API password. Protects the /admin/* endpoints (API-key management).
+  // Fail-closed: when unset/empty, the admin endpoints are disabled (return 503).
+  ADMIN_PASSWORD: Joi.string().optional().allow(''),
+
+  // Default credential seeding (optional). When both are set, an API key with
+  // the given value is created on startup if it does not already exist.
+  SEED_CLIENT_ID: Joi.string().optional().allow(''),
+  SEED_API_KEY: Joi.string()
+    .optional()
+    .allow('')
+    .max(64)
+    .message('SEED_API_KEY must be at most 64 characters'),
+
   // Monitoring
   ENABLE_METRICS: Joi.boolean().default(false),
   METRICS_PORT: Joi.number().default(9090),

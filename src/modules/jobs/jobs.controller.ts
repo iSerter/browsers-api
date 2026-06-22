@@ -24,7 +24,7 @@ import { Request } from 'express';
 import type { Response } from 'express';
 
 @Controller('jobs')
-@UseGuards(ThrottlerGuard)
+@UseGuards(ThrottlerGuard, ApiKeyGuard)
 export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
@@ -32,7 +32,6 @@ export class JobsController {
   ) {}
 
   @Post()
-  @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.CREATED)
   async createJob(@Body() createJobDto: CreateJobDto, @Req() req: any) {
     // Check URL policy

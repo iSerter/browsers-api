@@ -41,6 +41,41 @@ export class ApiKeysService {
     return saved;
   }
 
+  /**
+   * Ensure an API key with the given value exists, creating it only if absent.
+   * Used to seed an operator-controlled default credential at startup.
+   * Idempotent: safe to call on every boot.
+   */
+  async ensureApiKey(params: {
+    clientId: string;
+    key: string;
+    name?: string;
+    rateLimit?: number;
+  }): Promise<{ created: boolean; apiKey: ApiKey }> {
+    const existing = await this.apiKeyRepository.findOne({
+      where: { key: params.key },
+    });
+
+    if (existing) {
+      return { created: false, apiKey: existing };
+    }
+
+    const apiKey = this.apiKeyRepository.create({
+      key: params.key,
+      clientId: params.clientId,
+      name: params.name || 'Seeded default key',
+      rateLimit: params.rateLimit || 100,
+      status: ApiKeyStatus.ACTIVE,
+      isActive: true,
+    });
+
+    const saved = await this.apiKeyRepository.save(apiKey);
+
+    this.logger.log(`Seeded default API key for client: ${params.clientId}`);
+
+    return { created: true, apiKey: saved };
+  }
+
   async validateApiKey(key: string): Promise<ApiKey | null> {
     const apiKey = await this.apiKeyRepository.findOne({
       where: { key, isActive: true, status: ApiKeyStatus.ACTIVE },
