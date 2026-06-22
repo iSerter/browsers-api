@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "browsers-api-collection",
 		"name": "Browsers API",
-		"description": "Complete API collection for the Browser Automation API. Provides HTTP endpoints for browser tasks using Playwright with a producer-consumer pattern.",
+		"description": "Complete API collection for the Browser Automation API. Provides HTTP endpoints for browser tasks using Playwright with a producer-consumer pattern.\n\n**Authentication**\n- Job endpoints (`/api/v1/jobs*`) require an API key: header `X-API-Key: {{apiKey}}` or `Authorization: Bearer {{apiKey}}`.\n- Admin API-key/URL-policy endpoints (`/api/v1/admin/api-keys*`) require the admin password: header `X-Admin-Password: {{adminPassword}}` or `Authorization: Bearer {{adminPassword}}`. Fail-closed: if `ADMIN_PASSWORD` is not configured the server returns 503.\n\nSet the `apiKey` and `adminPassword` collection variables before running requests.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "browsers-api"
 	},
@@ -19,7 +19,8 @@
 								"exec": [
 									"if (pm.response.code === 201) {",
 									"    const jsonData = pm.response.json();",
-									"    pm.collectionVariables.set(\"jobId\", jsonData.id || jsonData.jobId);",
+									"    const data = jsonData.data || jsonData;",
+									"    pm.collectionVariables.set(\"jobId\", data.id || data.jobId);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -39,9 +40,9 @@
 								"type": "text"
 							}
 						],
-					"body": {
-						"mode": "raw",
-						"raw": "{\n  \"browserTypeId\": 1,\n  \"targetUrl\": \"https://example.com\",\n  \"actions\": [\n    {\n      \"action\": \"fill\",\n      \"target\": \"Email address\",\n      \"getTargetBy\": \"getByLabel\",\n      \"value\": \"user@example.com\"\n    },\n    {\n      \"action\": \"click\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\",\n      \"waitForNavigation\": true\n    },\n    {\n      \"action\": \"screenshot\",\n      \"fullPage\": true,\n      \"type\": \"png\"\n    }\n  ],\n  \"waitUntil\": \"networkidle\",\n  \"priority\": 10,\n  \"timeoutMs\": 30000,\n  \"maxRetries\": 3\n}",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"browserTypeId\": 1,\n  \"targetUrl\": \"https://example.com\",\n  \"actions\": [\n    {\n      \"action\": \"fill\",\n      \"target\": \"Email address\",\n      \"getTargetBy\": \"getByLabel\",\n      \"value\": \"user@example.com\"\n    },\n    {\n      \"action\": \"click\",\n      \"target\": \"Submit\",\n      \"getTargetBy\": \"getByText\",\n      \"waitForNavigation\": true\n    },\n    {\n      \"action\": \"screenshot\",\n      \"fullPage\": true,\n      \"type\": \"png\"\n    }\n  ],\n  \"waitUntil\": \"networkidle\",\n  \"priority\": 10,\n  \"timeoutMs\": 30000,\n  \"maxRetries\": 3\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -59,7 +60,7 @@
 								"jobs"
 							]
 						},
-						"description": "Create a new automation job. Requires API key authentication.\n\n**Actions Available:**\n- `fill`: Fill form fields\n- `click`: Click on elements\n- `moveCursor`: Move cursor with human-like movement\n- `scroll`: Scroll page with human-like behavior\n- `screenshot`: Capture screenshots\n- `snapshot`: Capture page state including HTML, metadata, and optional storage data\n\n**Request Parameters:**\n- `browserTypeId`: Integer, min 1 (required)\n- `targetUrl`: Valid URL with protocol (required)\n- `actions`: Array, min 1 item (required)\n- `waitUntil`: Enum (load, domcontentloaded, networkidle) - optional\n- `priority`: Integer, 0-100 - optional\n- `timeoutMs`: Integer, 1000-300000 - optional\n- `maxRetries`: Integer, 0-10 - optional\n\n**Response:** 201 Created with jobId, status, and createdAt"
+						"description": "Create a new automation job. Requires API key authentication.\n\n**Actions Available:**\n- `fill`: Fill form fields\n- `click`: Click on elements\n- `moveCursor`: Move cursor with human-like movement\n- `scroll`: Scroll page with human-like behavior\n- `screenshot`: Capture screenshots\n- `snapshot`: Capture page state including HTML, metadata, and optional storage data\n- `executeScript`: Run JavaScript (disabled unless ENABLE_EXECUTE_SCRIPT=true)\n\n**Request Parameters:**\n- `browserTypeId`: Integer, min 1 (required)\n- `targetUrl`: Valid URL with protocol (required)\n- `actions`: Array, min 1 item (required)\n- `waitUntil`: Enum (load, domcontentloaded, networkidle) - optional\n- `priority`: Integer, 0-100 - optional\n- `timeoutMs`: Integer, 1000-300000 - optional\n- `maxRetries`: Integer, 0-10 - optional\n\n**Response:** 201 Created with jobId, status, and createdAt"
 					},
 					"response": []
 				},
@@ -72,7 +73,8 @@
 								"exec": [
 									"if (pm.response.code === 201) {",
 									"    const jsonData = pm.response.json();",
-									"    pm.collectionVariables.set(\"jobId\", jsonData.id || jsonData.jobId);",
+									"    const data = jsonData.data || jsonData;",
+									"    pm.collectionVariables.set(\"jobId\", data.id || data.jobId);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -146,7 +148,8 @@
 								{
 									"key": "browserTypeId",
 									"value": "1",
-									"description": "Filter by browser type ID"
+									"description": "Filter by browser type ID",
+									"disabled": true
 								},
 								{
 									"key": "page",
@@ -161,16 +164,18 @@
 								{
 									"key": "createdAfter",
 									"value": "",
-									"description": "Filter jobs created after this date (ISO 8601)"
+									"description": "Filter jobs created after this date (ISO 8601)",
+									"disabled": true
 								},
 								{
 									"key": "createdBefore",
 									"value": "",
-									"description": "Filter jobs created before this date (ISO 8601)"
+									"description": "Filter jobs created before this date (ISO 8601)",
+									"disabled": true
 								}
 							]
 						},
-						"description": "List all jobs with optional filtering and pagination."
+						"description": "List all jobs with optional filtering and pagination. Requires API key authentication."
 					},
 					"response": []
 				},
@@ -302,7 +307,7 @@
 					"response": []
 				}
 			],
-			"description": "Job management endpoints for creating, listing, and managing automation jobs."
+			"description": "Job management endpoints for creating, listing, and managing automation jobs. All routes require API key authentication."
 		},
 		{
 			"name": "Actions",
@@ -455,6 +460,145 @@
 			"description": "Worker management and monitoring endpoints."
 		},
 		{
+			"name": "Captcha Solver",
+			"item": [
+				{
+					"name": "Get Providers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/captcha-solver/providers",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"captcha-solver",
+								"providers"
+							]
+						},
+						"description": "List captcha solving providers and their availability."
+					},
+					"response": []
+				},
+				{
+					"name": "Test Captcha",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"recaptcha\",\n  \"version\": \"v2\",\n  \"sitekey\": \"6Le-wvkSAAAAAPBMRTvw0Q4Muexq9bi0DJwx_mJ-\",\n  \"url\": \"https://example.com/login\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/captcha-solver/test",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"captcha-solver",
+								"test"
+							]
+						},
+						"description": "Test captcha solving for a given site.\n\n**Parameters:**\n- `type`: recaptcha | hcaptcha | datadome | funcaptcha (required)\n- `url`: Page URL (required)\n- `sitekey`: Required for reCAPTCHA and hCaptcha\n- `version`: v2 | v3 (required when type=recaptcha)\n- `action`: Required when type=recaptcha and version=v3\n- `proxy`: Optional proxy { type, host, port, username?, password? }\n\nSubject to stricter rate limits and SSRF protection."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Config",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/captcha-solver/config",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"captcha-solver",
+								"config"
+							]
+						},
+						"description": "Get the current captcha solver configuration."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Config",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"key\": \"CAPTCHA_MIN_CONFIDENCE\",\n  \"value\": \"0.7\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/captcha-solver/config",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"captcha-solver",
+								"config"
+							]
+						},
+						"description": "Update a single captcha solver configuration value.\n\n**Parameters:**\n- `key`: Config key name (required)\n- `value`: New value (required)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/captcha-solver/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"captcha-solver",
+								"stats"
+							]
+						},
+						"description": "Get captcha solving usage and cost statistics."
+					},
+					"response": []
+				}
+			],
+			"description": "Captcha solving provider, testing, configuration, and statistics endpoints."
+		},
+		{
 			"name": "Admin",
 			"item": [
 				{
@@ -521,7 +665,7 @@
 					"response": []
 				}
 			],
-			"description": "Administrative endpoints for monitoring and management."
+			"description": "Administrative monitoring endpoints (stats, workers, queue). These are not protected by ADMIN_PASSWORD."
 		},
 		{
 			"name": "API Keys",
@@ -535,9 +679,10 @@
 								"exec": [
 									"if (pm.response.code === 201 || pm.response.code === 200) {",
 									"    const jsonData = pm.response.json();",
-									"    if (jsonData.key) {",
-									"        pm.collectionVariables.set(\"apiKey\", jsonData.key);",
-									"        pm.collectionVariables.set(\"apiKeyId\", jsonData.id);",
+									"    const data = jsonData.data || jsonData;",
+									"    if (data.key) {",
+									"        pm.collectionVariables.set(\"apiKey\", data.key);",
+									"        pm.collectionVariables.set(\"apiKeyId\", data.id);",
 									"    }",
 									"}"
 								],
@@ -551,6 +696,11 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
+							},
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
 							}
 						],
 						"body": {
@@ -574,7 +724,7 @@
 								"api-keys"
 							]
 						},
-						"description": "Create a new API key. The key is returned only once - store it securely!\n\n**Parameters:**\n- `clientId`: Unique client identifier\n- `name`: Descriptive name for the key\n- `rateLimit`: Requests per minute (1-10000, default: 100)\n- `expiresAt`: Optional expiration date"
+						"description": "Create a new API key. The key is returned only once - store it securely!\n\n**Auth:** Requires `X-Admin-Password: {{adminPassword}}` (or Bearer).\n\n**Parameters:**\n- `clientId`: Unique client identifier (required)\n- `name`: Descriptive name for the key (required)\n- `rateLimit`: Requests per minute (1-10000, default: 100)\n- `expiresAt`: Optional expiration date"
 					},
 					"response": []
 				},
@@ -582,7 +732,13 @@
 					"name": "List API Keys",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/api-keys",
 							"host": [
@@ -595,7 +751,7 @@
 								"api-keys"
 							]
 						},
-						"description": "List all API keys (without sensitive key values)."
+						"description": "List all API keys (without sensitive key values). Requires admin password."
 					},
 					"response": []
 				},
@@ -603,7 +759,13 @@
 					"name": "Get API Key by ID",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/api-keys/{{apiKeyId}}",
 							"host": [
@@ -617,7 +779,7 @@
 								"{{apiKeyId}}"
 							]
 						},
-						"description": "Get details about a specific API key."
+						"description": "Get details about a specific API key. Requires admin password."
 					},
 					"response": []
 				},
@@ -625,7 +787,13 @@
 					"name": "Revoke API Key",
 					"request": {
 						"method": "DELETE",
-						"header": [],
+						"header": [
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/api-keys/{{apiKeyId}}",
 							"host": [
@@ -639,7 +807,7 @@
 								"{{apiKeyId}}"
 							]
 						},
-						"description": "Revoke (delete) an API key. This action cannot be undone."
+						"description": "Revoke (delete) an API key. This action cannot be undone. Requires admin password."
 					},
 					"response": []
 				},
@@ -647,7 +815,13 @@
 					"name": "List URL Policies",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/api-keys/url-policies",
 							"host": [
@@ -661,7 +835,7 @@
 								"url-policies"
 							]
 						},
-						"description": "List all URL policies that control which URLs can be accessed."
+						"description": "List all URL policies that control which URLs can be accessed. Requires admin password."
 					},
 					"response": []
 				},
@@ -674,8 +848,9 @@
 								"exec": [
 									"if (pm.response.code === 201 || pm.response.code === 200) {",
 									"    const jsonData = pm.response.json();",
-									"    if (jsonData.id) {",
-									"        pm.collectionVariables.set(\"urlPolicyId\", jsonData.id);",
+									"    const data = jsonData.data || jsonData;",
+									"    if (data.id) {",
+									"        pm.collectionVariables.set(\"urlPolicyId\", data.id);",
 									"    }",
 									"}"
 								],
@@ -689,11 +864,16 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
+							},
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
 							}
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"pattern\": \"https://example.com/**\",\n  \"type\": \"WHITELIST\",\n  \"description\": \"Allow access to example.com and subdomains\",\n  \"isActive\": true\n}",
+							"raw": "{\n  \"pattern\": \"https://example.com/**\",\n  \"type\": \"whitelist\",\n  \"description\": \"Allow access to example.com and subdomains\",\n  \"isActive\": true\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -713,7 +893,7 @@
 								"url-policies"
 							]
 						},
-						"description": "Create a URL policy to control which URLs can be accessed.\n\n**Policy Types:**\n- `WHITELIST`: Only allow URLs matching this pattern\n- `BLACKLIST`: Block URLs matching this pattern\n\n**Parameters:**\n- `pattern`: URL pattern (supports wildcards)\n- `type`: Policy type (WHITELIST or BLACKLIST)\n- `description`: Optional description\n- `isActive`: Whether the policy is active (default: true)"
+						"description": "Create a URL policy to control which URLs can be accessed. Requires admin password.\n\n**Policy Types:**\n- `whitelist`: Only allow URLs matching this pattern\n- `blacklist`: Block URLs matching this pattern (default)\n\n**Parameters:**\n- `pattern`: URL pattern (supports wildcards) (required)\n- `type`: Policy type (whitelist or blacklist)\n- `description`: Optional description\n- `isActive`: Whether the policy is active (default: true)"
 					},
 					"response": []
 				},
@@ -721,7 +901,13 @@
 					"name": "Get URL Policy by ID",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/api-keys/url-policies/{{urlPolicyId}}",
 							"host": [
@@ -736,7 +922,7 @@
 								"{{urlPolicyId}}"
 							]
 						},
-						"description": "Get details about a specific URL policy."
+						"description": "Get details about a specific URL policy. Requires admin password."
 					},
 					"response": []
 				},
@@ -744,7 +930,13 @@
 					"name": "Delete URL Policy",
 					"request": {
 						"method": "DELETE",
-						"header": [],
+						"header": [
+							{
+								"key": "X-Admin-Password",
+								"value": "{{adminPassword}}",
+								"type": "text"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/admin/api-keys/url-policies/{{urlPolicyId}}",
 							"host": [
@@ -759,12 +951,12 @@
 								"{{urlPolicyId}}"
 							]
 						},
-						"description": "Delete a URL policy."
+						"description": "Delete a URL policy. Requires admin password."
 					},
 					"response": []
 				}
 			],
-			"description": "API key and URL policy management endpoints."
+			"description": "API key and URL policy management endpoints. All routes are protected by ADMIN_PASSWORD — send `X-Admin-Password: {{adminPassword}}` (or `Authorization: Bearer {{adminPassword}}`). If ADMIN_PASSWORD is not configured the server returns 503."
 		},
 		{
 			"name": "Health",
@@ -775,17 +967,15 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/health",
+							"raw": "{{baseUrl}}/health",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"api",
-								"v1",
 								"health"
 							]
 						},
-						"description": "Comprehensive health check including database, memory, disk, browser pool, and workers."
+						"description": "Comprehensive health check including database, memory, disk, browser pool, and workers.\n\n**Note:** Served at the host root (no /api/v1 prefix)."
 					},
 					"response": []
 				},
@@ -795,18 +985,16 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/health/ready",
+							"raw": "{{baseUrl}}/health/ready",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"api",
-								"v1",
 								"health",
 								"ready"
 							]
 						},
-						"description": "Readiness probe - checks if the service is ready to accept traffic (database, memory, workers)."
+						"description": "Readiness probe - checks if the service is ready to accept traffic (database, memory, workers). Served at the host root (no /api/v1 prefix)."
 					},
 					"response": []
 				},
@@ -816,23 +1004,21 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/health/live",
+							"raw": "{{baseUrl}}/health/live",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"api",
-								"v1",
 								"health",
 								"live"
 							]
 						},
-						"description": "Liveness probe - checks if the service is alive (basic memory check)."
+						"description": "Liveness probe - checks if the service is alive (basic memory check). Served at the host root (no /api/v1 prefix)."
 					},
 					"response": []
 				}
 			],
-			"description": "Health check endpoints for monitoring and orchestration."
+			"description": "Health check endpoints for monitoring and orchestration. Served at the host root (no /api/v1 prefix)."
 		},
 		{
 			"name": "Metrics",
@@ -851,7 +1037,7 @@
 								"metrics"
 							]
 						},
-						"description": "Get Prometheus-formatted metrics for monitoring.\n\n**Response Format:** Prometheus text format\n\n**Metrics Include:**\n- HTTP request totals by method and route\n- Job totals by status\n- Worker statistics\n- Browser pool metrics\n\n**Note:** This endpoint returns Prometheus-compatible metrics in text format."
+						"description": "Get Prometheus-formatted metrics for monitoring.\n\n**Response Format:** Prometheus text format\n\n**Metrics Include:**\n- HTTP request totals by method and route\n- Job totals by status\n- Worker statistics\n- Browser pool metrics\n\n**Note:** This endpoint returns Prometheus-compatible metrics in text format and is served at the host root (no /api/v1 prefix)."
 					},
 					"response": []
 				}
@@ -891,6 +1077,11 @@
 			"type": "string"
 		},
 		{
+			"key": "adminPassword",
+			"value": "",
+			"type": "string"
+		},
+		{
 			"key": "jobId",
 			"value": "",
 			"type": "string"
@@ -912,4 +1103,3 @@
 		}
 	]
 }
-

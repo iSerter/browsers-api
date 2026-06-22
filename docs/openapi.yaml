@@ -1,0 +1,1508 @@
+openapi: 3.1.0
+info:
+  title: Browsers API
+  version: 1.0.0
+  description: >
+    Browser Automation API exposing HTTP endpoints for browser tasks driven by
+    Playwright. The system follows a producer-consumer pattern: API requests are
+    queued in PostgreSQL and processed asynchronously by browser workers.
+
+
+    ## Conventions
+
+    - **Global prefix:** All application routes are served under `/api/v1`
+      (configurable via `API_PREFIX`). The exceptions are `/health*` and
+      `/metrics`, which are served at the host root (no prefix).
+
+    - **Response envelope:** Every JSON response is wrapped in a standard envelope
+      (`success`, `data`, `error`, `metadata`) by a global interceptor. Binary
+      artifact downloads and the Prometheus `/metrics` endpoint are the
+      exceptions — they return raw bytes/text.
+
+    - **Validation:** Request bodies are validated globally; unknown properties are
+      rejected (`forbidNonWhitelisted`), so only documented fields are accepted.
+
+
+    ## Authentication
+
+    - **Job API (`/api/v1/jobs*`):** Requires a valid API key sent as
+      `X-API-Key: <key>` or `Authorization: Bearer <key>`.
+
+    - **Admin API (`/api/v1/admin/api-keys*`):** Requires the admin password sent
+      as `X-Admin-Password: <password>` or `Authorization: Bearer <password>`.
+      Fail-closed: if `ADMIN_PASSWORD` is not configured the admin endpoints return
+      `503`.
+
+    - All other endpoints (browsers, workers, actions, captcha-solver, admin
+      monitoring, health, metrics) are currently unauthenticated.
+  license:
+    name: UNLICENSED
+
+servers:
+  - url: http://localhost:3333
+    description: Local development
+
+tags:
+  - name: jobs
+    description: Job management (create, list, inspect, cancel, artifacts)
+  - name: admin-api-keys
+    description: API key & URL policy management (admin-password protected)
+  - name: admin-monitoring
+    description: Operational stats, workers, and queue status
+  - name: captcha-solver
+    description: Captcha solving providers, testing, configuration, and stats
+  - name: browsers
+    description: Available browser types
+  - name: workers
+    description: Browser worker status and statistics
+  - name: actions
+    description: Convenience endpoints that create single-action jobs
+  - name: health
+    description: Health, readiness, and liveness probes
+  - name: metrics
+    description: Prometheus metrics
+
+paths:
+  /api/v1:
+    get:
+      tags: [health]
+      summary: Root greeting
+      operationId: getRoot
+      security: []
+      responses:
+        '200':
+          description: Plain greeting string
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/v1/jobs:
+    post:
+      tags: [jobs]
+      summary: Create a new automation job
+      operationId: createJob
+      security:
+        - ApiKeyHeader: []
+        - ApiKeyBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+      responses:
+        '201':
+          description: Job accepted and queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobCreated'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Target URL blocked by a URL policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    get:
+      tags: [jobs]
+      summary: List jobs
+      operationId: listJobs
+      security:
+        - ApiKeyHeader: []
+        - ApiKeyBearer: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: browserTypeId
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: createdAfter
+          in: query
+          required: false
+          description: ISO 8601 date-time lower bound
+          schema:
+            type: string
+            format: date-time
+        - name: createdBefore
+          in: query
+          required: false
+          description: ISO 8601 date-time upper bound
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Paginated list of jobs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Job'
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          limit:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/jobs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [jobs]
+      summary: Get a job by ID
+      operationId: getJob
+      security:
+        - ApiKeyHeader: []
+        - ApiKeyBearer: []
+      responses:
+        '200':
+          description: The job, including browser type and artifact metadata
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [jobs]
+      summary: Cancel a job
+      operationId: cancelJob
+      description: Cancels a pending or processing job.
+      security:
+        - ApiKeyHeader: []
+        - ApiKeyBearer: []
+      responses:
+        '204':
+          description: Job cancelled (no content)
+        '400':
+          description: Job cannot be cancelled (already completed/failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/jobs/{id}/artifacts:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [jobs]
+      summary: List a job's artifacts
+      operationId: getJobArtifacts
+      security:
+        - ApiKeyHeader: []
+        - ApiKeyBearer: []
+      responses:
+        '200':
+          description: Array of artifact metadata objects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobArtifact'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/jobs/{id}/artifacts/{artifactId}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+      - name: artifactId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [jobs]
+      summary: Download an artifact file
+      operationId: downloadArtifact
+      description: >
+        Returns the raw artifact bytes with `Content-Type`,
+        `Content-Disposition`, and `Content-Length` headers set.
+      security:
+        - ApiKeyHeader: []
+        - ApiKeyBearer: []
+      responses:
+        '200':
+          description: Artifact file content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/api-keys:
+    post:
+      tags: [admin-api-keys]
+      summary: Create an API key
+      operationId: createApiKey
+      description: The raw key is returned only once — store it securely.
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKeyRequest'
+      responses:
+        '200':
+          description: API key created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ApiKeyCreated'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+    get:
+      tags: [admin-api-keys]
+      summary: List API keys
+      operationId: listApiKeys
+      description: Returns key metadata only (never the raw key value).
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      responses:
+        '200':
+          description: Array of API key summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiKeySummary'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+
+  /api/v1/admin/api-keys/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [admin-api-keys]
+      summary: Get an API key by ID
+      operationId: getApiKey
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      responses:
+        '200':
+          description: API key record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeySummary'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+    delete:
+      tags: [admin-api-keys]
+      summary: Revoke an API key
+      operationId: revokeApiKey
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      responses:
+        '200':
+          description: API key revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+
+  /api/v1/admin/api-keys/url-policies:
+    get:
+      tags: [admin-api-keys]
+      summary: List URL policies
+      operationId: listUrlPolicies
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      responses:
+        '200':
+          description: Array of URL policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UrlPolicy'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+    post:
+      tags: [admin-api-keys]
+      summary: Create a URL policy
+      operationId: createUrlPolicy
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUrlPolicyRequest'
+      responses:
+        '200':
+          description: URL policy created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UrlPolicy'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+
+  /api/v1/admin/api-keys/url-policies/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [admin-api-keys]
+      summary: Get a URL policy by ID
+      operationId: getUrlPolicy
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      responses:
+        '200':
+          description: URL policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UrlPolicy'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+    delete:
+      tags: [admin-api-keys]
+      summary: Delete a URL policy
+      operationId: deleteUrlPolicy
+      security:
+        - AdminPasswordHeader: []
+        - AdminBearer: []
+      responses:
+        '200':
+          description: URL policy deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/AdminDisabled'
+
+  /api/v1/admin/stats:
+    get:
+      tags: [admin-monitoring]
+      summary: Get aggregate stats
+      operationId: getAdminStats
+      security: []
+      responses:
+        '200':
+          description: Worker and browser-pool stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/admin/workers:
+    get:
+      tags: [admin-monitoring]
+      summary: Get detailed worker info
+      operationId: getAdminWorkers
+      security: []
+      responses:
+        '200':
+          description: Worker details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/admin/queue:
+    get:
+      tags: [admin-monitoring]
+      summary: Get queue / browser-pool status
+      operationId: getAdminQueue
+      security: []
+      responses:
+        '200':
+          description: Queue and pool availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/captcha-solver/providers:
+    get:
+      tags: [captcha-solver]
+      summary: List captcha solving providers
+      operationId: getCaptchaProviders
+      security: []
+      responses:
+        '200':
+          description: Provider availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/captcha-solver/test:
+    post:
+      tags: [captcha-solver]
+      summary: Test captcha solving
+      operationId: testCaptcha
+      description: >
+        Attempts to solve a captcha for the given site. Subject to stricter rate
+        limits and SSRF protection on the supplied URL/proxy.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestCaptchaRequest'
+      responses:
+        '200':
+          description: Solve result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/captcha-solver/config:
+    get:
+      tags: [captcha-solver]
+      summary: Get captcha solver configuration
+      operationId: getCaptchaConfig
+      security: []
+      responses:
+        '200':
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    patch:
+      tags: [captcha-solver]
+      summary: Update a captcha solver configuration value
+      operationId: updateCaptchaConfig
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConfigRequest'
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/captcha-solver/stats:
+    get:
+      tags: [captcha-solver]
+      summary: Get captcha solving usage statistics
+      operationId: getCaptchaStats
+      security: []
+      responses:
+        '200':
+          description: Usage and cost statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/browsers:
+    get:
+      tags: [browsers]
+      summary: List browser types
+      operationId: listBrowsers
+      security: []
+      responses:
+        '200':
+          description: Array of browser types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrowserType'
+
+  /api/v1/browsers/{id}:
+    get:
+      tags: [browsers]
+      summary: Get a browser type by ID
+      operationId: getBrowser
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Browser type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowserType'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/workers:
+    get:
+      tags: [workers]
+      summary: List workers
+      operationId: listWorkers
+      security: []
+      responses:
+        '200':
+          description: Array of workers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/workers/stats:
+    get:
+      tags: [workers]
+      summary: Get worker statistics
+      operationId: getWorkerStats
+      security: []
+      responses:
+        '200':
+          description: Worker statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/actions/screenshot:
+    post:
+      tags: [actions]
+      summary: Create a screenshot job
+      operationId: actionScreenshot
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/actions/visit:
+    post:
+      tags: [actions]
+      summary: Create a visit job
+      operationId: actionVisit
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/actions/form-fill:
+    post:
+      tags: [actions]
+      summary: Create a form-fill job
+      operationId: actionFormFill
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/actions/extract:
+    post:
+      tags: [actions]
+      summary: Create an extract job
+      operationId: actionExtract
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/v1/actions/pdf:
+    post:
+      tags: [actions]
+      summary: Create a PDF job
+      operationId: actionPdf
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /health:
+    get:
+      tags: [health]
+      summary: Full health check
+      operationId: healthCheck
+      description: >
+        Served at the host root (no `/api/v1` prefix). Checks database, memory,
+        disk, browser pool, and workers.
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResult'
+        '503':
+          description: One or more health indicators failing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResult'
+
+  /health/ready:
+    get:
+      tags: [health]
+      summary: Readiness probe
+      operationId: healthReady
+      security: []
+      responses:
+        '200':
+          description: Ready to accept traffic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResult'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResult'
+
+  /health/live:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      operationId: healthLive
+      security: []
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResult'
+        '503':
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResult'
+
+  /metrics:
+    get:
+      tags: [metrics]
+      summary: Prometheus metrics
+      operationId: getMetrics
+      description: Served at the host root (no `/api/v1` prefix).
+      security: []
+      responses:
+        '200':
+          description: Metrics in Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for job endpoints.
+    ApiKeyBearer:
+      type: http
+      scheme: bearer
+      description: API key supplied as a Bearer token (alternative to X-API-Key).
+    AdminPasswordHeader:
+      type: apiKey
+      in: header
+      name: X-Admin-Password
+      description: Admin password for `/admin/api-keys*` endpoints.
+    AdminBearer:
+      type: http
+      scheme: bearer
+      description: Admin password supplied as a Bearer token (alternative to X-Admin-Password).
+
+  parameters:
+    JobId:
+      name: id
+      in: path
+      required: true
+      description: Job UUID
+      schema:
+        type: string
+        format: uuid
+    UuidId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    AdminUnauthorized:
+      description: Missing or invalid admin credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    AdminDisabled:
+      description: Admin API disabled (ADMIN_PASSWORD not configured)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+
+  schemas:
+    ApiResponse:
+      type: object
+      description: Standard response envelope applied to all JSON responses.
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+          description: Endpoint-specific payload (null on error).
+        error:
+          nullable: true
+          $ref: '#/components/schemas/ErrorObject'
+        metadata:
+          $ref: '#/components/schemas/ResponseMetadata'
+      required: [success]
+
+    ErrorObject:
+      type: object
+      nullable: true
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        stack:
+          type: string
+          description: Present only in development.
+
+    ResponseMetadata:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: 1.0.0
+        requestId:
+          type: string
+          description: Correlation ID echoed from X-Request-Id.
+
+    JobStatus:
+      type: string
+      enum: [pending, processing, completed, failed, cancelled]
+
+    WaitUntil:
+      type: string
+      enum: [load, domcontentloaded, networkidle]
+
+    ActionType:
+      type: string
+      enum:
+        - click
+        - fill
+        - scroll
+        - moveCursor
+        - screenshot
+        - visit
+        - extract
+        - pdf
+        - snapshot
+        - executeScript
+
+    GetTargetBy:
+      type: string
+      enum: [getByLabel, getByText, getByRole, getBySelector, getByPlaceholder]
+
+    CreateJobRequest:
+      type: object
+      required: [browserTypeId, targetUrl, actions]
+      properties:
+        browserTypeId:
+          type: integer
+          minimum: 1
+        targetUrl:
+          type: string
+          format: uri
+          description: Target URL including protocol.
+        actions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ActionConfig'
+        waitUntil:
+          $ref: '#/components/schemas/WaitUntil'
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 100
+        timeoutMs:
+          type: integer
+          minimum: 1000
+          maximum: 300000
+        maxRetries:
+          type: integer
+          minimum: 0
+          maximum: 10
+        proxy:
+          $ref: '#/components/schemas/JobProxyConfig'
+        captcha:
+          $ref: '#/components/schemas/CaptchaConfig'
+        browserStorage:
+          $ref: '#/components/schemas/BrowserStorage'
+
+    ActionConfig:
+      type: object
+      required: [action]
+      description: >
+        A single browser action. Most fields are conditional on the action type;
+        only `action` is always required.
+      properties:
+        action:
+          $ref: '#/components/schemas/ActionType'
+        target:
+          type: string
+          description: CSS selector or locator text.
+        getTargetBy:
+          $ref: '#/components/schemas/GetTargetBy'
+        value:
+          type: string
+        attribute:
+          type: string
+        multiple:
+          type: boolean
+        index:
+          type: integer
+          minimum: 0
+        button:
+          type: string
+          enum: [left, right, middle]
+        clickCount:
+          type: integer
+          minimum: 1
+        waitForNavigation:
+          type: boolean
+        fullPage:
+          type: boolean
+        type:
+          type: string
+          enum: [png, jpeg]
+        quality:
+          type: integer
+          minimum: 0
+          maximum: 100
+        targetY:
+          type: number
+          minimum: 0
+        speed:
+          type: number
+        variance:
+          type: number
+          minimum: 0
+          maximum: 1
+        stepMin:
+          type: number
+        stepMax:
+          type: number
+        pauseChance:
+          type: number
+          minimum: 0
+          maximum: 1
+        jitter:
+          type: number
+        overshoot:
+          type: number
+        minPauseMs:
+          type: number
+        maxPauseMs:
+          type: number
+        stepsMin:
+          type: number
+        stepsMax:
+          type: number
+        padding:
+          type: number
+        typingDelay:
+          type: number
+        typingDelayMin:
+          type: number
+        typingDelayMax:
+          type: number
+        extractors:
+          type: object
+          additionalProperties: true
+        pdfFormat:
+          type: string
+        printBackground:
+          type: boolean
+        margin:
+          type: object
+          additionalProperties: true
+        snapshotConfig:
+          $ref: '#/components/schemas/SnapshotConfig'
+        script:
+          type: string
+          description: JavaScript to run (executeScript; disabled unless ENABLE_EXECUTE_SCRIPT=true).
+
+    SnapshotConfig:
+      type: object
+      properties:
+        cookies:
+          type: boolean
+          default: false
+        localStorage:
+          type: boolean
+          default: false
+        sessionStorage:
+          type: boolean
+          default: false
+
+    JobProxyConfig:
+      type: object
+      required: [server]
+      properties:
+        server:
+          type: string
+          pattern: '^(https?|socks5)://.+'
+          description: Proxy URL (http://, https://, or socks5://).
+        username:
+          type: string
+        password:
+          type: string
+
+    CaptchaConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        preferredProvider:
+          type: string
+          example: 2captcha
+        solverPriority:
+          type: array
+          items:
+            type: string
+          default: [native, 2captcha, anticaptcha]
+        enableThirdPartyFallback:
+          type: boolean
+          default: true
+        minConfidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.5
+        maxRetries:
+          type: object
+          additionalProperties:
+            type: number
+        timeouts:
+          type: object
+          additionalProperties:
+            type: number
+
+    BrowserStorage:
+      type: object
+      properties:
+        cookies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cookie'
+        localStorage:
+          type: object
+          additionalProperties:
+            type: string
+        sessionStorage:
+          type: object
+          additionalProperties:
+            type: string
+
+    Cookie:
+      type: object
+      required: [name, value, domain]
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        domain:
+          type: string
+        path:
+          type: string
+        secure:
+          type: boolean
+        httpOnly:
+          type: boolean
+        expires:
+          type: number
+          description: Unix timestamp (seconds).
+        sameSite:
+          type: string
+          enum: [Strict, Lax, None]
+
+    JobCreated:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        createdAt:
+          type: string
+          format: date-time
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        browserTypeId:
+          type: integer
+        targetUrl:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        priority:
+          type: integer
+        retryCount:
+          type: integer
+        result:
+          nullable: true
+          description: Action results once completed.
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobArtifact'
+
+    JobArtifact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        jobId:
+          type: string
+          format: uuid
+        artifactType:
+          type: string
+          example: screenshot
+        filePath:
+          type: string
+        mimeType:
+          type: string
+          example: image/png
+        sizeBytes:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateApiKeyRequest:
+      type: object
+      required: [clientId, name]
+      properties:
+        clientId:
+          type: string
+        name:
+          type: string
+        rateLimit:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 100
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ApiKeyCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          description: The raw API key — shown only once.
+        clientId:
+          type: string
+        name:
+          type: string
+        rateLimit:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        message:
+          type: string
+
+    ApiKeySummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+        name:
+          type: string
+        rateLimit:
+          type: integer
+        status:
+          type: string
+          enum: [active, revoked]
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateUrlPolicyRequest:
+      type: object
+      required: [pattern]
+      properties:
+        pattern:
+          type: string
+          description: URL pattern (supports `*` wildcards).
+        type:
+          type: string
+          enum: [whitelist, blacklist]
+          default: blacklist
+        description:
+          type: string
+        isActive:
+          type: boolean
+          default: true
+
+    UrlPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        pattern:
+          type: string
+        type:
+          type: string
+          enum: [whitelist, blacklist]
+        description:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    TestCaptchaRequest:
+      type: object
+      required: [type, url]
+      properties:
+        type:
+          type: string
+          enum: [recaptcha, hcaptcha, datadome, funcaptcha]
+        sitekey:
+          type: string
+          description: Required for reCAPTCHA and hCaptcha.
+        url:
+          type: string
+          format: uri
+        version:
+          type: string
+          enum: [v2, v3]
+          description: Required when type=recaptcha.
+        action:
+          type: string
+          description: Required when type=recaptcha and version=v3.
+        proxy:
+          $ref: '#/components/schemas/CaptchaProxyConfig'
+
+    CaptchaProxyConfig:
+      type: object
+      required: [type, host, port]
+      properties:
+        type:
+          type: string
+          enum: [http, https, socks4, socks5]
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+        password:
+          type: string
+
+    UpdateConfigRequest:
+      type: object
+      required: [key, value]
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+
+    BrowserType:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        engine:
+          type: string
+          example: chromium
+        isActive:
+          type: boolean
+
+    HealthResult:
+      type: object
+      description: NestJS Terminus health-check result.
+      properties:
+        status:
+          type: string
+          example: ok
+        info:
+          type: object
+          additionalProperties: true
+        error:
+          type: object
+          additionalProperties: true
+        details:
+          type: object
+          additionalProperties: true

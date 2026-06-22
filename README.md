@@ -563,6 +563,28 @@ See `.env.example` for complete list. Key variables:
 - `NODE_ENV` - Environment (development/production/test)
 - `LOG_LEVEL` - Logging level (debug/info/warn/error)
 
+**Authentication:**
+- `API_KEY_HEADER` - Header used to pass the API key (default: `X-API-Key`)
+- `ADMIN_PASSWORD` - Optional. Password protecting the `/admin/*` endpoints (API-key management)
+- `SEED_CLIENT_ID` - Optional. Client ID for a default credential seeded at startup
+- `SEED_API_KEY` - Optional. API key value (max 64 chars) for the seeded credential
+
+> **Job API:** All `/api/v1/jobs*` endpoints require a valid API key, sent as
+> `X-API-Key: <key>` or `Authorization: Bearer <key>`.
+>
+> **Admin API:** The `/admin/*` endpoints (create/list/revoke API keys, URL
+> policies) are protected by `ADMIN_PASSWORD`, sent as `X-Admin-Password: <value>`
+> or `Authorization: Bearer <value>`. This is **fail-closed**: if `ADMIN_PASSWORD`
+> is unset/empty the admin endpoints are disabled and return `503`. Combine this
+> with credential seeding below so a fresh deployment is usable without ever
+> opening the admin API.
+>
+> **Credential seeding:** When **both** `SEED_CLIENT_ID` and `SEED_API_KEY` are
+> set, an API key with that exact value is created on first startup if it does not
+> already exist (idempotent — safe across restarts). This lets a fresh deployment
+> be used immediately without a manual `POST /admin/api-keys` call. Use
+> high-entropy values in production and rotate keys via the `/admin/api-keys` API.
+
 **Browser:**
 - `PLAYWRIGHT_HEADLESS` - Run browsers headless (true/false)
 - `BROWSER_POOL_MIN_SIZE` - Minimum browsers in pool
@@ -608,6 +630,8 @@ docker build --no-cache -t browsers-api:latest .
 ## Additional Resources
 
 - **Documentation:**
+  - [OpenAPI Spec](docs/openapi.yaml) (also served live at `/api/docs`)
+  - [Postman Collection](Browsers-API.postman_collection.json)
   - [API Reference](docs/tech/05-api-reference.md)
   - [Docker Guide](docs/DOCKER.md)
   - [Kubernetes Guide](docs/KUBERNETES.md)
