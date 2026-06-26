@@ -122,7 +122,7 @@ describe('CaptchaSolverService', () => {
       expect(mockConfigRepository.find).toHaveBeenCalled();
     });
 
-    it('should throw error in production when no providers available', async () => {
+    it('should not throw in production when no providers available, but stay disabled', async () => {
       // Arrange
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
@@ -130,16 +130,15 @@ describe('CaptchaSolverService', () => {
       mockConfigRepository.find.mockResolvedValue([]);
       mockApiKeyManager.getAvailableProviders.mockReturnValue([]);
 
-      // Act & Assert
-      await expect(service.onModuleInit()).rejects.toThrow(
-        'No captcha solver providers are available',
-      );
+      // Act & Assert - should not crash the app on startup
+      await expect(service.onModuleInit()).resolves.toBeUndefined();
+      expect(service.isAvailable()).toBe(false);
 
       // Cleanup
       process.env.NODE_ENV = originalEnv;
     });
 
-    it('should log error but not throw in development when no providers', async () => {
+    it('should not throw in development when no providers, and stay disabled', async () => {
       // Arrange
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
@@ -150,8 +149,9 @@ describe('CaptchaSolverService', () => {
       // Act
       await service.onModuleInit();
 
-      // Assert - should not throw
+      // Assert - should not throw and remain disabled
       expect(service).toBeDefined();
+      expect(service.isAvailable()).toBe(false);
 
       // Cleanup
       process.env.NODE_ENV = originalEnv;

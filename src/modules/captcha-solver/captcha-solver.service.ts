@@ -28,6 +28,9 @@ export class CaptchaSolverService implements OnModuleInit {
   private readonly logger = new Logger(CaptchaSolverService.name);
   private configuration: CaptchaSolverConfiguration = {};
 
+  /** Whether at least one captcha solver provider is configured/available */
+  private available = false;
+
   /** In-memory config cache with TTL */
   private configCache: { data: CaptchaSolverConfig[]; expiresAt: number } | null = null;
   private readonly CONFIG_CACHE_TTL_MS = 60000; // 60 seconds
@@ -185,19 +188,21 @@ export class CaptchaSolverService implements OnModuleInit {
       }
     }
 
-    // Ensure at least one provider is available
+    // Check whether at least one provider is available. Having no providers
+    // is not a fatal error: the captcha solver simply stays disabled until an
+    // API key is configured. Runtime calls (e.g. solveWithFallback) still throw
+    // SolverUnavailableException if invoked while no providers are available.
     const availableProviders = this.apiKeyManager.getAvailableProviders();
     if (availableProviders.length === 0) {
-      throw new SolverUnavailableException(
-        'No captcha solver providers are available. Please configure at least one API key.',
-        'provider',
-        'no_providers_configured',
-        {
-          preferredProvider: this.configuration.preferredProvider,
-        },
+      this.available = false;
+      this.logger.warn(
+        'No captcha solver providers are configured. Captcha solving is disabled. ' +
+          'Configure at least one provider API key to enable it.',
       );
+      return;
     }
 
+    this.available = true;
     this.logger.log(
       `Available providers: ${availableProviders.join(', ')}`,
     );
@@ -241,6 +246,14 @@ export class CaptchaSolverService implements OnModuleInit {
    */
   getAvailableProviders(): string[] {
     return this.apiKeyManager.getAvailableProviders();
+  }
+
+  /**
+   * Whether the captcha solver is enabled (at least one provider configured).
+   * When false, the service is silently disabled and solve calls will fail.
+   */
+  isAvailable(): boolean {
+    return this.available;
   }
 
   /**
