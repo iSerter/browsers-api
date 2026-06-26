@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1](https://github.com/iSerter/browsers-api/compare/v0.2.0...v0.2.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* **captcha-solver:** update error handling for provider availability ([8ac6693](https://github.com/iSerter/browsers-api/commit/8ac669322f6a045d2dcd85a28792558a4a66adb9))
+
 ## [0.2.0](https://github.com/iSerter/browsers-api/compare/v0.1.0...v0.2.0) (2026-06-22)
 
 
