@@ -21,35 +21,38 @@ export class CaptchaSolverApiKey {
   @Index()
   provider: string;
 
-  @Column({ type: 'text' })
+  @Column({ name: 'api_key', type: 'text' })
   apiKey: string;
 
+  // Stored as VARCHAR(20) with a CHECK constraint by the migration (not a native
+  // pg enum), so map it to varchar to keep the entity in sync with the schema.
   @Column({
-    type: 'enum',
-    enum: ApiKeyHealthStatus,
+    name: 'health_status',
+    type: 'varchar',
+    length: 20,
     default: ApiKeyHealthStatus.UNKNOWN,
   })
   healthStatus: ApiKeyHealthStatus;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'last_successful_use', type: 'timestamp', nullable: true })
   lastSuccessfulUse: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'last_failure', type: 'timestamp', nullable: true })
   lastFailure: Date | null;
 
-  @Column({ default: 0 })
+  @Column({ name: 'consecutive_failures', default: 0 })
   consecutiveFailures: number;
 
-  @Column({ default: 0 })
+  @Column({ name: 'total_uses', default: 0 })
   totalUses: number;
 
-  @Column({ default: 0 })
+  @Column({ name: 'total_failures', default: 0 })
   totalFailures: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'last_validation_error', type: 'text', nullable: true })
   lastValidationError: string | null;
 
-  @Column({ default: true })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
