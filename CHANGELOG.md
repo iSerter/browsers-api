@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3](https://github.com/iSerter/browsers-api/compare/v0.2.2...v0.2.3) (2026-06-27)
+
+
+### Bug Fixes
+
+* correct healthcheck path and align health/metrics docs to /api/v1 prefix ([58110ad](https://github.com/iSerter/browsers-api/commit/58110ad1496a76e196de1253ab8880443e5f1245))
+* **health:** update Docker HEALTHCHECK command for improved reliability ([e81a1ca](https://github.com/iSerter/browsers-api/commit/e81a1ca86aec295153e4bdb2bd4ddb5830ecc4e4))
+
 ## [0.2.2](https://github.com/iSerter/browsers-api/compare/v0.2.1...v0.2.2) (2026-06-27)
 
 
