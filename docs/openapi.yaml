@@ -10,9 +10,8 @@ info:
 
     ## Conventions
 
-    - **Global prefix:** All application routes are served under `/api/v1`
-      (configurable via `API_PREFIX`). The exceptions are `/health*` and
-      `/metrics`, which are served at the host root (no prefix).
+    - **Global prefix:** All application routes — including `/health*` and
+      `/metrics` — are served under `/api/v1` (configurable via `API_PREFIX`).
 
     - **Response envelope:** Every JSON response is wrapped in a standard envelope
       (`success`, `data`, `error`, `metadata`) by a global interceptor. Binary
@@ -798,14 +797,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
 
-  /health:
+  /api/v1/health:
     get:
       tags: [health]
       summary: Full health check
       operationId: healthCheck
       description: >
-        Served at the host root (no `/api/v1` prefix). Checks database, memory,
-        disk, browser pool, and workers.
+        Checks database, memory, disk, browser pool, and workers.
       security: []
       responses:
         '200':
@@ -821,7 +819,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResult'
 
-  /health/ready:
+  /api/v1/health/ready:
     get:
       tags: [health]
       summary: Readiness probe
@@ -841,7 +839,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResult'
 
-  /health/live:
+  /api/v1/health/live:
     get:
       tags: [health]
       summary: Liveness probe
@@ -861,12 +859,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResult'
 
-  /metrics:
+  /api/v1/metrics:
     get:
       tags: [metrics]
       summary: Prometheus metrics
       operationId: getMetrics
-      description: Served at the host root (no `/api/v1` prefix).
       security: []
       responses:
         '200':

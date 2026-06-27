@@ -79,11 +79,11 @@ async function bootstrap() {
     'Bootstrap',
   );
   logger.log(
-    `Health check available at: http://localhost:${port}/health`,
+    `Health check available at: http://localhost:${port}/${apiPrefix}/health`,
     'Bootstrap',
   );
   logger.log(
-    `Metrics available at: http://localhost:${port}/metrics`,
+    `Metrics available at: http://localhost:${port}/${apiPrefix}/metrics`,
     'Bootstrap',
   );
   logger.log(
