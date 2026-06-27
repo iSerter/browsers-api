@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2](https://github.com/iSerter/browsers-api/compare/v0.2.1...v0.2.2) (2026-06-27)
+
+
+### Bug Fixes
+
+* **captcha-solver:** map api-key entity columns to snake_case schema ([1dba031](https://github.com/iSerter/browsers-api/commit/1dba0316130e0c41a6340f0f5cc30aa6806b65aa))
+* **health:** use realistic memory thresholds for browser service ([170d690](https://github.com/iSerter/browsers-api/commit/170d690b12ea13d3fab5207ae6328909a473bbc1))
+
 ## [0.2.1](https://github.com/iSerter/browsers-api/compare/v0.2.0...v0.2.1) (2026-06-26)
 
 
