@@ -88,9 +88,12 @@ RUN chmod +x docker-entrypoint.sh
 # Expose application port (configurable via PORT env variable, default: 3333)
 EXPOSE 3333
 
-# Health check (uses PORT env variable)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "const port = process.env.PORT || 3333; require('http').get(`http://localhost:${port}/api/v1/health`, (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+# Health check (uses PORT env variable).
+# Exec-form CMD (JSON array) so /bin/sh does NOT interpret the backticks/`${port}`
+# — Node reads process.env.PORT itself. `/health` is served at the host root with
+# NO /api/v1 prefix (see docs/openapi.yaml), so do not prefix it here.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD ["node", "-e", "require('http').get('http://localhost:'+(process.env.PORT||3333)+'/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 
 # Run the application via entrypoint script (handles Xvfb startup)
 CMD ["./docker-entrypoint.sh"]
